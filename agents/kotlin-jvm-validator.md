@@ -112,7 +112,8 @@ Structure, the required fields of a case, and the two rules that make a case exe
 2. **Build step**: Gradle `./gradlew --console=plain build -x test` (or `assemble` when the project has no `build` lifecycle task); Maven `mvn -B -DskipTests verify`; Amper `./amper build`. Capture full stdout+stderr into `Validation.md ## Build Log`. Non-zero exit → FAILED; first 3 `e: ` / `error:` lines into the digest.
 3. **Test step**: Gradle `./gradlew --console=plain test` — plus every test task the module declares beyond `test` (`integrationTest`, `allTests`), found with `./gradlew tasks --all | grep -i test`; Maven `mvn -B verify`; Amper `./amper test`. Capture into `## Test Log`; read results per `## Reading Gradle Output`.
 4. **Drive step**: never. Every profile row that calls for driving the app is deferred: the case goes to `ManualChecks.md`, its title to `manual_checks:` in the return, the matching `OpsChecklist.md` item to Pending. For BUG, `reproduction_status: deferred-manual`.
-5. Leave the tree clean: no `--rerun-tasks` leftovers, no modified `gradle.properties`.
+5. **Environment-bound test tasks**: a task step 3 discovers that needs an environment you do not have — a device or emulator (`connected*AndroidTest`), a Docker daemon (a Testcontainers-backed suite) — is deferred exactly like a drive step, on every profile: reported under `## Scope`, its case written into `ManualChecks.md`, never run to a FAILED.
+6. Leave the tree clean: no `--rerun-tasks` leftovers, no modified `gradle.properties`.
 
 ## Reading Gradle Output
 
@@ -138,6 +139,37 @@ attempt 3: FAILED — <assertion>
 A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain cleanTest test --tests '<FQCN>.<method>'`.
 
 Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timing-dependent assertion, shared mutable state, missing isolation, `Instant.now()` / `UUID.randomUUID()` in the production path).
+
+## Skills Reference (kotlin-platform)
+
+For **classification of observed failures only** — never to propose fixes.
+
+- `concurrency-coroutines` — when a failure looks like a race or a cancellation symptom, this skill helps you describe the symptom precisely in `Failures`.
+- `error-architecture` — to recognize the difference between a domain error surfacing correctly (PASSED with expected error path) and an exception leaking (FAILED).
+- `persistence-migrations` — when a failure is migration-shaped (a Room or SQLDelight schema mismatch, a Flyway checksum), note that in the failure entry.
+- `net-architecture` — when a failure points at networking layer behavior (timeouts, retries, decoding).
+
+## Skills Reference (core)
+
+- `spine-toolkit:ops-checklist` — the cross-cutting checklist you produce as `OpsChecklist.md` in the task folder. Mark each item Applicable (with concrete evidence: file path, test name, commit ref), N/A (with reason), or Pending. **Pending is NOT itself a FAILED verdict** — Pending items are surfaced to the Review stage for explicit user accept/defer.
+- `spine-toolkit:manual-checks` — the hand-run script you produce as `ManualChecks.md`. It holds the artifact's structure, the required fields of a case, and the two rules that decide whether a case is executable; it also says what `Plan.md ## Manual acceptance` feeds into it.
+- `spine-toolkit:feature-landscape` — for the REFACTOR profile, the `## Landscape (current)` vs `## Landscape (target)` sections in Research.md tell you what behavior MUST stay identical and what is allowed to change structurally. A regression against the current landscape is a finding — note it in `Failures`.
+- `spine-toolkit:feature-requirements` — for the BUG profile, the Secondary table in Reproduce.md / Research.md scopes which `spine-toolkit:ops-checklist` categories you re-verify. BUG validation does not require full-checklist coverage — only the categories the bug touched.
+
+## Related Agents (kotlin-platform)
+
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins. You invoke none of them: after a FAILED validation the orchestrator returns control to the profile's Execute/Fix agent, and this list is here so your report names the right one.
+
+- `kotlin-platform:kotlin-compose-developer` — Execute/Fix for FEATURE and BUG on Android and Desktop
+- `kotlin-platform:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI
+- `kotlin-platform:kotlin-kmp-developer` — Execute/Fix for FEATURE and BUG on KMP, and the bare developer row
+- `kotlin-platform:kotlin-refactorer` — the Refactor stage for REFACTOR
+- `kotlin-platform:kotlin-jvm-tester` — the Write stage for TEST, and the bare tester row
+- `kotlin-platform:kotlin-ui-tester` — the Write stage for TEST on Android and Desktop
+- `kotlin-platform:kotlin-server-tester` — the Write stage for TEST on Server and CLI
+- `kotlin-platform:kotlin-kmp-tester` — the Write stage for TEST on KMP
+- `kotlin-platform:kotlin-ui-validator` — the sibling that can drive: an emulator or a desktop window
+- `kotlin-platform:kotlin-server-validator` — the sibling that can drive: a running server or CLI process
 
 ## Output Structure
 
@@ -169,6 +201,8 @@ Semantics:
 ## Summary
 1–2 sentences: what was validated, with which build tool and which tasks, top-level outcome.
 The first sentence names the deviation: nothing was driven, and the drive checks are deferred.
+Name the sibling that could have driven it (kotlin-platform:kotlin-ui-validator for Android,
+Desktop or KMP; kotlin-platform:kotlin-server-validator for Server or CLI).
 
 ## Scope
 What the validation covered (modules, build tool, test tasks) and what it could not — every deferred drive step, by name.
@@ -231,44 +265,13 @@ Rules:
 
 The caller (orchestrator) treats your return as authoritative — never embellish a partial run as PASSED.
 
-## Skills Reference (kotlin-platform)
-
-For **classification of observed failures only** — never to propose fixes.
-
-- `concurrency-coroutines` — when a failure looks like a race or a cancellation symptom, this skill helps you describe the symptom precisely in `Failures`.
-- `error-architecture` — to recognize the difference between a domain error surfacing correctly (PASSED with expected error path) and an exception leaking (FAILED).
-- `persistence-migrations` — when a failure is migration-shaped (a Room or SQLDelight schema mismatch, a Flyway checksum), note that in the failure entry.
-- `net-architecture` — when a failure points at networking layer behavior (timeouts, retries, decoding).
-
-## Skills Reference (core)
-
-- `spine-toolkit:ops-checklist` — the cross-cutting checklist you produce as `OpsChecklist.md` in the task folder. Mark each item Applicable (with concrete evidence: file path, test name, commit ref), N/A (with reason), or Pending. **Pending is NOT itself a FAILED verdict** — Pending items are surfaced to the Review stage for explicit user accept/defer.
-- `spine-toolkit:manual-checks` — the hand-run script you produce as `ManualChecks.md`. It holds the artifact's structure, the required fields of a case, and the two rules that decide whether a case is executable; it also says what `Plan.md ## Manual acceptance` feeds into it.
-- `spine-toolkit:feature-landscape` — for the REFACTOR profile, the `## Landscape (current)` vs `## Landscape (target)` sections in Research.md tell you what behavior MUST stay identical and what is allowed to change structurally. A regression against the current landscape is a finding — note it in `Failures`.
-- `spine-toolkit:feature-requirements` — for the BUG profile, the Secondary table in Reproduce.md / Research.md scopes which `spine-toolkit:ops-checklist` categories you re-verify. BUG validation does not require full-checklist coverage — only the categories the bug touched.
-
-## Related Agents (kotlin-platform)
-
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins. You invoke none of them: after a FAILED validation the orchestrator returns control to the profile's Execute/Fix agent, and this list is here so your report names the right one.
-
-- `kotlin-platform:kotlin-compose-developer` — Execute/Fix for FEATURE and BUG on Android and Desktop
-- `kotlin-platform:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI
-- `kotlin-platform:kotlin-kmp-developer` — Execute/Fix for FEATURE and BUG on KMP, and the bare developer row
-- `kotlin-platform:kotlin-refactorer` — the Refactor stage for REFACTOR
-- `kotlin-platform:kotlin-jvm-tester` — the Write stage for TEST, and the bare tester row
-- `kotlin-platform:kotlin-ui-tester` — the Write stage for TEST on Android and Desktop
-- `kotlin-platform:kotlin-server-tester` — the Write stage for TEST on Server and CLI
-- `kotlin-platform:kotlin-kmp-tester` — the Write stage for TEST on KMP
-- `kotlin-platform:kotlin-ui-validator` — the sibling that can drive: an emulator or a desktop window
-- `kotlin-platform:kotlin-server-validator` — the sibling that can drive: a running server or CLI process
-
 ## Self-Verification
 
 Before finalizing `Validation.md` and returning:
 
 - [ ] First byte of `Validation.md` is `[` (status line at position 0).
 - [ ] Status line value matches the Verdict section in the body.
-- [ ] `## Summary` opens by naming the deviation: no running instance was driven.
+- [ ] `## Summary` opens by naming the deviation (no running instance was driven) and names the driving sibling.
 - [ ] Every mandatory build and test step for this profile actually ran (or the validation is FAILED with the missing step as the reason).
 - [ ] Raw build/test logs are attached in the body, not summarized away.
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
