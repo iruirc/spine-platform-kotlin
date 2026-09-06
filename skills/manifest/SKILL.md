@@ -24,7 +24,7 @@ tooling subset, so the degradation is "do less", never "do the wrong thing".
 
 architect   = kotlin-platform:kotlin-architect
 reviewer    = kotlin-platform:kotlin-reviewer
-refactorer  = —
+refactorer  = kotlin-platform:kotlin-refactorer
 security    = —
 diagnostics = —
 init        = —
