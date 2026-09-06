@@ -43,11 +43,11 @@ tester[target=CLI]     = kotlin-platform:kotlin-server-tester
 tester[target=KMP]     = kotlin-platform:kotlin-kmp-tester
 tester                 = kotlin-platform:kotlin-jvm-tester
 
-validator[target=Android] = —
-validator[target=Desktop] = —
+validator[target=Android] = kotlin-platform:kotlin-ui-validator
+validator[target=Desktop] = kotlin-platform:kotlin-ui-validator
 validator[target=Server]  = —
 validator[target=CLI]     = —
-validator[target=KMP]     = —
+validator[target=KMP]     = kotlin-platform:kotlin-ui-validator
 validator                 = kotlin-platform:kotlin-jvm-validator
 
 ## Axes
