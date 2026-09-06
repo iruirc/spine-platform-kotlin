@@ -1,0 +1,34 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install bats-core
+      - name: clone core with its tags, for the floor check and the fork hashes
+        # Blobless, not shallow: lint-core-refs resolves the declared floor by tag,
+        # and a --depth 1 clone carries no tags to resolve.
+        run: git clone --filter=blob:none https://github.com/iruirc/spine-toolkit.git /tmp/upstream
+      - name: bats
+        env:
+          SPINE_TOOLKIT_CORE: /tmp/upstream
+        run: |
+          set -o pipefail
+          scripts/test-foundation.sh all | tee /tmp/bats.log
+          # A skip here means a tool is missing from the runner, not a decision.
+          if grep -q '# skip' /tmp/bats.log; then
+            grep '# skip' /tmp/bats.log
+            echo "the above tests did not run; CI must carry the tools they need"
+            exit 1
+          fi
+      - name: vendored lints
+        run: |
+          scripts/lint-i18n.sh
+          scripts/lint-locales.sh
+      - name: manifest contract, checked by core's own lint
+        run: /tmp/upstream/scripts/lint-manifest.sh .
