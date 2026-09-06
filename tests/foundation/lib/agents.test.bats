@@ -8,3 +8,4 @@ setup() {
 }
 
 @test "kotlin-architect: shape" { assert_agent_shape "$ROOT/agents/kotlin-architect.md" kotlin-architect; }
+@test "kotlin-kmp-developer: shape" { assert_agent_shape "$ROOT/agents/kotlin-kmp-developer.md" kotlin-kmp-developer; }
