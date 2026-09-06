@@ -5,3 +5,5 @@ setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
   . "$ROOT/tests/foundation/helpers/shape.bash"
 }
+
+@test "architecture-choice: shape" { assert_skill_shape "$ROOT/skills/architecture-choice"; }
