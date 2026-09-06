@@ -41,7 +41,7 @@ tester[target=Desktop] = —
 tester[target=Server]  = —
 tester[target=CLI]     = —
 tester[target=KMP]     = —
-tester                 = —
+tester                 = kotlin-platform:kotlin-jvm-tester
 
 validator[target=Android] = —
 validator[target=Desktop] = —
