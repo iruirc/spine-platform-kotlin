@@ -23,7 +23,7 @@ fallback for a project whose `target` never resolved; it points at the agent of 
 tooling subset, so the degradation is "do less", never "do the wrong thing".
 
 architect   = kotlin-platform:kotlin-architect
-reviewer    = —
+reviewer    = kotlin-platform:kotlin-reviewer
 refactorer  = —
 security    = —
 diagnostics = —
