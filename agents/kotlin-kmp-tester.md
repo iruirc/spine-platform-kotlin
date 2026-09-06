@@ -150,7 +150,9 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 A `commonTest` test cannot import MockK or Turbine unless the project's catalog makes them
 multiplatform dependencies; check `libs.versions.toml` before writing the import, and prefer
-hand-written fakes in `commonTest` — they compile everywhere.
+hand-written fakes in `commonTest` — they compile everywhere. In `commonTest` the lifecycle
+hooks are `@BeforeTest`/`@AfterTest` from `kotlin.test`; the `@BeforeEach`/`@AfterEach` of
+Environment Cleanup are the platform-test-set (JVM) form.
 
 ### Runner Matrix
 
