@@ -12,3 +12,4 @@ setup() {
 @test "kotlin-compose-developer: shape" { assert_agent_shape "$ROOT/agents/kotlin-compose-developer.md" kotlin-compose-developer; }
 @test "kotlin-server-developer: shape" { assert_agent_shape "$ROOT/agents/kotlin-server-developer.md" kotlin-server-developer; }
 @test "kotlin-jvm-tester: shape" { assert_agent_shape "$ROOT/agents/kotlin-jvm-tester.md" kotlin-jvm-tester; }
+@test "kotlin-ui-tester: shape" { assert_agent_shape "$ROOT/agents/kotlin-ui-tester.md" kotlin-ui-tester; }
