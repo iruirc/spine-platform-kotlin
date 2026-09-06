@@ -22,7 +22,7 @@ differs — what the agent runs, not how it reasons. The bare row of a fanned-ou
 fallback for a project whose `target` never resolved; it points at the agent of the common
 tooling subset, so the degradation is "do less", never "do the wrong thing".
 
-architect   = —
+architect   = kotlin-platform:kotlin-architect
 reviewer    = —
 refactorer  = —
 security    = —
