@@ -48,7 +48,7 @@ validator[target=Desktop] = —
 validator[target=Server]  = —
 validator[target=CLI]     = —
 validator[target=KMP]     = —
-validator                 = —
+validator                 = kotlin-platform:kotlin-jvm-validator
 
 ## Axes
 

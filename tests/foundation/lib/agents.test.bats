@@ -15,3 +15,4 @@ setup() {
 @test "kotlin-ui-tester: shape" { assert_agent_shape "$ROOT/agents/kotlin-ui-tester.md" kotlin-ui-tester; }
 @test "kotlin-server-tester: shape" { assert_agent_shape "$ROOT/agents/kotlin-server-tester.md" kotlin-server-tester; }
 @test "kotlin-kmp-tester: shape" { assert_agent_shape "$ROOT/agents/kotlin-kmp-tester.md" kotlin-kmp-tester; }
+@test "kotlin-jvm-validator: shape" { assert_agent_shape "$ROOT/agents/kotlin-jvm-validator.md" kotlin-jvm-validator; }
