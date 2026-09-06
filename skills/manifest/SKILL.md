@@ -27,7 +27,7 @@ reviewer    = kotlin-platform:kotlin-reviewer
 refactorer  = kotlin-platform:kotlin-refactorer
 security    = kotlin-platform:kotlin-security
 diagnostics = kotlin-platform:kotlin-diagnostics
-init        = —
+init        = kotlin-platform:kotlin-init
 
 developer[target=Android] = kotlin-platform:kotlin-compose-developer
 developer[target=Desktop] = kotlin-platform:kotlin-compose-developer

@@ -22,3 +22,4 @@ setup() {
 @test "kotlin-refactorer: shape" { assert_agent_shape "$ROOT/agents/kotlin-refactorer.md" kotlin-refactorer; }
 @test "kotlin-security: shape" { assert_agent_shape "$ROOT/agents/kotlin-security.md" kotlin-security; }
 @test "kotlin-diagnostics: shape" { assert_agent_shape "$ROOT/agents/kotlin-diagnostics.md" kotlin-diagnostics; }
+@test "kotlin-init: shape" { assert_agent_shape "$ROOT/agents/kotlin-init.md" kotlin-init; }
