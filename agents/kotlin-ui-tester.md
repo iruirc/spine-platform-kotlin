@@ -141,6 +141,8 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 ### Compose UI Testing
 
+The Compose test rule is a JUnit4 `@Rule`: a Compose test class uses `@Before`/`@After` (and `@RunWith` where Robolectric is needed) whatever `- Tests:` says — the `@BeforeEach`/`@AfterEach` of Environment Cleanup belong to the JUnit5 classes around it.
+
 - `createComposeRule()` for test rule — sets up the Compose test environment.
 - Find nodes: `onNodeWithText()`, `onNodeWithTag()`, `onNodeWithContentDescription()`.
 - Perform actions: `performClick()`, `performScrollTo()`, `performTextInput()`.
