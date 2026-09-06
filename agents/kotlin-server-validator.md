@@ -110,14 +110,14 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 1. Read `- Build:` and `- Framework:`. Every Gradle command with `--console=plain`.
 2. **Build step**: Gradle `./gradlew build -x test`; Maven `mvn -B -DskipTests verify`. Capture into `## Build Log`.
-3. **Test step**: Gradle `./gradlew test` plus every declared test task (`integrationTest`, `functionalTest` — `./gradlew tasks --all | grep -i test`); Maven `mvn -B verify` (surefire + failsafe). Testcontainers needs a Docker daemon: probe with `docker info >/dev/null 2>&1`; absent → the tests that need it **cannot run**, which is FAILED with reason `docker unavailable` (Hard Rule 3) — the project turns that into a manual check with `drive_app: off`, not you.
+3. **Test step**: Gradle `./gradlew test` plus every declared test task (`integrationTest`, `functionalTest` — `./gradlew tasks --all | grep -i test`); Maven `mvn -B verify` (surefire + failsafe). Testcontainers needs a Docker daemon: probe with `docker info >/dev/null 2>&1`; absent → the tests that need it **cannot run**, which is FAILED with reason `docker unavailable` (Hard Rule 3). `drive_app: off` does not reach the test step; a project that must validate without Docker gates those suites itself — `@Testcontainers(disabledWithoutDocker = true)`, or a separate task the run can skip — and the skipped cases go to `ManualChecks.md`.
 
 ### Boot and smoke (Server)
 
 4. Boot in the background with the framework's run task, capturing its log:
    | Framework | Command | Ready signal |
    |---|---|---|
-   | Spring Boot | `./gradlew bootRun` (or `java -jar build/libs/*.jar`) | `GET /actuator/health` → `{"status":"UP"}`, else log line `Started .* in` |
+   | Spring Boot | `./gradlew bootRun` (or `java -jar build/libs/*.jar`; `<module>/build/libs/` in a multi-module build) | `GET /actuator/health` → `{"status":"UP"}`, else log line `Started .* in` |
    | Ktor | `./gradlew run` | log line `Application started` / `Responding at` |
    | Micronaut | `./gradlew run` | `GET /health` → `{"status":"UP"}`, else `Startup completed` |
    | Quarkus | `./gradlew quarkusDev` (prefer `java -jar build/quarkus-app/quarkus-run.jar`) | `GET /q/health` → `UP` |
@@ -128,7 +128,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 ### Run and assert (CLI)
 
-4. Build the distribution: `./gradlew installDist` → `build/install/<app>/bin/<app>`, or the fat jar the plan names.
+4. Build the distribution: `./gradlew installDist` → `build/install/<app>/bin/<app>` (`<module>/build/install/…` in a multi-module build), or the fat jar the plan names.
 5. Run every invocation `Plan.md` lists, capturing exit code, stdout and stderr separately; assert each against the plan's expectation. A CLI with no listed invocations gets `--help` (exit 0, non-empty stdout) as the minimum smoke.
 6. Leave `@TempDir`-style scratch directories deleted; never run the command against the user's real config directory.
 
@@ -241,7 +241,8 @@ and stderr.
 
 ## Failures
 Structured list of every failure. Each entry:
-- Type: build error / test failure / boot failure / HTTP assertion / command assertion / reproduction
+- Type: build error / test failure / boot failure / crash / HTTP assertion / command assertion / reproduction
+  (a crash is a process that died after becoming ready, mid-smoke)
 - Location: file:line from the compiler, or the `<testcase>` class and method from the JUnit XML
 - Message: full text (truncate only in the return digest, not here)
 
@@ -273,8 +274,8 @@ notes: <optional one-line context>
 
 Rules:
 
-- `failed_count` reflects build failures, test failures, boot failures and assertion failures — HTTP or command — combined.
-- Include at most 5 entries under `errors:` (the rest live in `Validation.md`). Order: build errors first, then test failures, then boot failures and assertions.
+- `failed_count` reflects build failures, test failures, boot failures, crashes and assertion failures — HTTP or command — combined.
+- Include at most 5 entries under `errors:` (the rest live in `Validation.md`). Order: build errors first, then test failures, then boot failures, crashes and assertions.
 - `reproduction_status` is BUG-only — omit the field entirely on every other profile. `deferred-manual` when the switch is `off`; `not-replayed` when a replay was expected and stayed inconclusive, with the reason in `notes`.
 - `manual_checks:` lists the case titles from `ManualChecks.md` and is empty when you wrote no such file. Non-empty obliges the caller to surface the list to the user.
 - `flaky_tests:` empty list for non-TEST profiles or when no flake was observed.
