@@ -45,8 +45,8 @@ tester                 = kotlin-platform:kotlin-jvm-tester
 
 validator[target=Android] = kotlin-platform:kotlin-ui-validator
 validator[target=Desktop] = kotlin-platform:kotlin-ui-validator
-validator[target=Server]  = —
-validator[target=CLI]     = —
+validator[target=Server]  = kotlin-platform:kotlin-server-validator
+validator[target=CLI]     = kotlin-platform:kotlin-server-validator
 validator[target=KMP]     = kotlin-platform:kotlin-ui-validator
 validator                 = kotlin-platform:kotlin-jvm-validator
 
