@@ -38,8 +38,8 @@ developer                 = kotlin-platform:kotlin-kmp-developer
 
 tester[target=Android] = kotlin-platform:kotlin-ui-tester
 tester[target=Desktop] = kotlin-platform:kotlin-ui-tester
-tester[target=Server]  = —
-tester[target=CLI]     = —
+tester[target=Server]  = kotlin-platform:kotlin-server-tester
+tester[target=CLI]     = kotlin-platform:kotlin-server-tester
 tester[target=KMP]     = —
 tester                 = kotlin-platform:kotlin-jvm-tester
 
