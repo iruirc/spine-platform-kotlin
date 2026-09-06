@@ -57,3 +57,8 @@ setup() {
 @test "ecosystem is declared and is kotlin" {
   grep -qE '^ecosystem[[:space:]]*=[[:space:]]*kotlin$' "$M"
 }
+
+@test "the setup entrypoint names a skill that exists" {
+  grep -qE '^setup[[:space:]]*=[[:space:]]*`kotlin-setup`$' "$M"
+  [ -f "$ROOT/skills/kotlin-setup/SKILL.md" ]
+}

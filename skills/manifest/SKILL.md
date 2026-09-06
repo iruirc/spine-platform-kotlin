@@ -161,4 +161,4 @@ release ops      → —
 Skills spine-toolkit invokes by name, or `—` for one this platform does not provide. `setup` is the
 platform half of installation: core writes the config, this skill fills `## Stack` and `## Modules`.
 
-setup = —
+setup = `kotlin-setup`
