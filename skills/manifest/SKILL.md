@@ -29,8 +29,8 @@ security    = —
 diagnostics = —
 init        = —
 
-developer[target=Android] = —
-developer[target=Desktop] = —
+developer[target=Android] = kotlin-platform:kotlin-compose-developer
+developer[target=Desktop] = kotlin-platform:kotlin-compose-developer
 developer[target=Server]  = —
 developer[target=CLI]     = —
 developer[target=KMP]     = kotlin-platform:kotlin-kmp-developer
