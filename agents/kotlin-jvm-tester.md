@@ -155,7 +155,7 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 ## Validation Tooling
 
 - **Build tool via Bash** — `- Build:` in `## Stack` says which: `./gradlew <task>` (Gradle KTS / Groovy), `mvn <phase>` (Maven), `./amper test` (Amper). Run the narrowest task that covers the tests you wrote (`:module:test --tests 'com.example.FooTest'`), then the module's full test task before reporting.
-- **JUnit XML** — read failures from `build/test-results/**/*.xml` (`<failure>` / `<error>` elements, with `message` and the stack trace in the element body), never from the console alone: Gradle truncates console output and hides it behind `--info`.
+- **JUnit XML** — read failures from the build tool's report directory, never from the console alone: Gradle `build/test-results/**/*.xml` (Gradle truncates console output and hides it behind `--info`), Maven `target/surefire-reports/TEST-*.xml` and `target/failsafe-reports/TEST-*.xml`, Amper `build/tasks/**/test-results/**/*.xml`. Failures are `<failure>` / `<error>` elements, with `message` and the stack trace in the element body.
 - **mobile MCP** — only where the profile requires driving the app; the validator agent owns that, you use it for a UI test that needs visual confirmation.
 
 When `NEED_TEST = false` in the task, do not generate tests — run the existing suite and report.
@@ -189,7 +189,7 @@ Your response MUST be structured with these top-level sections:
 - `## File Structure` — where test files go
 - `## Test Code` — complete test code, ready to compile and run
 - `## Fixtures` — test data or helpers (or `(none)`)
-- `## Validation Report` — results of running the tests: the exact Gradle/Maven invocation and its summary line
+- `## Validation Report` — results of running the tests: the exact Gradle/Maven/Amper invocation and its summary line
 - `## Notes` — rationale for structure/mocking choices; anything the reviewer should know
 
 ## Quality Gate
