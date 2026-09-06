@@ -346,7 +346,7 @@ When async code uses callback patterns:
 
 ---
 
-## 10. Mobile-Specific Refactoring Tasks
+## 10. UI-Specific Refactoring Tasks (Android, Compose Desktop)
 
 ### Extract ViewModel Logic into UseCase
 When a ViewModel contains business logic that should be reusable:
@@ -403,11 +403,23 @@ When logic is reused across features or a build has grown past the point where o
 - Move files with `git mv` so history follows; fix imports; declare the dependency `implementation` unless a consumer's public API exposes the module's types — only then `api`.
 - One module per commit; the build is green after each.
 - KMP: a module extracted from `commonMain` keeps the same source-set hierarchy — do not extract an `actual` without its `expect`.
+
 See `pkg-gradle-modules`, `pkg-kmp-source-sets`.
 
 ---
 
 ## Process
+
+### Conformance to Existing Code (mandatory, before any edit)
+
+Before writing or changing ANY file, you MUST first read existing code and mirror its conventions. Untethered code that ignores established patterns is a defect even when it compiles and passes tests.
+
+1. **Read the whole target file**, not just the edit site. Understand its structure, naming, error-handling style, and the pattern it already follows.
+2. **Find the closest analogues** — sibling implementations of the same concept already in the codebase. Examples: another per-property updater next to the one you add, another delegate protocol of the same family, another style entry for a peer UI tab, another migration of the same kind. Read at least the 1–3 nearest ones.
+3. **Extract the shared convention** the analogues obey (signature shape, dispatch style, naming, where the value is read from, how siblings are wired) and make your change conform to it. Diverge only with an explicit reason captured in `## Conformance to existing code`.
+4. **Cite the analogues** by `path:line` in your output — this is evidence you actually looked, not a claim that you did.
+
+This step is not optional and not satisfied by "I followed the project style" in the abstract. No citations → the step was skipped.
 
 1. **Analyze**: Read the code, understand current structure and dependencies.
 2. **Plan**: State what you will change, why, and what stays the same.
@@ -435,6 +447,15 @@ See `pkg-gradle-modules`, `pkg-kmp-source-sets`.
   - `/** Shared thumbnail loader. Invariant: all consumers read the same payload to avoid a double-decode race. */`
   - `// Cancel-order race fix: cancel + null-assignment MUST happen BEFORE resetSession — otherwise the dangling Job observes a torn state.`
   - `// detekt workaround: SwallowedException false-positive on the rethrow below.`
+
+## Self-Check Before Completing
+
+- [ ] No behaviour change: every existing test untouched and green
+- [ ] One refactoring per commit; the build is green after each
+- [ ] Analogues cited by `path:line` in `## Before`
+- [ ] Every target of the touched module still compiles (`allTests` on a KMP module)
+- [ ] DI registrations updated for every extracted type
+- [ ] No task/phase/EPIC/ticket references in comments (see `## Comment Policy`)
 
 ## Skills Reference (kotlin-platform)
 
@@ -481,7 +502,7 @@ When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_
 
 Your response MUST be structured with these top-level sections so the orchestrator can place it into the stage file:
 
-- `## Before` — current structure and the specific problem
+- `## Before` — current structure and the specific problem, plus the analogues you will mirror, cited by `path:line`
 - `## Plan` — step-by-step refactoring plan (matches Plan.md phases)
 - `## After` — new structure with full code for modified files
 - `## Verification` — how to confirm no behavior change (which tests, which scenarios)
