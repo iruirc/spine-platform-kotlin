@@ -62,3 +62,45 @@ setup() {
   grep -qE '^setup[[:space:]]*=[[:space:]]*`kotlin-setup`$' "$M"
   [ -f "$ROOT/skills/kotlin-setup/SKILL.md" ]
 }
+
+@test "the Roles table is exactly the spec's twenty-four rows" {
+  rows="$(sed -n '/^## Roles/,/^## Axes/p' "$M" \
+           | grep -E '^[a-z][a-z-]*(\[[^]]+\])?[[:space:]]*=' | tr -s ' ' | sort)"
+  expected="$(sort <<'EOF'
+architect = kotlin-platform:kotlin-architect
+reviewer = kotlin-platform:kotlin-reviewer
+refactorer = kotlin-platform:kotlin-refactorer
+security = kotlin-platform:kotlin-security
+diagnostics = kotlin-platform:kotlin-diagnostics
+init = kotlin-platform:kotlin-init
+developer[target=Android] = kotlin-platform:kotlin-compose-developer
+developer[target=Desktop] = kotlin-platform:kotlin-compose-developer
+developer[target=Server] = kotlin-platform:kotlin-server-developer
+developer[target=CLI] = kotlin-platform:kotlin-server-developer
+developer[target=KMP] = kotlin-platform:kotlin-kmp-developer
+developer = kotlin-platform:kotlin-kmp-developer
+tester[target=Android] = kotlin-platform:kotlin-ui-tester
+tester[target=Desktop] = kotlin-platform:kotlin-ui-tester
+tester[target=Server] = kotlin-platform:kotlin-server-tester
+tester[target=CLI] = kotlin-platform:kotlin-server-tester
+tester[target=KMP] = kotlin-platform:kotlin-kmp-tester
+tester = kotlin-platform:kotlin-jvm-tester
+validator[target=Android] = kotlin-platform:kotlin-ui-validator
+validator[target=Desktop] = kotlin-platform:kotlin-ui-validator
+validator[target=Server] = kotlin-platform:kotlin-server-validator
+validator[target=CLI] = kotlin-platform:kotlin-server-validator
+validator[target=KMP] = kotlin-platform:kotlin-ui-validator
+validator = kotlin-platform:kotlin-jvm-validator
+EOF
+)"
+  [ "$rows" = "$expected" ] || { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$rows"); return 1; }
+}
+
+@test "sixteen agent files, and every one of them is named by a Roles row" {
+  n="$(ls "$ROOT"/agents/*.md | wc -l | tr -d ' ')"
+  [ "$n" -eq 16 ] || { echo "expected 16 agents, found $n"; return 1; }
+  for f in "$ROOT"/agents/*.md; do
+    a="$(basename "$f" .md)"
+    grep -qE "kotlin-platform:${a}([[:space:]]|$)" "$M" || { echo "agent no Roles row names: $a"; return 1; }
+  done
+}
