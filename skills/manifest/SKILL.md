@@ -31,8 +31,8 @@ init        = —
 
 developer[target=Android] = kotlin-platform:kotlin-compose-developer
 developer[target=Desktop] = kotlin-platform:kotlin-compose-developer
-developer[target=Server]  = —
-developer[target=CLI]     = —
+developer[target=Server]  = kotlin-platform:kotlin-server-developer
+developer[target=CLI]     = kotlin-platform:kotlin-server-developer
 developer[target=KMP]     = kotlin-platform:kotlin-kmp-developer
 developer                 = kotlin-platform:kotlin-kmp-developer
 
