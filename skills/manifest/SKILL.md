@@ -26,7 +26,7 @@ architect   = kotlin-platform:kotlin-architect
 reviewer    = kotlin-platform:kotlin-reviewer
 refactorer  = kotlin-platform:kotlin-refactorer
 security    = kotlin-platform:kotlin-security
-diagnostics = —
+diagnostics = kotlin-platform:kotlin-diagnostics
 init        = —
 
 developer[target=Android] = kotlin-platform:kotlin-compose-developer
