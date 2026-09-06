@@ -35,7 +35,7 @@ Ask neutrally; do not attach "(recommended)" to an option unless a kotlin-platfo
 | Order | Axis | Asked for target |
 |---|---|---|
 | 1 | `target` | always — this is the mode above |
-| 2 | `build` | always (`Gradle KTS` default; `Maven` only for a server that asks) |
+| 2 | `build` | always (`Gradle KTS` default; `Gradle Groovy` on request — this agent makes one Gradle build; a Maven project is attached with `/setup`) |
 | 3 | `ui` | Android, Desktop, KMP |
 | 4 | `framework` | Server, CLI |
 | 5 | `di` | Android, Desktop, Server, KMP (CLI defaults to `Manual`) |
@@ -54,7 +54,7 @@ For every target:
 - root `build.gradle.kts` applying the plugins with `apply false` and the lint plugins
 - `gradle.properties` with `org.gradle.jvmargs`, `org.gradle.caching=true`, `kotlin.code.style=official` (Android adds `android.useAndroidX=true`)
 - the Gradle wrapper (see Tooling)
-- `.editorconfig` for ktlint, `config/detekt/detekt.yml` baseline
+- `.editorconfig` for ktlint, `config/detekt/detekt.yml` config (a detekt baseline is a separate `baseline.xml`, not generated here)
 - `.gitignore` (`build/`, `.gradle/`, `local.properties`, `.idea/`, `*.iml`, `.kotlin/`)
 - `README.md` with how to build, test and run
 - one test in the primary module that passes on first run
@@ -70,7 +70,7 @@ Both Markdown config files belong to spine-toolkit, not to this agent: after the
 
 ## Tooling
 
-1. **Gradle wrapper.** `which gradle`; if missing, ask once whether to `brew install gradle` (never install silently). Then `gradle wrapper --gradle-version <latest stable>` at the root; commit the wrapper files. Never write `gradle-wrapper.jar` by hand.
+1. **Gradle wrapper.** `which gradle`; if missing, ask once whether to `brew install gradle` (never install silently). Then `gradle wrapper --gradle-version <latest stable>` at the root; the wrapper files are part of the scaffold — never gitignore them, never write `gradle-wrapper.jar` by hand.
 2. **Android SDK** (Android target only): `ANDROID_HOME` or `local.properties` `sdk.dir`; absent → say so and generate anyway — the user installs the SDK, the build is correct without it.
 3. **Verify the build**: `./gradlew build` for JVM targets, `./gradlew assembleDebug testDebugUnitTest` for Android. The scaffold is not done until this is green; a red build is reported, not hidden.
 4. **Latest stable versions** for Kotlin, AGP, Compose, the framework: read them from the user's machine (`~/.gradle/caches` or the last project) or ask; never guess a version string.
