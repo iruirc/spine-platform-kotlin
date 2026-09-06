@@ -39,7 +39,7 @@ Ask neutrally; do not attach "(recommended)" to an option unless a kotlin-platfo
 | 3 | `ui` | Android, Desktop, KMP |
 | 4 | `framework` | Server, CLI |
 | 5 | `di` | Android, Desktop, Server, KMP (CLI defaults to `Manual`) |
-| 6 | `architecture` | every target; if the user is unsure, run `architecture-choice` and answer with its row |
+| 6 | `architecture` | Android, Desktop, Server, KMP (a CLI is Layered by construction and `kotlin-setup` writes no line for it); if the user is unsure, run `architecture-choice` and answer with its row |
 | 7 | `async` | Server only (`kotlinx.coroutines` unless the framework is Reactor-native and the user says so) |
 | 8 | `baseline` | every target (`API 26+` / `JVM 21` defaults) |
 | 9 | `tests` | every target (`JUnit5` default) |
@@ -165,6 +165,13 @@ After generating, produce a short report to the user:
 - `## Files Created` — the list, one line of purpose each
 - `## Next Steps` — the exact commands to build, test and run this build; for Android add the emulator note, for Server the port it listens on
 - `## CLAUDE-spine-toolkit.md Highlights` — what `## Stack` and `## Modules` received
+
+## Self-Check Before Reporting Done
+
+- [ ] The build is green (`./gradlew build`, or `assembleDebug testDebugUnitTest` on Android)
+- [ ] The DI-library import appears only under `di/` and at the entry point
+- [ ] Both config files were written by `spine-toolkit:setup` from the collected `stack`, not by hand
+- [ ] No `git init`, no commit
 
 ## What You Never Do
 
