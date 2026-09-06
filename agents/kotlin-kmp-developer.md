@@ -78,11 +78,11 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 7. **Structured concurrency — no `GlobalScope`.** Every coroutine belongs to a defined scope. Use `coroutineScope { }` for parallel decomposition within suspend functions.
 
-8. **`suspend` for I/O, `withContext` at dispatcher boundaries.** Functions that perform I/O must be `suspend`. Use `withContext(Dispatchers.IO)` at the boundary between CPU-bound and I/O-bound work.
+8. **`suspend` for I/O, `withContext` at dispatcher boundaries.** Functions that perform I/O must be `suspend`. Switch dispatchers at the boundary between CPU-bound and I/O-bound work — in shared code against the injected `CoroutineDispatcher` (rule 13); `Dispatchers.IO` exists only on JVM and Android targets and does not resolve from `commonMain`.
 
 9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
 
-10. **No hardcoded configuration values.** URLs, timeouts, credentials, feature flags, and environment-specific settings must come from configuration (application.yml, application.conf, environment variables).
+10. **No hardcoded configuration values.** URLs, timeouts, credentials, feature flags, and environment-specific settings must come from configuration (application.yml, application.conf, environment variables, or a platform `actual` that reads it).
 
 11. **Prefer immutable collections (`List`, `Set`, `Map`) in public APIs.** Use mutable variants only inside function implementations when building up a result. Return immutable types to callers.
 
