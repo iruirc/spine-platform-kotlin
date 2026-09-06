@@ -244,7 +244,7 @@ class UserRepositoryIntegrationTest {
 ### Micronaut / Quarkus / http4k
 
 - **Micronaut**: `@MicronautTest` boots the context; `@Client` for HTTP; `@MockBean` to replace a bean; `@Property` overrides.
-- **Quarkus**: `@QuarkusTest` + RestAssured (`given().when().get("/users/1").then().statusCode(200)`); `@InjectMock` for a bean; `@TestProfile` for configuration.
+- **Quarkus**: `@QuarkusTest` + RestAssured (``given().`when`().get("/users/1").then().statusCode(200)`` — `when` is a Kotlin keyword, so it is backticked; or the Kotlin extensions `Given { } When { } Then { }`); `@InjectMock` for a bean; `@TestProfile` for configuration.
 - **http4k**: a handler is a function — call it with a `Request` and assert on the `Response`; no server boot needed. `http4k-testing-approval` for golden responses.
 
 ### Test Slices, Cheapest First
@@ -253,14 +253,14 @@ class UserRepositoryIntegrationTest {
 |---|---|---|
 | Unit: service with MockK repositories | nothing | business rules |
 | Web: `@WebMvcTest` / `testApplication` with fakes | web layer only | request mapping, validation, status codes, error bodies |
-| Repository: `@DataJpaTest` / Exposed against Testcontainers | database | queries, constraints, migrations |
+| Repository: `@DataJpaTest` with `@AutoConfigureTestDatabase(replace = NONE)` (without it the slice swaps the container for H2) / Exposed against Testcontainers | database | queries, constraints, migrations |
 | Full: `@SpringBootTest` / whole Ktor app + Testcontainers | everything | one happy path per feature, not per case |
 
 A test at a higher slice than its assertion needs is a slow test that hides which layer broke.
 
 ### CLI Tests
 
-- Run the command in-process: Clikt `command.parse(args)` with a captured `CliktConsole`/stdout; kotlinx-cli `parser.parse(args)`.
+- Run the command in-process: Clikt `command.test("args")` from `com.github.ajalt.clikt.testing` returns `stdout`, `stderr` and `statusCode` in one result — never `parse()` directly, which throws `CliktError` instead of exiting; kotlinx-cli `parser.parse(args)` for valid input.
 - Assert three things: exit code (`0` / `1` / `2`), stdout content, stderr content — separately.
 - Configuration precedence (flags > env > file > defaults) is one parameterized test, not four.
 - A command that touches the file system runs in `@TempDir`.
