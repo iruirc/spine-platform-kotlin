@@ -104,3 +104,21 @@ EOF
     grep -qE "kotlin-platform:${a}([[:space:]]|$)" "$M" || { echo "agent no Roles row names: $a"; return 1; }
   done
 }
+
+@test "the Topics table is exactly the spec's ten rows" {
+  rows="$(sed -n '/^## Topics/,/^## Entrypoints/p' "$M" | grep -E '^[a-z][a-z ]*→' | tr -s ' ' | sort)"
+  expected="$(sort <<'EOF'
+state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`, `arch-clean`, `arch-layered`, `arch-hexagonal`, `compose-state`
+navigation → `nav-compose`, `nav-multiplatform`
+networking → `net-architecture`, `net-http-clients`, `net-openapi`
+persistence → `persistence-architecture`, `persistence-room-sqldelight`, `persistence-jvm-orm`, `persistence-migrations`
+dependency graph → `di-composition-root`, `di-hilt`, `di-koin`, `di-spring`
+concurrency → `concurrency-coroutines`, `reactive-flow`
+errors → `error-architecture`
+packaging → `pkg-gradle-modules`, `pkg-kmp-source-sets`
+deep links → `nav-deeplinks`
+release ops → `release-ops`, `release-ops-android`, `release-ops-server`
+EOF
+)"
+  [ "$rows" = "$expected" ] || { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$rows"); return 1; }
+}
