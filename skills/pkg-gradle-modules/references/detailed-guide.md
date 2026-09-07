@@ -83,19 +83,19 @@ dependencies {
 }
 
 gradlePlugin {
-    // Binary plugins only. `kotlin-platform.jvm.library` is a precompiled script two sections down,
+    // Binary plugins only. `orders.jvm.library` is a precompiled script two sections down,
     // and a script plugin registers itself by its file name.
     plugins {
         register("androidApplication") {
-            id = "kotlin-platform.android.application"
+            id = "orders.android.application"
             implementationClass = "AndroidApplicationConventionPlugin"
         }
         register("androidLibrary") {
-            id = "kotlin-platform.android.library"
+            id = "orders.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
         }
         register("androidFeature") {
-            id = "kotlin-platform.android.feature"
+            id = "orders.android.feature"
             implementationClass = "AndroidFeatureConventionPlugin"
         }
     }
@@ -112,7 +112,7 @@ artifact form until the duplicate coordinate actually causes a mismatch.
 ## Convention Plugins
 
 Three classes and the helper they share, under `build-logic/src/main/kotlin/`.
-`kotlin-platform.jvm.library` is not among them — it is the precompiled script in the next section.
+`orders.jvm.library` is not among them — it is the precompiled script in the next section.
 The library plugin carries the version-catalog lookup, the only part of the setup that is not
 obvious.
 
@@ -188,7 +188,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
 // Composing convention plugins by id is what keeps the Android defaults in exactly one file.
 class AndroidFeatureConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
-        pluginManager.apply("kotlin-platform.android.library")
+        pluginManager.apply("orders.android.library")
         pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
         val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
         extensions.configure<LibraryExtension> { buildFeatures { compose = true } }
@@ -210,7 +210,7 @@ The same convention as a build script whose *file name is the plugin id* — not
 `implementationClass`; `kotlin-dsl` compiles the file into a plugin.
 
 ```kotlin
-// build-logic/src/main/kotlin/kotlin-platform.jvm.library.gradle.kts
+// build-logic/src/main/kotlin/orders.jvm.library.gradle.kts
 import org.gradle.api.artifacts.VersionCatalogsExtension
 
 plugins {
@@ -237,7 +237,7 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 registerGraphRuleCheck()   // a top-level Project extension in build-logic resolves here too
 ```
 
-This is the only form `kotlin-platform.jvm.library` takes: it has no entry in `gradlePlugin { }`,
+This is the only form `orders.jvm.library` takes: it has no entry in `gradlePlugin { }`,
 because a script plugin is registered by its file name. Writing both a class and a script for one id
 is the one way to get two plugins that disagree.
 
@@ -255,7 +255,7 @@ Which form to take:
 # gradle/libs.versions.toml — every version in the build is in this file
 [versions]
 agp = "8.7.3"
-kotlin = "2.2.0"
+kotlin = "2.2.20"
 compose-bom = "2024.12.01"
 coroutines = "1.9.0"
 ktor = "3.0.3"
@@ -298,7 +298,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version = "2.2.0-2.0.2" }
+ksp = { id = "com.google.devtools.ksp", version = "2.2.20-2.0.2" }
 ```
 
 1. `androidx-compose-material3` carries no version on purpose: the BOM supplies it, and a version
@@ -306,7 +306,7 @@ ksp = { id = "com.google.devtools.ksp", version = "2.2.0-2.0.2" }
    `libs.kotlinx.coroutines.core`, `libs.bundles.ktor.client`, `alias(libs.plugins.kotlin.jvm)`.
 2. A `[plugins]` entry is what `alias(...)` reads and cannot be used as a dependency; a `[libraries]`
    entry is the reverse. KSP versions carry the Kotlin version they were built against
-   (`2.2.0-2.0.2`), so keep the pair adjacent in the file — upgrading one alone fails configuration.
+   (`2.2.20-2.0.2`), so keep the pair adjacent in the file — upgrading one alone fails configuration.
 
 ## Module Build Files
 
@@ -314,7 +314,7 @@ Five files, one per archetype. What each one is *missing* is the design.
 
 ```kotlin
 // :app/build.gradle.kts — the only module that names every other module
-plugins { id("kotlin-platform.android.application") }
+plugins { id("orders.android.application") }
 
 android {
     namespace = "com.example.orders"
@@ -334,7 +334,7 @@ dependencies {
 ```kotlin
 // :feature:orders/build.gradle.kts — the absent lines are project(":feature:cart") and
 // project(":data:orders"): the repository interface lives in :core:model and :app binds it.
-plugins { id("kotlin-platform.android.feature") }
+plugins { id("orders.android.feature") }
 
 android { namespace = "com.example.feature.orders" }
 
@@ -347,7 +347,7 @@ dependencies {
 
 ```kotlin
 // :core:model/build.gradle.kts — no project(...) line exists, and that is the archetype
-plugins { id("kotlin-platform.jvm.library") }
+plugins { id("orders.jvm.library") }
 
 dependencies {
     api(libs.kotlinx.datetime)   // Instant appears in this module's own signatures
@@ -357,7 +357,7 @@ dependencies {
 ```kotlin
 // :data:orders/build.gradle.kts — every framework in the build lands here
 plugins {
-    id("kotlin-platform.android.library")
+    id("orders.android.library")
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
 }
@@ -376,7 +376,7 @@ dependencies {
 ```kotlin
 // :api:orders/build.gradle.kts — interfaces and DTOs, and a build file to match
 plugins {
-    id("kotlin-platform.jvm.library")
+    id("orders.jvm.library")
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -516,7 +516,7 @@ includeBuild("../shared-lib") {
 ```kotlin
 // :core:model/build.gradle.kts
 plugins {
-    id("kotlin-platform.jvm.library")
+    id("orders.jvm.library")
     `java-test-fixtures`
 }
 

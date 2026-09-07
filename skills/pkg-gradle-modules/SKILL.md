@@ -148,7 +148,7 @@ composition root.
 
 ```toml
 [versions]
-kotlin = "2.2.0"
+kotlin = "2.2.20"
 ktor = "3.0.3"
 
 [libraries]
@@ -188,7 +188,7 @@ the module applies by id:
 ```kotlin
 // :feature:orders/build.gradle.kts — the whole file
 plugins {
-    id("kotlin-platform.android.feature")
+    id("orders.android.feature")
 }
 
 android { namespace = "com.example.feature.orders" }
@@ -204,12 +204,12 @@ dependencies {
    the one that matters: its jar is on the classpath of *every* build script in the build, so any
    change to it recompiles all of them. An included build reaches only the modules that apply one of
    its plugin ids.
-2. **Name the plugins `kotlin-platform.<target>.<archetype>`** — `kotlin-platform.android.application`,
-   `kotlin-platform.android.library`, `kotlin-platform.jvm.library`,
-   `kotlin-platform.android.feature`. The dotted id reads as a
-   coordinate, sorts sensibly, and cannot collide with a published plugin id.
+2. **Name the plugins `<project>.<target>.<archetype>`** — in a build whose root project is
+   `orders`: `orders.android.application`, `orders.android.library`, `orders.jvm.library`,
+   `orders.android.feature`. The dotted id reads as a coordinate, sorts sensibly, and the project
+   segment is what keeps it from colliding with a published plugin id.
 3. **Precompiled script plugins and binary plugins are both fine.** A file named
-   `kotlin-platform.jvm.library.gradle.kts` *is* the plugin id and needs no registration — shortest
+   `orders.jvm.library.gradle.kts` *is* the plugin id and needs no registration — shortest
    path, and the right default. A `Plugin<Project>` class registered in `gradlePlugin { }` buys typed
    access to extensions, shared helper functions and a plugin you can unit-test; take it when the
    conventions grow past a screenful.
