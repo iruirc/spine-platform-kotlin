@@ -19,7 +19,7 @@ one's.
 > - `arch-hexagonal` — the generated client as an outbound adapter, the generated server interface as an inbound one
 > - `error-architecture` — turning an undocumented status or a parse failure into one domain error
 > - `pkg-gradle-modules` — the module that owns the generated tree, and why nothing `api`-exposes it
-> - `release-ops` — publishing the spec as a versioned artifact, and the CI lane that diffs it
+> - `pkg-kmp-source-sets` — the `commonMain` constraint that rules out every JVM-only generator row
 
 ## When to Use
 
@@ -43,17 +43,19 @@ source of truth is hand-writing with extra steps.
 
 | Generator | Emits | Take it when |
 |---|---|---|
-| `openapi-generator`, Gradle plugin `org.openapi.generator`, `generatorName = "kotlin"` | models plus a client over the library you name: `library = "jvm-retrofit2" \| "jvm-okhttp4" \| "jvm-ktor" \| "multiplatform"`, with `serializationLibrary = "kotlinx_serialization"` | the default — it covers every client row of `net-http-clients`, including the KMP one, and the whole config is Gradle |
-| Fabrikt, Gradle plugin `com.cjbooms.fabrikt` | Kotlin-first models, optionally a client and Spring controller interfaces; JVM-only | the models are what matter and their shape is what you will read — Fabrikt emits idiomatic Kotlin (data classes, sealed `oneOf`, real nullability) rather than a Kotlin rendering of a Java template |
+| `openapi-generator`, Gradle plugin `org.openapi.generator`, `generatorName = "kotlin"` | models plus a client over the library you name: `library = "jvm-retrofit2" \| "jvm-okhttp4" \| "jvm-ktor" \| "jvm-spring-restclient" \| "jvm-spring-webclient" \| "multiplatform"`, with `serializationLibrary = "kotlinx_serialization"` | the default — it covers every client row of `net-http-clients`, including the KMP one, and the whole config is Gradle |
+| Fabrikt — `com.cjbooms:fabrikt`, a library and a CLI; from Gradle through the third-party `ch.acanda.gradle.fabrikt` plugin, since the project publishes none of its own | Kotlin-first models (Jackson or kotlinx.serialization) and, optionally, Spring and Micronaut controller interfaces, Ktor server routes, and OkHttp, OpenFeign, Ktor or Spring HTTP-interface clients; JVM-only | the models are what matter and their shape is what you will read — Fabrikt emits idiomatic Kotlin (data classes, sealed `oneOf`, real nullability) rather than a Kotlin rendering of a Java template |
 | No generator | — | the spec is a handful of endpoints, or it lies about the API often enough that the generated client would be a phantom |
 
 1. **The `library` is not a new decision.** It has to be the client `net-http-clients` already chose
    for this build. `library = "jvm-okhttp4"` in a Retrofit project is a second client: a second
    connection pool, a second interceptor stack, and one of them without the auth header.
 2. **KMP has two paths and no third.** `openapi-generator` with `library = "multiplatform"` (Ktor and
-   kotlinx.serialization underneath, `commonMain`-safe), or Fabrikt models with a hand-written Ktor
-   client over them. The `jvm-*` rows do not compile in `commonMain`, and Fabrikt alone does not
-   leave the JVM (`pkg-kmp-source-sets`).
+   kotlinx.serialization underneath, `commonMain`-safe), or Fabrikt's kotlinx.serialization models
+   with a hand-written Ktor client over them — those models are ordinary Kotlin data classes and
+   compile in `commonMain` as long as nothing in the spec maps to a JVM type, which `format:
+   date-time` and `number` do by default. Fabrikt's generated clients and its CLI are JVM-only, and
+   no `jvm-*` row compiles in `commonMain` (`pkg-kmp-source-sets`).
 3. **The generated `Api` is not the project's `ApiClient`.** An adapter in `:data` implements the
    interface `net-architecture` defines and maps generated models to the project's own DTOs; no
    generated type crosses that file in either direction.
@@ -95,23 +97,25 @@ spec renames a field or adds one the domain does not want.
 
 ```kotlin
 // :data/build.gradle.kts
-plugins { alias(libs.plugins.openapi.generator) }   // pinned in the catalog, never a range
+plugins {
+    kotlin("jvm")
+    alias(libs.plugins.openapi.generator)           // pinned in the catalog, never a range
+}
 
 val generated = layout.buildDirectory.dir("generated/openapi")
 
 openApiGenerate {
     generatorName.set("kotlin")
+    library.set("jvm-retrofit2")                    // the client net-http-clients already chose
     inputSpec.set("$rootDir/specs/orders.yaml")     // committed beside the build
     outputDir.set(generated.map { it.asFile.path })
+    packageName.set("com.example.api.generated")    // the infrastructure package lands under it too
     apiPackage.set("com.example.api.generated.api")
     modelPackage.set("com.example.api.generated.model")
     generateApiTests.set(false)
     generateModelTests.set(false)
     configOptions.set(
-        mapOf(
-            "library" to "jvm-retrofit2",           // the client net-http-clients already chose
-            "serializationLibrary" to "kotlinx_serialization",
-        ),
+        mapOf("serializationLibrary" to "kotlinx_serialization", "nonPublicApi" to "true"),
     )
 }
 
@@ -133,8 +137,8 @@ is derived from it, or the spec is the source and the interfaces are generated f
 | Spring Boot | `springdoc-openapi` (`org.springdoc:springdoc-openapi-starter-webmvc-ui`) reads the controllers and their annotations, serves the spec and Swagger UI | `openapi-generator` `generatorName = "kotlin-spring"` with `interfaceOnly = true` — generated `@RequestMapping` interfaces that hand-written controllers implement |
 | Ktor | `io.ktor:ktor-server-openapi` and `io.ktor:ktor-server-swagger` **serve a spec file you maintain**; neither derives anything from the routing tree | the natural fit: `openapi-generator` `generatorName = "kotlin-server"` with `library = "ktor"`, or hand-written routes and a test that validates them against the spec |
 | http4k | `http4k-contract` — the contract DSL *is* the spec: a route declares its lenses and the description renders from them | already contract-first by construction; there is no second direction to choose |
-| Micronaut | `micronaut-openapi` — an annotation processor writes the spec at compile time | reachable through `openapi-generator`, but against the grain of a framework built on compile-time annotation processing |
-| Quarkus | `quarkus-smallrye-openapi` — derives the spec from the endpoint annotations and serves it at `/q/openapi` | the same trade as Micronaut |
+| Micronaut | `micronaut-openapi` — an annotation processor writes the spec at compile time | the same `micronaut-openapi` Gradle plugin runs the other direction: `openapi { server(file("orders.yaml")) { lang = "kotlin" } }`, and `client(...)` for the consuming side |
+| Quarkus | `quarkus-smallrye-openapi` — derives the spec from the endpoint annotations and serves it at `/q/openapi` | reachable through `openapi-generator`, but the annotation processor is what the framework is built around |
 
 1. **Pick the direction once, per service, and write it down.** Code-first plus a hand-edited spec
    file in the repository is two sources of truth, and they part company in the first sprint.
@@ -165,7 +169,7 @@ the code it was written beside and never with the API.
 | Side | What runs | Against |
 |---|---|---|
 | client | tests against a stub driven from the spec — Prism (`prism mock`) answers the whole spec with nothing written, WireMock with `com.atlassian.oai:swagger-request-validator-wiremock` checks the stubs you did write, or an `openapi-generator` server stub | the spec version the client generated from |
-| server | the MockMvc or RestAssured tests that already exist, plus a validating matcher — `swagger-request-validator-mockmvc`, `swagger-request-validator-restassured`, or `openapi4j` | the spec the service publishes |
+| server | the MockMvc or RestAssured tests that already exist, plus a validating matcher — `swagger-request-validator-mockmvc` or `swagger-request-validator-restassured` (`openapi4j` is the other implementation, archived since 2021 and blind to 3.1) | the spec the service publishes |
 | CI | `openapi-diff` or `oasdiff` between the base spec and the branch's | the previous spec |
 
 ```kotlin
@@ -186,9 +190,12 @@ fun `placing an order matches the spec`() {
    examples or schemas with no stub written, which is the cheap breadth. WireMock costs a stub per
    case and buys the responses a spec never describes — a 500, a truncated body, a socket that hangs
    — which is where the retry and timeout rules are tested (`net-architecture`).
-3. **Test the undocumented response.** Staging returns an HTML maintenance page under a 200 and the
-   generated client throws a serialization failure, not an HTTP one; the adapter maps it like any
-   other failure, and a test that never sees it lets the app crash instead (`error-architecture`).
+3. **Test the response the spec does not describe.** The two that actually arrive are an enum value
+   the spec does not list — `kotlinx.serialization` throws unless the property has a default and the
+   `Json` is configured with `coerceInputValues = true` — and a field the spec marks required that
+   comes back missing or null, which is a `MissingFieldException` out of the generated model. Both
+   are serialization failures, not HTTP ones, and the adapter maps them like any other failure
+   (`error-architecture`); a suite that only ever replays the spec's own examples sees neither.
 4. **Both sides must name the same spec version.** A client generated from a tag and tested against
    the branch's spec proves nothing about what ships.
 5. **Breaking-change detection is the producer's job and fails the producer's build.** `openapi-diff`
@@ -199,13 +206,17 @@ fun `placing an order matches the spec`() {
 
 ## Hygiene
 
-1. **One package prefix for everything generated** — `com.example.api.generated`, with `apiPackage`
-   and `modelPackage` beneath it. One import to grep for, and a rule a reviewer can apply without
-   reading the mapping.
-2. **`internal` where the generator allows it, a module boundary where it does not.** The Kotlin
-   client generator emits public declarations and offers no visibility knob, so the isolation has to
-   be structural: the generated tree lives in the module that owns the adapter, and dependants get it
-   through `implementation`, never `api` (`pkg-gradle-modules`).
+1. **One package prefix for everything generated** — `packageName` set to `com.example.api.generated`
+   with `apiPackage` and `modelPackage` beneath it. `packageName` is the one that catches the
+   generator's own `infrastructure` package, which otherwise lands in `org.openapitools.client`,
+   outside the prefix and outside every rule written about it.
+2. **`nonPublicApi` first, the module boundary behind it.** The `kotlin` generator takes
+   `configOptions["nonPublicApi"] = "true"` and emits its declarations with reduced access modifiers
+   — `internal` — which is exactly the visibility the adapter needs and nothing above it can reach
+   (`explicitApi` is the neighbouring knob, for a build in explicit-API mode). But `internal` is
+   scoped to a Gradle module, so it enforces something only while the generated tree sits in the
+   module that owns the adapter, and that module exposes it with `implementation`, never `api`
+   (`pkg-gradle-modules`).
 3. **Regenerate in CI and fail on the difference.** When the tree is a build output, the CI build
    already is that check. Checked in as a deliberate exception — an IDE that has to index it, a
    consumer with no generator on its path — CI runs the generate task and then `git diff --exit-code`
@@ -245,9 +256,10 @@ fun `placing an order matches the spec`() {
    the API looked like in the sprint the file was last touched.
 6. **A code-first spec that only exists on a running instance.** Nothing to diff, nothing to pin, and
    consumers generate from whatever staging happened to be serving on the morning they built.
-7. **Hand-written JSON fixtures beside a spec that exists.** They encode what the code already does;
-   the day the server adds a required field or changes a nullability, every test passes and the
-   application fails to parse the first real response.
+7. **Hand-written JSON fixtures beside a spec that exists.** They encode what the code already did on
+   the day they were written, and nothing regenerates them: the spec turns a field required, every
+   fixture in the suite still parses, and the first real response fails with a `MissingFieldException`
+   no test in the repository could have produced.
 8. **`interfaceOnly = false` on `kotlin-spring`.** The generator writes the controllers, someone adds
    logic to them, and regeneration either destroys it or is quietly never run again.
 9. **A spec fetched from a URL at build time, or an unpinned generator.** Both make the build a
