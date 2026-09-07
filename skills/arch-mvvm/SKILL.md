@@ -143,7 +143,8 @@ share sheet, a haptic. Anything still true after a configuration change belongs 
 | `MutableSharedFlow(replay = 0, extraBufferCapacity = 1)` | many collectors | emitted with no collector means dropped, and the recreation gap is exactly that window |
 
 1. **Default to `Channel` + `receiveAsFlow()`** for navigation and snackbars: one screen, one
-   collector, buffered across the configuration-change gap.
+   collector, buffered across the configuration-change gap — with one element's worth of risk, since
+   `receiveAsFlow()` can take an item out of the channel just as collection is cancelled.
 2. **Collect effects lifecycle-aware** — `viewModel.effects.flowWithLifecycle(lifecycle)`, not a bare
    `LaunchedEffect(Unit) { effects.collect { } }`, or a backgrounded screen navigates under the one
    the user is looking at.
@@ -155,18 +156,23 @@ share sheet, a haptic. Anything still true after a configuration change belongs 
 
 ```kotlin
 @Composable
-fun OrdersRoute(onOpenOrder: (OrderId) -> Unit, viewModel: OrdersViewModel = hiltViewModel()) {
-    val state by viewModel.state.collectAsStateWithLifecycle()   // Android
-    // val state by viewModel.state.collectAsState()             // Desktop and commonMain
+fun OrdersRoute(
+    onOpenOrder: (OrderId) -> Unit,
+    viewModel: OrdersViewModel = hiltViewModel(),   // koinViewModel() on KMP/Desktop
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()   // Android and commonMain
+    // val state by viewModel.state.collectAsState()             // Compose Desktop only
     OrdersScreen(state = state, onEvent = viewModel::onEvent)
 }
 ```
 
-1. **`collectAsStateWithLifecycle()` on Android** (`androidx.lifecycle:lifecycle-runtime-compose`) —
-   it stops collecting below `STARTED`. `collectAsState()` keeps a backgrounded screen re-rendering
-   and keeps its upstream alive.
-2. **`collectAsState()` on Compose Desktop and in `commonMain`**, where there is no Android
-   lifecycle to observe. This is the one place the two targets legitimately differ.
+1. **`collectAsStateWithLifecycle()` on Android and in `commonMain`**
+   (`androidx.lifecycle:lifecycle-runtime-compose`, multiplatform since Lifecycle 2.8) — it stops
+   collecting below `STARTED`. `collectAsState()` keeps a backgrounded screen re-rendering and keeps
+   its upstream alive.
+2. **`collectAsState()` on Compose Desktop only**, where there is no lifecycle to observe. A Compose
+   Multiplatform screen in `commonMain` *is* the Android screen, so it takes the lifecycle-aware
+   collector like any other Android screen.
 3. **Derived flows are shared once, not re-collected per subscriber:**
 
 ```kotlin
@@ -280,7 +286,8 @@ different problems, and adding both at once fixes neither.
 
 1. **`collectAsState()` in an Android app** — the screen keeps collecting in the back stack and
    behind a locked screen, holding its upstream open and recomposing off-screen. Use
-   `collectAsStateWithLifecycle()`; `collectAsState()` is for Desktop and `commonMain` only.
+   `collectAsStateWithLifecycle()`; `collectAsState()` is for Compose Desktop only — `commonMain`
+   that also runs on Android needs the lifecycle-aware collector just as much.
 2. **Business logic in the composable** — a `try/catch` around a repository call inside
    `LaunchedEffect`, or `if (user.isPremium && cart.total > 100)` in the render. Recomposition runs
    it an unpredictable number of times, and no unit test can reach it.

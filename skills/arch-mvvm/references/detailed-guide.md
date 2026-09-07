@@ -4,9 +4,11 @@ One screen — a list of orders that loads, fails, retries, refreshes and opens 
 twice: once with a sealed `UiState`, once with a data-class one, plus the hybrid the third table row
 recommends. Every section is self-contained; load the one you need, not the file.
 
-Android imports are shown. On Compose Desktop and in `commonMain`, replace
-`collectAsStateWithLifecycle()` with `collectAsState()`, drop `flowWithLifecycle`, and read
-`Test Setup` for the test differences.
+Android imports are shown. `collectAsStateWithLifecycle()` and
+`androidx.lifecycle.compose.LocalLifecycleOwner` are multiplatform since Lifecycle 2.8, so a Compose
+Multiplatform screen in `commonMain` keeps this code as written — it is the Android screen. Only
+Compose Desktop, which has no lifecycle to observe, swaps in `collectAsState()` and collects effects
+in a plain `LaunchedEffect`. Read `Test Setup` for the test differences.
 
 ## Shared Pieces
 
@@ -61,6 +63,7 @@ class FakeOrderRepository : OrderRepository {
     }
 }
 
+// String.format is JVM-only — on KMP the formatter is injected per platform.
 val money = MoneyFormatter { cents -> "$%.2f".format(cents / 100.0) }
 val beans = Order(OrderId("1"), "Coffee beans", totalCents = 1800)
 val beansRow = OrderRow(OrderId("1"), "Coffee beans", "$18.00")
@@ -145,7 +148,7 @@ Three things carry the design:
 fun OrdersRoute(
     onOpenOrder: (OrderId) -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: OrdersViewModel = hiltViewModel(),
+    viewModel: OrdersViewModel = hiltViewModel(),   // koinViewModel() on KMP/Desktop
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -164,7 +167,9 @@ fun OrdersRoute(
 ```
 
 `flowWithLifecycle` is what keeps a back-stacked screen from navigating on top of the one the user is
-looking at; the `Channel` buffers the effect until the screen is resumed again.
+looking at, and the `Channel` holds the rest until the screen resumes. One element can still be lost:
+`receiveAsFlow()` may have taken it out of the channel at the instant collection is cancelled. Where
+losing it is not acceptable, keep the effect in `UiState` behind a consume callback instead.
 
 ```kotlin
 @Composable
@@ -287,6 +292,14 @@ data class OrdersUiState(
     val error: UiMessage? = null,
 ) {
     val showEmptyPane: Boolean get() = !isLoading && error == null && orders.isEmpty()
+}
+
+// This shape earns one event the sealed section has no state for; the rest are unchanged.
+sealed interface OrdersUiEvent {
+    data object Appeared : OrdersUiEvent
+    data object RetryClicked : OrdersUiEvent
+    data object PullRefreshed : OrdersUiEvent
+    data class OrderClicked(val id: OrderId) : OrdersUiEvent
 }
 ```
 
@@ -518,6 +531,30 @@ and refresh indicator from the data-class one. That is the whole trade: one more
 
 The channel plumbing used above, complete, plus the state-driven alternative.
 
+Three additions to `Shared Pieces` that this section uses:
+
+```kotlin
+interface OrderRepository {
+    suspend fun load(): List<Order>
+    suspend fun archive(id: OrderId)
+}
+
+sealed interface UiMessage {
+    data object Offline : UiMessage
+    data object Unexpected : UiMessage
+    data object Archived : UiMessage
+}
+
+// Resolved in the composable, the only layer that has a Context.
+fun UiMessage.resolve(context: Context): String = context.getString(
+    when (this) {
+        UiMessage.Offline -> R.string.orders_offline
+        UiMessage.Unexpected -> R.string.orders_unexpected
+        UiMessage.Archived -> R.string.orders_archived
+    }
+)
+```
+
 ```kotlin
 sealed interface OrdersEffect {
     data class OpenOrder(val id: OrderId) : OrdersEffect
@@ -560,7 +597,9 @@ LaunchedEffect(viewModel, lifecycle) {
 ```
 
 `resolve(context)` runs in the composable, not the ViewModel — the rule that keeps `Context` out of
-the ViewModel and the tests off a device.
+the ViewModel and the tests off a device. Note that `showSnackbar` suspends until the snackbar is
+dismissed, so every later effect queues behind it; launch it in a child coroutine
+(`launch { snackbarHostState.showSnackbar(…) }`) when a navigation must not wait for a message.
 
 The state-driven alternative, for an effect that must survive process death (a payment result, a
 completed wizard) — the flag lives in the state and the Screen reports back when it has acted:
@@ -592,7 +631,7 @@ test-only.
 ```kotlin
 // Android and any JVM source set with JUnit 4
 class MainDispatcherRule(
-    private val dispatcher: TestDispatcher = StandardTestDispatcher(),
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
 ) : TestWatcher() {
     override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
     override fun finished(description: Description) = Dispatchers.resetMain()
@@ -620,8 +659,9 @@ Guidance that applies to every test above:
    intermediate `Loading`. Reach for the unconfined one only when a test genuinely does not care
    about intermediate states.
 2. Inject a dispatcher rather than calling `withContext(Dispatchers.IO)` inside the ViewModel where
-   you can; when it is injected, pass the `StandardTestDispatcher` from the same scheduler, or
-   `advanceUntilIdle()` will not reach that work. Layer-wide dispatcher placement is
+   you can; when it is injected, pass `StandardTestDispatcher(testScheduler)` from inside `runTest`,
+   or `mainDispatcherRule.dispatcher`, which is the same scheduler. A dispatcher built on any other
+   scheduler is one `advanceUntilIdle()` never reaches. Layer-wide dispatcher placement is
    `concurrency-coroutines`.
 3. Turbine's `awaitItem()` drives the scheduler, so most tests need no explicit `advanceUntilIdle()`;
    add it when the assertion is about a side effect (a call count, a repository write) instead.
