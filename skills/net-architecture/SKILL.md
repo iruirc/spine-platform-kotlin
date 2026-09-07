@@ -98,11 +98,16 @@ Cross-cutting behaviour belongs in one stack around the client, in one order, ou
    that layer, called once per attempt and once per redirect, seeing the bytes actually on the wire —
    the `Authorization` header included. The four rows above are four `addInterceptor` calls in that
    order; application interceptors nest in the order they are added. Reach for a network interceptor
-   only when the wire itself is the question.
+   only when the wire itself is the question — it is skipped entirely when the response comes from
+   the cache (`## Caching`), so nothing that must run once per call belongs there.
 2. **OkHttp already splits row 4 from the rest**: `callTimeout` bounds the whole call, while
    `connectTimeout`, `readTimeout` and `writeTimeout` bound one attempt. Row 2 has a built-in seat
    too — `authenticator`, called on a 401 with the failed response, returning the replay request or
-   `null` to give up, with `Response.priorResponse` available to bound the loop.
+   `null` to give up, with `Response.priorResponse` available to bound the loop. Take that seat only
+   when OkHttp's own follow-up layer *is* row 3: an `Authenticator` runs inside
+   `RetryAndFollowUpInterceptor`, below every application interceptor, so an app-level retry added
+   with `addInterceptor` would wrap it and put row 3 outside row 2. With an app-level retry, auth is
+   an application interceptor that refreshes and replays itself.
 3. **Ktor installs the same layering as plugins.** `Auth` and `HttpRequestRetry` both wrap the send
    and nest in install order, the first installed being the outer one, so `install(Auth)` goes above
    `install(HttpRequestRetry)` in the `HttpClient { }` block. `Logging` and `HttpTimeout` sit on
@@ -121,8 +126,9 @@ One expired token must produce one refresh, however many requests are in flight.
 ```kotlin
 class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
     private val mutex = Mutex()
-    private var current: Token = Token.NONE
     private var inFlight: Deferred<Token>? = null
+    var current: Token = Token.NONE
+        private set
 
     // `seen` is the token whose request got the 401: if it is no longer the current one,
     // somebody else already refreshed and this caller only has to re-read.
@@ -130,7 +136,11 @@ class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
         val job = mutex.withLock {
             if (current != seen) return current
             inFlight ?: scope.async {
-                auth.refresh(seen.refreshToken).also { mutex.withLock { current = it; inFlight = null } }
+                try {
+                    auth.refresh(seen.refreshToken).also { fresh -> mutex.withLock { current = fresh } }
+                } finally {
+                    mutex.withLock { inFlight = null }
+                }
             }.also { inFlight = it }
         }
         return job.await()
@@ -150,7 +160,10 @@ class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
    one and the user is signed out for no reason they can describe.
 5. **One refresh, one replay.** A 401 on the replayed request is a real authentication failure:
    surface it and sign out (`error-architecture`), do not loop.
-6. **On Ktor, do not hand-roll any of this.** `Auth`'s `bearer { refreshTokens { } }` is already
+6. **Clear the cached `Deferred` on the failure path too.** A refresh that threw and stayed cached
+   replays its exception to every caller that arrives afterwards, and the session is dead until the
+   process restarts — hence the `finally`.
+7. **On Ktor, do not hand-roll any of this.** `Auth`'s `bearer { refreshTokens { } }` is already
    single-flight — it guards the refresh internally and parks parallel callers on its result. A
    hand-rolled store beside it produces two refreshes for one 401.
 

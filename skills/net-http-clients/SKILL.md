@@ -48,6 +48,7 @@ section, not the file: `rg -n "^## " skills/net-http-clients/references/detailed
 | OkHttp used directly, with no typed layer over it | `OkHttp Alone` |
 | A blocking outbound client in a Spring service | `Spring RestClient` |
 | A reactive outbound client in a Spring service | `Spring WebClient` |
+| A CLI or tool calling out with no HTTP dependency at all | `JDK HttpClient` |
 | Tests against a real socket for Retrofit or OkHttp | `Retrofit + OkHttp — Test Double`, `OkHttp Alone — Test Double` |
 | Tests with no socket, running on every KMP target | `Ktor Client — Test Double` |
 | Tests for a Spring outbound call | `Spring RestClient — Test Double`, `Spring WebClient — Test Double` |
@@ -117,9 +118,13 @@ val http = OkHttpClient.Builder()
     .callTimeout(60.seconds.toJavaDuration())
     .addInterceptor(logging)
     .addInterceptor(AuthInterceptor(tokens))
-    .authenticator(RefreshAuthenticator(tokens))
+    .addInterceptor(RetryInterceptor())
     .build()
 ```
+
+One chain, in the middleware order: OkHttp's `authenticator` seat runs inside its retry-and-follow-up
+layer, below every application interceptor, so mixing it with an app-level retry inverts auth and
+retry. `net-architecture` owns that rule; the reference has both interceptors in full.
 
 The same four settings on a Ktor client, where they are plugins rather than builder calls:
 
@@ -148,9 +153,10 @@ val http = HttpClient(OkHttp) {
 
 1. **Set the timeouts; the defaults are not a policy.** OkHttp ships 10 seconds each for connect, read
    and write and *no* call timeout, so a slow drip of bytes holds a request open forever — add
-   `callTimeout`. The Ktor client has no timeouts at all until `HttpTimeout` is installed, and its
-   three knobs are `requestTimeoutMillis`, `connectTimeoutMillis` and `socketTimeoutMillis`. In Spring
-   the timeouts live on the request factory or the connector, not on the builder.
+   `callTimeout`. The Ktor client has no client-level timeout policy until `HttpTimeout` is installed
+   — whatever the engine defaults to is what applies, and that differs per engine — and its three
+   knobs are `requestTimeoutMillis`, `connectTimeoutMillis` and `socketTimeoutMillis`. In Spring the
+   timeouts live on the request factory or the connector, not on the builder.
 2. **One `OkHttpClient` per process, one `HttpClient` per process.** The instance owns the connection
    pool, the dispatcher's threads and the response cache; building one per call throws all three away
    every time and leaks threads until the pool evicts them. A variant — a different timeout for
@@ -198,7 +204,8 @@ val http = HttpClient(OkHttp) {
    missing, and a bug that reproduces in one half of the app. Pick the row and migrate to it.
 2. **`runBlocking` around a suspending call.** It blocks the calling thread until the request
    finishes — on Android's main thread that is a frozen UI and an ANR, on a server thread it is the
-   thread pool it was supposed to free. It exists for `main()` and for tests
+   thread pool it was supposed to free. It exists for `main()`, for tests, and for blocking callbacks
+   OkHttp invokes on its own threads (`Interceptor`, `Authenticator`) — nowhere else
    (`concurrency-coroutines`).
 3. **Logging bodies in release.** `Level.BODY` left on ships tokens and personal data into logcat or
    the log aggregator, and the `Authorization` header goes with it unless it was redacted. Body
@@ -209,9 +216,10 @@ val http = HttpClient(OkHttp) {
 5. **Jackson without `jackson-module-kotlin`.** Non-null `val`s get `null` written into them by
    reflection, default arguments are ignored, and the failure surfaces as an NPE in code with no
    nullable type in sight.
-6. **Default timeouts, or no timeouts.** A Ktor client with `HttpTimeout` never installed waits as
-   long as the socket does, and an OkHttp client with no `callTimeout` will hold a spinner on screen
-   for as long as the server keeps dripping bytes.
+6. **Default timeouts, or no policy at all.** A Ktor client with `HttpTimeout` never installed has no
+   client-level policy and inherits whatever its engine happens to default to — different on `CIO`,
+   `OkHttp` and `Darwin`. An OkHttp client with no `callTimeout` holds a spinner on screen for as long
+   as the server keeps dripping bytes.
 7. **A JVM-only client in a module that is about to be shared.** Retrofit and Moshi in what will
    become `commonMain` means the migration is a rewrite of every data source rather than a source-set
    move (`pkg-kmp-source-sets`).
