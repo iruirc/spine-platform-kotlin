@@ -621,7 +621,17 @@ LaunchedEffect(state.paidOrderId) {
 
 It costs a field and a consume callback, and it is the only one of the three that comes back after
 the process is killed, provided the field is written through `SavedStateHandle`. Use it there; use
-the channel everywhere else.
+the channel everywhere else. That handle is where a search query, a wizard step and a pending route
+belong too — it is the ViewModel's own store, and it holds `Bundle`-able values, not domain types:
+
+```kotlin
+class CheckoutViewModel(private val handle: SavedStateHandle) : ViewModel() {
+    val paidOrderId: StateFlow<String?> = handle.getStateFlow("paidOrderId", null)
+
+    fun onPaid(id: OrderId) { handle["paidOrderId"] = id.value }
+    fun onNavigatedToReceipt() { handle["paidOrderId"] = null }
+}
+```
 
 ## Test Setup
 

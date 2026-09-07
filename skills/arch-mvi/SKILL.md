@@ -225,7 +225,8 @@ fun SearchRoute(
 3. **`flowWithLifecycle(lifecycle)` is not optional on Android** — without it a backgrounded screen
    keeps consuming effects and navigates under the one the user is looking at. Compose Desktop, which
    has no lifecycle to observe, drops it and the `lifecycle` key with it.
-4. **On Orbit, use `orbit-compose`**: `viewModel.collectAsState()` for the state and
+4. **On Orbit, use `orbit-compose`**: `viewModel.collectAsState()` (orbit-compose's own extension
+   on the container host, not `androidx.compose.runtime`'s `Flow.collectAsState()`) for the state and
    `viewModel.collectSideEffect { }` for effects. Both are lifecycle-aware already, so writing the
    `flowWithLifecycle` dance around them is duplicated machinery, not extra safety.
 5. **The stateless half takes `(state, onIntent)` and nothing else.** A composable typed against the

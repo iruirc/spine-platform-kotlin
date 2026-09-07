@@ -149,9 +149,8 @@ Cross-cutting (always, regardless of pattern):
    presentation) is **not** this — one pattern per layer, not one per feature
 3. **Choosing without writing it down** — record the choice in the active project guidance file's
    `## Stack` so every later task reads one source of truth instead of re-deciding
-4. **Refusing to migrate when the signals appear** — see the signals in `arch-layered` and the
-   recomposition and state-ownership signals in `compose-state`. A stack fits a project's current
-   size, not its whole lifetime
+4. **Refusing to migrate when the signals appear** — see the signals in `arch-layered`. A stack
+   fits a project's current size, not its whole lifetime
 5. **Letting a library pick the architecture** — "we use Compose, therefore MVVM" is fine; "we use
    Flow, therefore MVI" is not. A library is a tool, not a pattern
 
@@ -171,7 +170,9 @@ Cross-cutting (always, regardless of pattern):
    Values are the manifest's own spellings (`MVVM`, `MVI`, `Clean Architecture`, `Layered`,
    `Hexagonal`; `Hilt`, `Koin`, `Dagger`, `Spring`, `Manual`), because that is what
    `spine-toolkit:stack-detect` matches against. Don't invent fields. Record a short context line
-   above the section as a comment: `<!-- Chosen YYYY-MM-DD: <axes summary> -> <stack> -->`.
+   above the section as a comment: `<!-- Chosen YYYY-MM-DD: <axes summary> -> <stack> -->`. When a
+   caller (such as `kotlin-setup`) asked for the value, return it instead of writing — during setup
+   that caller is the only writer.
 6. **If the user disagrees with the recommendation** — record their choice as-is, then add
    `Objection: <reason from the matrix or Fast Path>` either directly under `## Stack`, or in
    `Done.md → ## Objections` of the active task. Risks must stay visible.

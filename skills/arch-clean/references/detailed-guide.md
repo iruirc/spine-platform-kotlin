@@ -346,15 +346,21 @@ internal fun Order.toLineEntities(): List<OrderLineEntity> =
 ```
 
 Failure mapping is mapping too, and it belongs in the same place for the same reason — it is the
-translation from someone else's vocabulary into the domain's:
+translation from someone else's vocabulary into the domain's. Two hops, because the transport's
+vocabulary and the domain's are two vocabularies; the families themselves are `error-architecture`'s:
 
 ```kotlin
-internal fun Throwable.toOrderError(): OrderError = when (this) {
-    is OrderError -> this
-    is IOException -> OrderError.Offline
-    is HttpException -> if (code() == 404) OrderError.NotFound else OrderError.Unexpected(this)
-    is SerializationException -> OrderError.Unexpected(this)
-    else -> OrderError.Unexpected(this)
+internal fun Throwable.toDataError(): DataError = when (this) {
+    is DataError -> this
+    is IOException -> DataError.Unreachable(this)
+    is HttpException -> DataError.Http(code(), response()?.errorBody()?.problemType())
+    else -> DataError.Malformed(this)
+}
+
+internal fun DataError.toOrderError(): OrderError = when (this) {
+    is DataError.Unreachable -> OrderError.Offline
+    is DataError.Http -> if (status == 404) OrderError.NotFound else OrderError.Unexpected(this)
+    is DataError.Malformed, DataError.Empty -> OrderError.Unexpected(this)
 }
 ```
 
@@ -500,9 +506,9 @@ internal fun Order.toRow(dates: DateFormatter, money: MoneyFormatter): OrderRow 
 )
 
 internal fun Throwable.toUiMessage(): UiMessage = when (this) {
-    OrderError.Offline -> UiMessage.Offline
-    OrderError.NotFound -> UiMessage.Gone
-    else -> UiMessage.Unexpected
+    OrderError.Offline -> UiMessage.Resource(R.string.orders_offline)
+    OrderError.NotFound -> UiMessage.Resource(R.string.orders_not_found)
+    else -> UiMessage.Resource(R.string.orders_unexpected)
 }
 ```
 

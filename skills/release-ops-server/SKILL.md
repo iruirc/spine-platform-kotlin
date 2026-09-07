@@ -225,7 +225,7 @@ The discipline — expand/contract, additive first, never a rename in one deploy
 3. **No PII in logs, and this is a release gate, not a style preference** — logs leave the process and
    land in a third party's index. The redaction rule is `error-architecture` `## Logging and PII`.
 4. **Cardinality is what kills a metrics backend.** A user id, an order id or a raw path as a tag
-   creates a series per value; template the path (`/orders/{id}`) and keep identifiers in the traces.
+   creates a series per value; template the path (`/orders/{id}`) and keep identifiers in the traces and logs.
 5. **A health endpoint is not a metric.** Alert on the RED series and on saturation; alerting on the
    probe only tells you what the orchestrator already acted on.
 
