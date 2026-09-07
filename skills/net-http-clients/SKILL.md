@@ -126,30 +126,39 @@ One chain, in the middleware order: OkHttp's `authenticator` seat runs inside it
 layer, below every application interceptor, so mixing it with an app-level retry inverts auth and
 retry. `net-architecture` owns that rule; the reference has both interceptors in full.
 
-The same four settings on a Ktor client, where they are plugins rather than builder calls:
+The same chain on a Ktor client, where the layers are plugins rather than builder calls:
 
 ```kotlin
+private val idempotent = setOf(HttpMethod.Get, HttpMethod.Put, HttpMethod.Delete, HttpMethod.Head)
+
 val http = HttpClient(OkHttp) {
-    install(ContentNegotiation) { json(appJson) }
     install(Logging) {
         level = if (isDebug) LogLevel.BODY else LogLevel.NONE
         sanitizeHeader { it == HttpHeaders.Authorization }
     }
     install(Auth) {
         bearer {
-            loadTokens { tokens.current() }
-            refreshTokens { tokens.refreshed(oldTokens) }
+            loadTokens { tokens.current.let { BearerTokens(it.access, it.refreshToken) } }
+            refreshTokens {
+                tokens.refresh(tokens.current).let { BearerTokens(it.access, it.refreshToken) }
+            }
         }
     }
-    install(HttpRequestRetry) { retryOnServerErrors(maxRetries = 3); exponentialDelay() }
-    install(HttpTimeout) {
-        connectTimeoutMillis = 10_000
-        requestTimeoutMillis = 30_000
-        socketTimeoutMillis = 20_000
+    install(HttpRequestRetry) {
+        maxRetries = 3
+        retryIf { req, res -> req.method in idempotent && res.status.value in 500..599 }
+        retryOnExceptionIf { req, cause -> req.method in idempotent && cause is IOException }
+        exponentialDelay()
     }
-    defaultRequest { url(baseUrl) }
+    install(HttpTimeout) {
+        connectTimeoutMillis = 10_000; requestTimeoutMillis = 30_000; socketTimeoutMillis = 20_000
+    }
 }
 ```
+
+`HttpRequestRetry` is method-blind, so both predicates are guarded: `retryOnServerErrors()` on its
+own repeats every POST. `ContentNegotiation`, `defaultRequest` and the engine argument are left out
+for length — see the reference for the full plugin set.
 
 1. **Set the timeouts; the defaults are not a policy.** OkHttp ships 10 seconds each for connect, read
    and write and *no* call timeout, so a slow drip of bytes holds a request open forever — add

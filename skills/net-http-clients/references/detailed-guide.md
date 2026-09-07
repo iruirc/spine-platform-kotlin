@@ -342,7 +342,7 @@ class DownloadTest {
         server.enqueue(MockResponse().setBody("payload").setHeadersDelay(10, TimeUnit.SECONDS))
         val into = File.createTempFile("download", null)
 
-        val job = launch { download(server.url("/file").toString(), into, watched) }
+        val job = launch(Dispatchers.IO) { download(server.url("/file").toString(), into, watched) }
         assertNotNull(server.takeRequest(5, TimeUnit.SECONDS))
         job.cancelAndJoin()
 
@@ -356,6 +356,9 @@ class DownloadTest {
   reading. `EventListener.canceled` fires only if `Call.cancel()` was actually reached.
 - `takeRequest` before the cancellation is what makes the test deterministic — cancel a job whose
   body has not run yet and the assertion passes for the wrong reason.
+- `launch(Dispatchers.IO)`, not a bare `launch`: `runBlocking`'s event loop is one thread, and
+  `takeRequest` blocks it, so a child queued on that same dispatcher would never start and the
+  `assertNotNull` above would fail before anything was cancelled.
 - `setHeadersDelay`, not `setBodyDelay`: the call has to still be suspended in `await()` when the
   cancellation lands. Once the body copy has started, it is blocking I/O and cancellation no longer
   reaches the socket through this bridge.
