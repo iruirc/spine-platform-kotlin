@@ -107,6 +107,10 @@ as method parameters, as `ordersClient` above takes `props` rather than calling 
 
 ## Scopes
 
+`di-composition-root`'s scopes table owns the cross-framework rows — app, screen and
+request/session, and what each means before a container names it. These are the four Spring itself
+declares, and how long each one actually lasts.
+
 | Scope | Lives for | Declared as |
 |---|---|---|
 | singleton | the whole context — **the default, and the right answer for almost every bean** | nothing; it is what you get |
@@ -166,6 +170,8 @@ Three mechanisms that look alike and answer different questions.
 class is where `@Value` strings stop spreading:
 
 ```kotlin
+import java.time.Duration          // not kotlin.time.Duration — Spring binds the java.time one
+
 @ConfigurationProperties(prefix = "orders")
 @Validated
 data class OrdersProperties(
@@ -188,8 +194,9 @@ orders:
   that uses it, or `@ConfigurationPropertiesScan` on the application class for all of them. A
   `@ConfigurationProperties` class is not a `@Component` and is not found by component scanning.
 - **Relaxed binding maps `base-url`, `baseUrl` and `ORDERS_BASEURL` to the same property**, so the
-  YAML reads as kebab-case and the Kotlin reads as camelCase with no adapter. `Duration` binds from
-  `30s`, `2m`, `PT30S`; `DataSize` from `10MB`.
+  YAML reads as kebab-case and the Kotlin reads as camelCase with no adapter. `java.time.Duration`
+  binds from `30s`, `2m`, `PT30S`; `DataSize` from `10MB`. `kotlin.time.Duration` is not a binding
+  target, and a property declared with it fails to convert at startup.
 - **`@Validated` plus `jakarta.validation` constraints fail the context at startup** with the property
   path in the message. Constraints go on the field via `@field:` — the annotation would otherwise
   land on the constructor parameter, where nothing reads it. This is the difference between a bad
@@ -203,12 +210,15 @@ orders:
 ## Kotlin Specifics
 
 Kotlin classes and members are `final` by default; Spring's proxies are subclasses. Without help,
-`@Transactional` on a Kotlin `@Service` fails to start the context — or, worse, quietly does nothing
-when the container falls back to a JDK interface proxy the caller does not use.
+`@Transactional` on a Kotlin `@Service` either fails to start the context, or — where the bean
+implements an interface — falls back to a JDK interface proxy, and injecting the concrete class then
+fails with `BeanNotOfRequiredTypeException`. Both are loud. Advice reached through the interface
+still applies; what fails silently is a self-call or a `private` method (see Common Mistakes).
 
 ```kotlin
 plugins {
-    kotlin("plugin.spring")   // all-open, keyed to Spring's own annotations
+    kotlin("jvm") version "..."
+    kotlin("plugin.spring") version "..."  // all-open, keyed to Spring's own annotations
 }
 ```
 
@@ -228,9 +238,10 @@ plugins {
    the classpath.
 4. **`@Bean` functions live on a top-level `@Configuration` class, not in a `companion object`.** A
    companion member is compiled onto the `Companion` class, which the container never parses, so the
-   bean silently does not exist; adding `@JvmStatic` makes it register and buys nothing, because the
-   Java reason for a `static @Bean` — defining a `BeanFactoryPostProcessor` without instantiating its
-   configuration class early — is served in Kotlin by a small separate `@Configuration` class.
+   bean silently does not exist. `@JvmStatic` makes it register as a static `@Bean`, which is the
+   documented form for a `BeanFactoryPostProcessor` or `BeanPostProcessor` — those must be created
+   without instantiating their configuration class early. For everything else, a small separate
+   `@Configuration` class holding just that bean is the clearer way to get the same isolation.
 5. **`lateinit var` is for a value the framework assigns after construction**, and on a server that is
    very nearly nothing. It trades a compile-time guarantee for an
    `UninitializedPropertyAccessException` at some later call.
@@ -250,7 +261,7 @@ The context is expensive, so the question in every test is how little of it to b
 | Serialization of one type | `@JsonTest` |
 | One HTTP client and its bindings | `@RestClientTest` with `MockRestServiceServer` |
 | The whole application wired together | `@SpringBootTest`, with `webEnvironment = RANDOM_PORT` when a real port is needed |
-| Replace one bean with a mock | `@MockkBean` (or `@SpykBean`) from `com.ninja-squad:springmockk`, the MockK-based pair to Boot's own `@MockitoBean` — `@MockBean` is the Mockito one, deprecated since Boot 3.4 |
+| Replace one bean with a mock | `@MockkBean` (or `@SpykBean`) from `com.ninja-squad:springmockk`, the MockK-based pair to `@MockitoBean` — which ships in Spring Framework 6.2's `spring-test` and which Boot 3.4 adopts, deprecating its own Mockito-based `@MockBean` |
 | Add a bean only tests need | a `@TestConfiguration` class, brought in with `@Import(...)`; it is not picked up by component scanning, which is the point |
 | Point the context at a container or a fake server | `@ServiceConnection` on a Testcontainers field (Boot 3.1+), or `@DynamicPropertySource` for anything it does not cover |
 
@@ -272,11 +283,10 @@ different `@MockkBean` sets are a minutes-long suite that mostly starts Spring.
    class whose `@Bean` methods call each other, it silently builds a second instance of a bean the
    rest of the app treats as a singleton — two connection pools, two caches. Take dependencies as
    `@Bean` method parameters, then `false` is always safe.
-3. **`@Transactional` on a self-call.** `this.doWork()` from another method of the same bean goes
-   straight to the instance, not through the proxy, so the annotation does nothing and nothing warns.
-   The same holds for `private` methods and for any class the all-open plugin did not open. Move the
-   annotated method to a collaborator, or put the boundary where the call enters the bean
-   (`arch-layered`).
+3. **`@Transactional` on a class the all-open plugin did not open.** Only the annotations
+   `kotlin("plugin.spring")` knows are opened; a `final` helper the annotation was moved onto, or a
+   `private` method, gets no proxy and no warning. Where the boundary belongs once the class is
+   proxyable — and why a self-call defeats it — is `arch-layered` `## Transaction Boundary`.
 4. **A `data class` as a `@Component` or `@Service`.** `equals`/`hashCode` compare injected
    collaborators, `toString()` prints them into logs — credentials included — and `copy()` hands out
    a second instance of what the container calls a singleton. A `data class` models a value:

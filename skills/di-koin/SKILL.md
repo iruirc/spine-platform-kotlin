@@ -105,8 +105,8 @@ implementation (`nav-multiplatform`) — goes behind one `expect` declaration:
 // commonMain
 expect val platformModule: Module
 
-fun initKoin(config: KoinAppDeclaration? = null) = startKoin {
-    config?.invoke(this)
+fun initKoin(appDeclaration: KoinAppDeclaration = {}) = startKoin {
+    appDeclaration()
     modules(commonModule, platformModule)
 }
 
@@ -121,26 +121,29 @@ actual val platformModule = module {
 }
 ```
 
-The nullable `config` parameter is the only seam a platform entry needs to add its own context —
+The `appDeclaration` parameter is the only seam a platform entry needs to add its own context —
 `initKoin { androidContext(this@App) }` from `Application.onCreate`, a bare `initKoin()` from a
 desktop `main()` or from the iOS app entry through the generated `KoinKt.doInitKoin`. Where each of
 those entries lives is `di-composition-root`; the source-set placement is `pkg-kmp-source-sets`. A
 `fun platformModule(): Module` reads the same and is the better form when the module needs an
 argument.
 
-**Koin Annotations** (`io.insert-koin:koin-annotations` plus the `koin-ksp-compiler` KSP processor)
-replaces the module bodies with `@Single`, `@Factory`, `@KoinViewModel` and `@Scope` on the classes
-themselves, gathered by an `@Module @ComponentScan` class or by the generated `defaultModule`. It
-pays on a large graph, where the modules had become a second copy of the constructor list and drifted
-from it; and it buys back some of what runtime resolution gave away, because the KSP option
-`KOIN_CONFIG_CHECK=true` makes a missing binding a build failure. It costs a KSP round on every
-module that carries an annotation, which is the build time Koin was chosen to avoid — so it is a
-decision for the graph as a whole, not per feature, and hand-written modules stay a fine answer.
+### Koin Annotations
+
+`io.insert-koin:koin-annotations` plus the `koin-ksp-compiler` KSP processor replace the module
+bodies with `@Single`, `@Factory`, `@KoinViewModel` and `@Scope` on the classes themselves, gathered
+by an `@Module @ComponentScan` class or by the generated `defaultModule`. It pays on a large graph,
+where the modules had become a second copy of the constructor list and drifted from it, and the KSP
+option `KOIN_CONFIG_CHECK=true` buys back some of what runtime resolution gave away by making a
+missing binding a build failure. It costs a KSP round on every module carrying an annotation — the
+build time Koin was chosen to avoid — so it is a decision for the graph as a whole, not per feature,
+and hand-written modules stay a fine answer.
 
 ## Scopes
 
-Koin has one scope mechanism and Android has another, and the common mistake is to reach for the
-wrong one.
+`di-composition-root`'s scopes table owns the cross-framework rows — what app, screen and
+request/session mean before any container renames them. This one is narrower: Koin has one scope
+mechanism and Android has another, and the common mistake is to reach for the wrong one.
 
 | Need | Reach for | Closed by |
 |---|---|---|
@@ -207,11 +210,10 @@ fun OrderDetailScreen(orderId: OrderId) {
 - **`koinInject()`** resolves anything else — a formatter, an image loader, a clock — for a
   composable that genuinely needs it and has no ViewModel. It is a service locator call, so keep it
   at the screen's edge and pass the result down as a parameter.
-- **Previews and desktop entry points need a container.** Outside an Android `Application` there is no
-  `startKoin` behind the composable, so wrap the tree in `KoinApplication(application = { modules(previewModule) }) { … }`,
-  or in `KoinContext()` when a Koin instance already exists and only needs to be published into the
-  composition. A preview with fake definitions is the cheapest way to keep previews from needing a
-  database.
+- **Previews and desktop entry points need a container.** Outside an Android `Application` nothing
+  called `startKoin`, so wrap the tree in `KoinApplication(application = { modules(previewModule) }) { … }`,
+  or in `KoinContext { … }` when an instance already exists and only needs publishing into the
+  composition. Fake definitions in a preview keep it from needing a database.
 
 ## Ktor Plugin
 
@@ -228,7 +230,7 @@ fun Application.module() {
 }
 
 fun Route.orderRoutes() {
-    val orders by inject<OrderService>()     // resolved once, at route-building time
+    val orders by inject<OrderService>()     // lazy: resolved on first access, then cached
 
     get("/orders/{id}") {
         val perRequest = call.scope.get<RequestContext>()
@@ -237,14 +239,16 @@ fun Route.orderRoutes() {
 }
 ```
 
-- **`by inject()` at route-building time, not per call.** The delegate is evaluated once when the
-  route is built, so an app-scoped service costs one resolve for the process rather than one per
-  request.
+- **`by inject()` at the route level, not inside the handler.** `Route.inject<T>()` hands back a
+  `lazy`: the delegate is created while the route is built and resolved on first access — inside the
+  first request that reaches it. The resolve still happens once per process rather than once per
+  request, but a missing binding surfaces on that first request, per this skill's opening rule.
 - **`requestScope { scoped { … } }` declares per-request definitions**, and `call.scope` is the scope
   the plugin opens for the call and closes when it ends. That is where a trace id, a caller identity
   or a per-request `UnitOfWork` belongs — the row `di-composition-root` calls "request or session".
-- **`slf4jLogger()` is worth installing.** Koin's default logger is silent below `ERROR`, and the log
-  line naming the missing type is most of the diagnosis when a resolve fails in production.
+- **`slf4jLogger()` is worth installing.** Koin's default is `EmptyLogger`, which prints nothing at
+  any level, so a failed resolve leaves only the exception. With the logger installed, the line
+  naming the type nobody defined is most of the diagnosis.
 
 ## Testing
 
