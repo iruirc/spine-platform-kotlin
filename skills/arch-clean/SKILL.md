@@ -60,7 +60,7 @@ not the file:
 | The implementation that picks a source and maps the failure | `Data — Repository Implementation` |
 | A ViewModel that consumes the use case and nothing else | `Presentation — ViewModel` |
 | One test per layer, and what each is allowed to touch | `Testing` |
-| The three dependency blocks that enforce the rule, JVM and KMP | `Gradle Wiring` |
+| The four build files that enforce the rule, JVM and KMP | `Gradle Wiring` |
 
 ## Layers and the Dependency Rule
 
@@ -75,10 +75,13 @@ Three layers, two arrows, both pointing at the domain:
    `implementation(project(":data"))` and no `project(":app")`. That absence is the architecture, and
    it is one grep away in review — which is why it survives a year and a folder convention does not.
 2. **`:domain` is `kotlin("jvm")` or a KMP module**, never `com.android.library`, and it declares one
-   dependency: `kotlinx-coroutines-core`. `Instant` and `Clock` are standard library since Kotlin
-   2.2, so `kotlinx-datetime` joins it only for time zones and calendar arithmetic. If a file there
-   needs an import outside `kotlin.*`, `kotlinx.coroutines.*` and your own packages, either the type
-   is wrong or the file is in the wrong module.
+   dependency: `kotlinx-coroutines-core`. `kotlin.time.Instant` and `kotlin.time.Clock` are stable
+   since Kotlin 2.3 and available from 2.1.20 behind `@ExperimentalTime`; on 2.2 or earlier either
+   add `-opt-in=kotlin.time.ExperimentalTime` or use `kotlinx.datetime.Instant` and `Clock` and keep
+   `kotlinx-datetime` as a `:domain` dependency — which the calendar types (`LocalDate`, `TimeZone`)
+   need on every version anyway. If a file there needs an import outside `kotlin.*`,
+   `kotlinx.coroutines.*`, `kotlinx.datetime.*` and your own packages, either the type is wrong or
+   the file is in the wrong module.
 3. **Presentation depends on `:domain` only.** It sees use cases and entities. A ViewModel that can
    name `OrderDto` has a dependency the graph should have refused.
 4. **`:data` depends on `:domain` and implements its interfaces.** Control flows outward at runtime —
@@ -210,8 +213,10 @@ Three model families, one per concern that can change independently:
 // :data — mappers are internal extension functions, one per direction
 internal fun OrderDto.toDomain(): Order = Order(
     id = OrderId(requireNotNull(id) { "order without id" }),
+    customer = CustomerId(requireNotNull(customerId)),
     placedAt = Instant.parse(requireNotNull(placedAt)),
-    status = status.toDomainStatus(),
+    status = status.toOrderStatus(),
+    currency = requireNotNull(currency),
     lines = lines.orEmpty().map(OrderLineDto::toDomain),
 )
 ```
@@ -304,9 +309,10 @@ Adopt it when at least two hold:
 - Feature work is parallel enough that a cross-team edge should be a compile error
 
 Skip it when the app is CRUD over an API you control, when a solo project's "domain" is
-`if (items.isEmpty())`, or when a server just maps HTTP to SQL (`arch-layered`). The tiebreak
-`architecture-choice` states is **Clean vs MVVM → MVVM until 4+ devs or a KMP shared layer**, and it
-holds because extraction is additive: a ViewModel's constructor changes from a repository to a use
+`if (items.isEmpty())`, or when a server just maps HTTP to SQL (`arch-layered`).
+`architecture-choice`'s When in Doubt row sends the undecided reader to MVVM; its Decision Matrix
+names the two conditions — team size and a KMP shared layer — that flip the answer. That advice is
+safe because extraction is additive: a ViewModel's constructor changes from a repository to a use
 case wrapping it, and nothing else moves.
 
 Two properties of the adoption itself:
@@ -339,7 +345,8 @@ Two properties of the adoption itself:
 5. **`:domain` as an Android library module** — `id("com.android.library")` because the wizard
    offered it. Its tests now want a device or Robolectric, `android.text.TextUtils` is one
    autocomplete away, and the KMP move later is blocked by the plugin. `kotlin("jvm")` or
-   `kotlin("multiplatform")`.
+   `kotlin("multiplatform")` — and if a module truly needs an Android target under KMP, that is
+   `com.android.kotlin.multiplatform.library` on `:data`, never here.
 6. **A port shaped like the transport** — `getOrders(page: Int, perPage: Int, ifNoneMatch: String?)`.
    Paging cursors, ETags and status codes are `:data` vocabulary; the domain asked for a customer's
    orders. Now every caller and every fake knows how the API paginates, and the day it changes they

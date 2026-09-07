@@ -9,9 +9,12 @@ The header comment on each block is the module and path the file belongs to. Tha
 in this architecture the path *is* the constraint, because the module a file sits in decides what it
 is allowed to import.
 
-Time types are `kotlin.time.Instant` and `kotlin.time.Clock`, in the standard library since Kotlin
-2.2. On an older toolchain they are `kotlinx.datetime.Instant` and `kotlinx.datetime.Clock` and the
-`kotlinx-datetime` dependency moves from optional to required; nothing else in these files changes.
+Time types are `kotlin.time.Instant` and `kotlin.time.Clock`: stable since Kotlin 2.3, and available
+from 2.1.20 behind `@ExperimentalTime`. On Kotlin 2.2 or earlier, either add
+`-opt-in=kotlin.time.ExperimentalTime` to the module's compiler options or use
+`kotlinx.datetime.Instant` and `kotlinx.datetime.Clock` and keep `kotlinx-datetime` as a `:domain`
+dependency; nothing else in these files changes. No sample below carries an `@OptIn` annotation —
+that opt-in belongs in the build file, once.
 
 ## Domain — Entity and Repository Port
 
@@ -446,12 +449,15 @@ Injecting the dispatcher rather than hard-coding `Dispatchers.IO` is what lets a
 
 ## Presentation — ViewModel
 
-The presentation layer's entire view of everything below it is one constructor parameter:
+The presentation layer's entire view of everything below it is one constructor parameter —
+`GetOrders`. The other two are its own formatters, declared in this module:
 
 ```kotlin
 // :feature:orders — com/acme/feature/orders/OrdersViewModel.kt
 class OrdersViewModel(
     private val getOrders: GetOrders,
+    private val dates: DateFormatter,
+    private val money: MoneyFormatter,
     savedState: SavedStateHandle,
 ) : ViewModel() {
 
@@ -467,7 +473,7 @@ class OrdersViewModel(
         viewModelScope.launch {
             _state.value = OrdersUiState.Loading
             _state.value = getOrders(customer).fold(
-                onSuccess = { orders -> OrdersUiState.Content(orders.map(Order::toRow)) },
+                onSuccess = { orders -> OrdersUiState.Content(orders.map { it.toRow(dates, money) }) },
                 onFailure = { error -> OrdersUiState.Error(error.toUiMessage()) },
             )
         }
@@ -483,6 +489,9 @@ The third mapping boundary lives here, and it is presentation's own:
 
 ```kotlin
 // :feature:orders — domain → what the screen renders. Formatting is a UI concern.
+fun interface DateFormatter { fun medium(at: Instant): String }
+fun interface MoneyFormatter { fun format(amount: Money, currency: String): String }
+
 internal fun Order.toRow(dates: DateFormatter, money: MoneyFormatter): OrderRow = OrderRow(
     id = id.value,
     title = "#" + id.value.takeLast(6),
@@ -586,14 +595,18 @@ Against a real engine, one integration test per source is enough to prove the sc
 
 ```kotlin
 // Server: the real database and the real migrations, in a container.
+import org.testcontainers.utility.DockerImageName
+
 @Testcontainers
 class OrderTableTest {
-    @Container val postgres = PostgreSQLContainer("postgres:16-alpine")
+    // <Nothing> because Kotlin cannot infer Testcontainers' self-referential SELF parameter.
+    @Container val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
     // Flyway/Liquibase runs against it in @BeforeEach — persistence-migrations.
 }
 
-// Android client: the real Room, no file on disk. inMemoryDatabaseBuilder takes a Context,
-// so this is an instrumented test (Room's multiplatform builder takes none and runs on the JVM).
+// Android client: the real Room, no file on disk. This one belongs to an Android-library :data —
+// inMemoryDatabaseBuilder takes a Context there, so it runs instrumented. On the multiplatform
+// layout, Room 2.7's KMP builder takes none and the same test runs on the JVM.
 private val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
     .allowMainThreadQueries()
     .build()
@@ -608,7 +621,11 @@ screen depends on:
 @Test
 fun `an offline failure renders the offline message`() = runTest {
     val repo = FakeOrderRepository().apply { failure = OrderError.Offline }
-    val viewModel = OrdersViewModel(GetOrders(repo), SavedStateHandle(mapOf("customerId" to "c-1")))
+    val viewModel = OrdersViewModel(
+        getOrders = GetOrders(repo),
+        dates = { "" }, money = { _, _ -> "" },   // fun interfaces: a lambda is the whole fake
+        savedState = SavedStateHandle(mapOf("customerId" to "c-1")),
+    )
 
     viewModel.state.test {
         assertEquals(OrdersUiState.Loading, awaitItem())
@@ -635,7 +652,9 @@ plugins { kotlin("jvm") }
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
-    // implementation(libs.kotlinx.datetime)  // only for time zones and calendar arithmetic
+    // Calendar types (LocalDate, TimeZone) need this on every Kotlin version; on 2.2 or earlier
+    // Instant and Clock come from here too, unless the module opts in to kotlin.time.
+    implementation(libs.kotlinx.datetime)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
@@ -643,7 +662,9 @@ dependencies {
 ```
 
 ```kotlin
-// :data/build.gradle.kts — every framework in the project lands here.
+// :data/build.gradle.kts — every framework in the project lands here. kotlin("jvm") is the server
+// and KMP-JVM shape; a :data that owns Room on Android applies the Android library plugin instead,
+// which is what makes the in-memory Room test above an instrumented one.
 plugins {
     kotlin("jvm")
     alias(libs.plugins.ksp)
@@ -697,12 +718,12 @@ plugins { kotlin("multiplatform") }
 
 kotlin {
     jvm()
-    androidTarget()
     iosArm64(); iosSimulatorArm64()
 
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)   // calendar types; see the JVM block above
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -711,6 +732,12 @@ kotlin {
     }
 }
 ```
+
+No `androidTarget()` here: that target wants an Android Gradle plugin applied to the module, which is
+precisely what Mistake 5 forbids `:domain`, so Android consumers take the `jvm()` variant. The one
+exception in the whole layout is the Android KMP library plugin
+(`com.android.kotlin.multiplatform.library`), and it belongs on `:data` when a platform driver needs
+an Android API — never on `:domain`.
 
 `:data` is multiplatform too, and it is the only module allowed an `iosMain` or an `androidMain` —
 for a driver, never for a rule (`pkg-kmp-source-sets`). Two greps keep the whole thing honest in CI,
