@@ -77,9 +77,9 @@ Back is not one gesture. It is three different platform facts sharing a name:
 | Desktop | nothing — there is no system back | the app draws it: a toolbar arrow, an `Esc` binding, a mouse side button |
 
 1. **One back abstraction in `commonMain`, and every screen calls it.** Compose Multiplatform ships
-   one since 1.7 — `BackHandler` from `androidx.compose.ui.backhandler`, usable directly in
-   `commonMain`. It is still experimental, so pin the Compose Multiplatform version and expect the
-   import path to move again before it settles.
+   one since 1.8 — `BackHandler` and `PredictiveBackHandler` from `androidx.compose.ui.backhandler`,
+   in `org.jetbrains.compose.ui:ui-backhandler`, a separate dependency the `commonMain` source set
+   declares. Still experimental: pin the version and expect the import path to move once more.
 
 ```kotlin
 // commonMain
@@ -90,7 +90,7 @@ fun EditorScreen(state: EditorState, onDiscard: () -> Unit, onBack: () -> Unit) 
 }
 ```
 
-2. **Decompose brings its own**, from Essenty, plus `predictiveBackGestureOverlay` — which draws the
+2. **Decompose brings its own**, from Essenty, plus `PredictiveBackGestureOverlay` — which draws the
    edge-swipe preview on every target, including the ones whose OS has no such gesture. If the app
    is on Decompose, use that one and do not mix in the Compose Multiplatform handler.
 3. **On desktop the handler never fires**, so a screen that is only escapable through back is a
@@ -131,7 +131,7 @@ class OrderDetailComponent(context: ComponentContext, id: String) : ComponentCon
     private val state = MutableValue(
         stateKeeper.consume(key = "state", strategy = State.serializer()) ?: State(id = id)
     )
-    private val worker = instanceKeeper.getOrCreate { OrderWorker() }
+    private val worker = instanceKeeper.getOrCreate { OrderWorker() } // : InstanceKeeper.Instance
 
     init { stateKeeper.register(key = "state", strategy = State.serializer()) { state.value } }
 }

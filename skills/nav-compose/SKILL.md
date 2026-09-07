@@ -48,11 +48,13 @@ stack for you, and Navigation 3 hands it back.
 **Take Navigation 3 when the back stack is application state.** One signal is enough: the app must
 compute its own stack (an adaptive layout collapsing two destinations into one pane, a wizard whose
 steps depend on the answers, a stack restored from the server), or multi-pane is a requirement and
-`ListDetailSceneStrategy` is the feature you are about to hand-roll.
+`ListDetailSceneStrategy` is the feature you are about to hand-roll. Accept the alpha churn.
 
 **Take Navigation Compose when the project already runs it**, and in a new project matching no
 signal above. It is stable, every Android answer in circulation assumes it, and the type-safe API in
-2.8 removed the one thing that used to be wrong with it.
+2.8 removed the one thing that used to be wrong with it. On Compose Desktop the coordinate is
+JetBrains' `org.jetbrains.androidx.navigation:navigation-compose` — the same type-safe API, so every
+sample below reads the same on both targets.
 
 **Never both in one app.** They share no back stack, so a destination in one is invisible to the
 other and system back reaches exactly one. The rest of this file is written against Navigation
@@ -86,8 +88,8 @@ NavHost(navController, startDestination = OrderList) {
 3. **An argument carries identity, not payload.** `OrderDetail(val id: String)`, and the ViewModel
    loads the order. A route is saved state and can be spelled as a URL, so what rides in it is
    size-capped, stale by the time it is read, and public.
-4. **Nullable fields and fields with a default become optional query arguments**, the rest path
-   segments — which is why `Search(query = null)` is legal.
+4. **A field with a default becomes an optional query argument**, every other field a path segment.
+   Nullability alone does not do it: `Search(val query: String? = null)` is optional for the `=`.
 5. **A custom type in a route needs its own `NavType`**, passed per destination through
    `composable<T>(typeMap = ...)` — and wanting one is usually rule 3 being violated.
 6. **The ViewModel reads its own arguments** with `savedStateHandle.toRoute<OrderDetail>()` — not a
@@ -160,7 +162,10 @@ navController.popBackStack()
 
 // in the Route of the screen that asked — `composable<Checkout> { entry -> CheckoutRoute(entry, …) }`
 @Composable
-fun CheckoutRoute(entry: NavBackStackEntry, viewModel: CheckoutViewModel = hiltViewModel()) {
+fun CheckoutRoute(
+    entry: NavBackStackEntry,
+    viewModel: CheckoutViewModel = hiltViewModel(), // Android; koinViewModel() on Desktop
+) {
     val picked by entry.savedStateHandle.getStateFlow<String?>(PickedCurrency, null)
         .collectAsStateWithLifecycle()
     LaunchedEffect(picked) {
@@ -242,7 +247,9 @@ fun AppBottomBar(navController: NavHostController, tabs: List<Tab>) {
    to say:
 
 ```kotlin
-BackHandler(enabled = state.hasUnsavedChanges) { showDiscardDialog = true }
+BackHandler(enabled = state.hasUnsavedChanges) { // Android; Desktop draws its own back affordance
+    showDiscardDialog = true
+}
 ```
 
 3. **An always-enabled `BackHandler` opts the screen out of the predictive-back preview**: the
@@ -267,8 +274,11 @@ composable<OrderDetail> {
 }
 
 @Composable
-fun OrderDetailRoute(onBack: () -> Unit, onOpenInvoice: (String) -> Unit,
-                     viewModel: OrderDetailViewModel = hiltViewModel()) {
+fun OrderDetailRoute(
+    onBack: () -> Unit,
+    onOpenInvoice: (String) -> Unit,
+    viewModel: OrderDetailViewModel = hiltViewModel(), // Android; koinViewModel() on Desktop
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     OrderDetailScreen(state = state, onEvent = viewModel::onEvent, onBack = onBack)
 }
@@ -287,7 +297,7 @@ fun OrderDetailRoute(onBack: () -> Unit, onOpenInvoice: (String) -> Unit,
 
 ## Deep Links
 
-A destination declares the URL it answers to — the whole of deep linking that belongs in this file:
+A destination declares the URL it answers to; `nav-deeplinks` owns everything upstream of that.
 
 ```kotlin
 composable<OrderDetail>(
@@ -295,17 +305,13 @@ composable<OrderDetail>(
 ) { /* … */ }
 ```
 
-Everything upstream — intent filters and custom schemes, App Links verification, `onNewIntent`,
-notification and widget entry points, cold-start buffering behind a sign-in gate — is
-`nav-deeplinks`, which parses the URL into the typed Route this graph already knows how to show.
-
 ## Testing
 
 ```kotlin
 @Test
 fun openingAnOrderNavigatesToDetail() {
     lateinit var navController: TestNavHostController
-    composeRule.setContent {
+    composeRule.setContent { // Android instrumented; on Desktop test through the Navigator interface
         navController = TestNavHostController(LocalContext.current)
         navController.navigatorProvider.addNavigator(ComposeNavigator())
         AppNavHost(navController = navController)
