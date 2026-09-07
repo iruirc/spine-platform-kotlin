@@ -27,3 +27,4 @@ setup() {
 @test "di-hilt: shape" { assert_skill_shape "$ROOT/skills/di-hilt"; }
 @test "di-koin: shape" { assert_skill_shape "$ROOT/skills/di-koin"; }
 @test "di-spring: shape" { assert_skill_shape "$ROOT/skills/di-spring"; }
+@test "concurrency-coroutines: shape" { assert_skill_shape "$ROOT/skills/concurrency-coroutines"; }

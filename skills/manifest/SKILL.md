@@ -150,7 +150,7 @@ navigation       → `nav-compose`, `nav-multiplatform`
 networking       → `net-architecture`, `net-http-clients`, `net-openapi`
 persistence      → `persistence-architecture`, `persistence-room-sqldelight`, `persistence-jvm-orm`, `persistence-migrations`
 dependency graph → `di-composition-root`, `di-hilt`, `di-koin`, `di-spring`
-concurrency      → —
+concurrency      → `concurrency-coroutines`
 errors           → —
 packaging        → —
 deep links       → `nav-deeplinks`
