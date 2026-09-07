@@ -16,3 +16,5 @@ setup() {
 @test "nav-compose: shape" { assert_skill_shape "$ROOT/skills/nav-compose"; }
 @test "nav-multiplatform: shape" { assert_skill_shape "$ROOT/skills/nav-multiplatform"; }
 @test "nav-deeplinks: shape" { assert_skill_shape "$ROOT/skills/nav-deeplinks"; }
+@test "net-architecture: shape" { assert_skill_shape "$ROOT/skills/net-architecture"; }
+@test "net-http-clients: shape" { assert_skill_shape "$ROOT/skills/net-http-clients"; }
