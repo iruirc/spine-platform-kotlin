@@ -24,9 +24,9 @@ en
 
 - `skills/manifest/SKILL.md` — **the contract core reads.** Five tables: `## Roles`, `## Axes`,
   `## Heuristics`, `## Topics`, `## Entrypoints`. Everything core knows about Kotlin arrives here.
-- `skills/` — knowledge skills: `arch-*`, `compose-state`, `nav-*`, `net-*`, `persistence-*`, `di-*`,
-  `concurrency-coroutines`, `reactive-flow`, `error-architecture`, `pkg-*`, `release-ops*`, plus
-  `kotlin-setup`
+- `skills/` — knowledge skills: `architecture-choice`, `arch-*`, `compose-state`, `nav-*`, `net-*`,
+  `persistence-*`, `di-*`, `concurrency-coroutines`, `reactive-flow`, `error-architecture`, `pkg-*`,
+  `release-ops*`, plus `kotlin-setup`
 - `agents/` — sixteen `kotlin-*` Claude Code subagents, named by the manifest's `## Roles` table;
   `developer`, `tester` and `validator` fan out on `target`
 - `commands/` — `/kotlin-init`
