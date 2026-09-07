@@ -8,3 +8,4 @@ setup() {
 
 @test "architecture-choice: shape" { assert_skill_shape "$ROOT/skills/architecture-choice"; }
 @test "arch-mvvm: shape" { assert_skill_shape "$ROOT/skills/arch-mvvm"; }
+@test "arch-mvi: shape" { assert_skill_shape "$ROOT/skills/arch-mvi"; }
