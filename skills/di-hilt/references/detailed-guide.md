@@ -6,8 +6,8 @@ replaces the network layer. The last section is the plain-Dagger fallback for th
 not reach. Every section is self-contained; load the one you need, not the file.
 
 The app it wires is an orders screen over an `OrderRepository` backed by an HTTP client and a Room
-database. Its implementation carries an `@Inject` constructor — which is what lets every later
-section write `@Binds` instead of `@Provides`:
+database. Its implementation carries an `@Inject` constructor, which is what lets every later section
+write `@Binds` instead of `@Provides`:
 
 ```kotlin
 class OrderRepositoryImpl @Inject constructor(
@@ -19,7 +19,7 @@ class OrderRepositoryImpl @Inject constructor(
 ## Gradle and KSP Setup
 
 Versions in the catalog, aliases in the build files. The KSP version's Kotlin prefix must match the
-project's Kotlin version; a mismatch fails the build with a version message, which is the good case.
+project's Kotlin version — a mismatch fails the build with a version message, the good case.
 
 ```toml
 # gradle/libs.versions.toml
@@ -61,6 +61,8 @@ dependencies {
 
     androidTestImplementation(libs.hilt.android.testing)
     kspAndroidTest(libs.hilt.compiler)
+    testImplementation(libs.hilt.android.testing)   // the Robolectric half of Testing
+    kspTest(libs.hilt.compiler)
 }
 
 hilt { enableAggregatingTask = true }
@@ -75,8 +77,8 @@ Per-module rules for a split build:
 | `:data` | no | yes | `@Module`s and `@Inject` constructors, but no entry point to transform |
 | `:domain` | no | no | plain Kotlin: no annotation, no processor, no Dagger on the classpath |
 
-The `:domain` row is worth defending in review: one `@Inject` on a use case puts the whole container
-on the classpath of the module whose point was not having one.
+The `:domain` row is worth defending in review: one `@Inject` on a use case puts the container on the
+classpath of the module whose point was not having one.
 
 ## Application and Android Entry Points
 
@@ -108,7 +110,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { OrdersApp() }
+        setContent { OrdersRoot() }
     }
 }
 
@@ -119,14 +121,13 @@ class SyncService : Service() {
 ```
 
 Field injection is correct in exactly these classes, because the framework calls their constructors —
-nowhere else. A `WorkManager` worker takes a constructor instead: `@HiltWorker` plus `@AssistedInject`
-with `@Assisted Context` and `@Assisted WorkerParameters`.
+nowhere else. A `WorkManager` worker takes a constructor instead: `@HiltWorker` with
+`@AssistedInject`, `@Assisted Context` and `@Assisted WorkerParameters`.
 
 ## Modules
 
 Three modules split by kind rather than by feature — interface bindings, third-party constructions,
-qualified values — all installed in `SingletonComponent`, because everything they build lives for the
-process.
+qualified values — all in `SingletonComponent`, because everything they build lives for the process.
 
 ```kotlin
 @Module
@@ -139,8 +140,8 @@ interface RepositoryModule {
 ```
 
 `@Binds` is an abstract function with no body: Hilt already knows how to construct
-`OrderRepositoryImpl`, so the binding is a rename in the generated component. `@Provides` is for
-types you cannot annotate — a builder result, a library singleton, a value:
+`OrderRepositoryImpl`, so the binding is a rename in the generated component. `@Provides` is for a
+type you cannot annotate — a builder result, a library singleton, a value:
 
 ```kotlin
 @Module
@@ -173,8 +174,8 @@ object NetworkModule {
 `provideOrdersApi` is unscoped on purpose: a Retrofit proxy is cheap, and the expensive things it
 closes over are already `@Singleton`. Scope what is expensive, not what is convenient.
 `@ApplicationContext` and `@ActivityContext` are the two qualifiers Hilt ships, from
-`dagger.hilt.android.qualifiers`. Your own are annotations, and are how two bindings of one type stop
-colliding:
+`dagger.hilt.android.qualifiers`; your own are annotations, and are how two bindings of one type
+stop colliding:
 
 ```kotlin
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class IoDispatcher
@@ -193,9 +194,9 @@ class OrderRepositoryImpl @Inject constructor(
 ```
 
 Injecting the dispatcher rather than naming `Dispatchers.IO` inline is what lets a unit test hand the
-repository a `StandardTestDispatcher` (`concurrency-coroutines`). A module that must hold both kinds
-puts the `@Provides` half in a `companion object` of the `interface` — legal, and slightly worse to
-read than two modules. Prefer two.
+repository a `StandardTestDispatcher` (`concurrency-coroutines`). A module holding both kinds puts
+the `@Provides` half in a `companion object` of the `interface` — legal, and slightly worse to read
+than two modules. Prefer two.
 
 ## ViewModels
 
@@ -215,7 +216,7 @@ class OrderDetailViewModel @Inject constructor(
 ```
 
 `SavedStateHandle` needs no binding of its own — Hilt provides it in `ViewModelComponent`, populated
-from the back stack entry's arguments, and it survives process death. `toRoute()` turns those
+from the back stack entry's arguments, and it survives process death; `toRoute()` turns those
 arguments back into the typed route object (`nav-compose`). At the call site:
 
 ```kotlin
@@ -236,8 +237,8 @@ anything another screen might also want.
 
 ## Assisted Injection
 
-Use it when a constructor parameter is known only at the call site and is **not** a route
-argument — a callback value, an object the graph has no way to build.
+Use it when a constructor parameter is known only at the call site and is **not** a route argument —
+a callback value, an object the graph has no way to build.
 
 ```kotlin
 @HiltViewModel(assistedFactory = OrderEditViewModel.Factory::class)
@@ -298,9 +299,7 @@ consumer asks for the set — and this is the line that goes wrong:
 @Singleton
 class Analytics @Inject constructor(
     private val sinks: Set<@JvmSuppressWildcards AnalyticsSink>,
-) {
-    fun track(event: AnalyticsEvent) = sinks.forEach { it.track(event) }
-}
+) { fun track(event: AnalyticsEvent) = sinks.forEach { it.track(event) } }
 ```
 
 Without `@JvmSuppressWildcards`, Kotlin compiles the parameter to `Set<? extends AnalyticsSink>` and
@@ -322,10 +321,11 @@ class DeepLinkRouter @Inject constructor(
 )
 ```
 
-`@ClassKey` keys by `KClass`, and a custom `@MapKey` annotation keys by an enum or a value class. Use
-`@ElementsIntoSet` when one provider returns several elements at once.
+`@ClassKey` keys by `Class<?>`, so its injection site is `Map<Class<*>, @JvmSuppressWildcards T>`; a
+custom `@MapKey` keys by whatever an annotation member may be — an enum, a `String`, a `Class` or a
+primitive, never a value class. Use `@ElementsIntoSet` when one provider returns several elements.
 
-The rule that keeps multibindings honest: contribute from the module that **owns** the element. Once
+The rule that keeps multibindings honest: contribute from the module that **owns** the element — once
 `:app` lists every handler, the multibinding is a hand-written list with extra annotations.
 
 ## Entry Points for Non-Hilt Classes
@@ -354,11 +354,9 @@ class OrdersContentProvider : ContentProvider() {
 ```
 
 `by lazy` matters: a `ContentProvider`'s `onCreate` runs before the `Application` finishes
-initializing, so resolving eagerly there fails.
-
-`EntryPointAccessors` has one accessor per component, each taking the matching object:
-`fromApplication(context, T::class.java)` for `SingletonComponent`, `fromActivity`, `fromFragment`
-and `fromView` for theirs.
+initializing, so resolving eagerly there fails. `EntryPointAccessors` has one accessor per component,
+each taking the matching object: `fromApplication(context, T::class.java)` for `SingletonComponent`,
+`fromActivity`, `fromFragment` and `fromView` for theirs.
 
 A manifest-registered `BroadcastReceiver` you do own should be `@AndroidEntryPoint` instead — the
 entry point is only for the ones you do not. The last legitimate case is a third-party callback that
@@ -399,7 +397,7 @@ class OrderDetailTest {
     @get:Rule(order = 1) val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Inject lateinit var orders: OrderRepository
-    @BindValue val clock: Clock = FixedClock(Instant.parse("2026-01-01T00:00:00Z"))
+    @BindValue @JvmField val clock: Clock = FixedClock(Instant.parse("2026-01-01T00:00:00Z"))
 
     @Before fun setUp() = hiltRule.inject()
 
@@ -411,27 +409,28 @@ class OrderDetailTest {
 
 Rule order is not cosmetic: `HiltAndroidRule` must run first, or the Activity the Compose rule
 launches is created before the graph exists. `@BindValue` binds a test field into the graph — right
-for one value in one class, where a whole module would be ceremony.
+for one value in one class, where a whole module would be ceremony — and it needs `@JvmField`,
+because a plain Kotlin `val` compiles to a private backing field and Hilt rejects private ones.
 
 `@UninstallModules(NetworkModule::class)` removes a module for one test class only, with `@BindValue`
 fields supplying what it used to provide. It forces a separate component build for that class, so it
-is the slower tool and belongs to genuine one-offs.
+is the slower tool, for genuine one-offs.
 
 The same tests run on the JVM under Robolectric: keep `@HiltAndroidTest`, the rule and
 `hiltRule.inject()`, add `@RunWith(RobolectricTestRunner::class)` and
-`@Config(application = HiltTestApplication::class)` — which names the test application directly, so
-no custom runner is involved.
+`@Config(application = HiltTestApplication::class)`, which names the test application directly — no
+custom runner involved.
 
 Plain unit tests use none of this: `OrderRepositoryImpl(FakeApi(), FakeDao(), testDispatcher)` is the
-whole setup, and a unit test that needs Hilt is telling you the class under test reaches for the graph
-instead of taking parameters.
+whole setup, and a unit test that needs Hilt is telling you the class under test reaches for the
+graph instead of taking parameters.
 
 ## Plain Dagger
 
 Hilt's components are generated against `Application`, `Activity`, `Fragment` and friends, so two
 situations fall outside it: a multi-module library with no Android dependency, and a non-Android JVM
 target (a CLI, a server module, a shared JVM core). There the same library is used through Dagger's
-own API, with the components written by hand.
+own API, components written by hand.
 
 ```kotlin
 @Singleton
@@ -458,7 +457,7 @@ fun main(args: Array<String>) {
 and `@BindsInstance` is how a value the graph cannot construct — parsed arguments, an environment —
 enters it.
 
-A narrower lifetime is a `@Subcomponent` with its own `@Scope` — the machinery Hilt generates for
+A narrower lifetime is a `@Subcomponent` with its own `@Scope` — what Hilt generates for
 `ActivityComponent` and friends, written out:
 
 ```kotlin

@@ -116,7 +116,7 @@ class AppGraph(private val config: Config) {
     val orders: OrderRepository by lazy { OrderRepositoryImpl(http, db) }
     val placeOrder: PlaceOrder by lazy { PlaceOrder(orders, clock) }
 
-    private val clock: Clock get() = Clock.System
+    private val clock: Clock = Clock.System
 }
 ```
 
@@ -218,7 +218,7 @@ resolves.** What that looks like per framework:
 | Framework | The test |
 |---|---|
 | Hilt | a `@HiltAndroidTest` that injects and asserts, with `@TestInstallIn` replacing the network module for the whole test source set |
-| Koin | `checkModules()` or `verify()` — walks every definition and fails on a missing one, with no app run |
+| Koin | `verify()` — walks every definition and fails on a missing one, with no app run (`di-koin`) |
 | Spring | `@SpringBootTest` loading the context **is** the assertion: it fails on a missing or ambiguous bean |
 | Manual `AppGraph` | construct it with a test `Config` and touch every public `val` |
 

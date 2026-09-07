@@ -64,7 +64,7 @@ plain-Dagger fallback. Each section stands alone; load the section, not the file
 | Resolution | compile time | compile time | runtime |
 | Components | generated, tied to the Android lifecycles | you write every `@Component` and `@Subcomponent` | none — a container of definitions |
 | Codegen | KSP (or kapt) | KSP (or kapt) | none; Koin Annotations adds an optional KSP layer |
-| A missing binding | a build error naming the type and the component | a build error | a runtime failure, unless `verify()`/`checkModules()` runs in tests |
+| A missing binding | a build error naming the type and the component | a build error | a runtime failure, unless `verify()` runs in tests |
 | Build cost | annotation processing on every module with a module or an entry point | the same | zero |
 | Take it when | the app is Android-only and stays that way | a non-Android JVM module needs DI, or the generated component hierarchy is genuinely in the way | anything must compile for KMP, Compose Desktop or Ktor, or the graph is small enough that codegen is not worth its build time |
 
@@ -257,8 +257,8 @@ Four things that decide build time and correctness:
    plugin does not propagate across module boundaries. A `:domain` module should declare none of
    those and therefore needs neither (`pkg-gradle-modules`).
 4. **`androidx.hilt` artifacts are versioned separately** from `com.google.dagger` ones:
-   `hilt-navigation-compose` for `hiltViewModel()`, `hilt-work` plus `androidx.hilt:hilt-compiler`
-   for `@HiltWorker`.
+   `androidx.hilt:hilt-navigation-compose` for `hiltViewModel()`, `androidx.hilt:hilt-work` plus
+   `androidx.hilt:hilt-compiler` for `@HiltWorker`.
 
 ## Testing
 
@@ -269,7 +269,7 @@ Instrumentation and Robolectric tests build the real graph and replace pieces of
 | Run a test against the Hilt graph | `@HiltAndroidTest`, a `HiltAndroidRule` at order 0, `hiltRule.inject()` in `@Before` |
 | Replace a module for the whole test source set | a test module annotated `@TestInstallIn(components = [SingletonComponent::class], replaces = [NetworkModule::class])` |
 | Replace a module for one test class | `@UninstallModules(NetworkModule::class)` plus local `@BindValue` fields |
-| Substitute a single binding | `@BindValue val repo: OrderRepository = FakeOrderRepository()` — a field in the test, bound into the graph |
+| Substitute a single binding | `@BindValue @JvmField val repo: OrderRepository = FakeOrderRepository()` — a test field bound into the graph; `@JvmField` because a plain Kotlin `val` compiles to a private field and Hilt rejects those |
 | The test `Application` | `HiltTestApplication`, installed by a `CustomTestRunner : AndroidJUnitRunner` that overrides `newApplication`, named in `testInstrumentationRunner` |
 | The same on the JVM | Robolectric plus `@Config(application = HiltTestApplication::class)` |
 
