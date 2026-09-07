@@ -35,7 +35,7 @@ setup() {
 
 @test "no file in kotlin-platform names the core tree by a filesystem path" {
   pat='(\.\./(core|spine-toolkit|swift-platform|kotlin-platform)([^A-Za-z0-9_-]|$)'
-  pat="$pat"'|(^|[^A-Za-z0-9_.$-])core/'
+  pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
   pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|swift-platform|kotlin-platform)/)'
   # Three files are excluded by name: the two suites that look for a sibling checkout
   # of core (they skip rather than dangle when it is absent) and this one, which
