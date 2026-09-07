@@ -415,7 +415,7 @@ See `pkg-gradle-modules`, `pkg-kmp-source-sets`.
 Before writing or changing ANY file, you MUST first read existing code and mirror its conventions. Untethered code that ignores established patterns is a defect even when it compiles and passes tests.
 
 1. **Read the whole target file**, not just the edit site. Understand its structure, naming, error-handling style, and the pattern it already follows.
-2. **Find the closest analogues** — sibling implementations of the same concept already in the codebase. Examples: another per-property updater next to the one you add, another delegate protocol of the same family, another style entry for a peer UI tab, another migration of the same kind. Read at least the 1–3 nearest ones.
+2. **Find the closest analogues** — sibling implementations of the same concept already in the codebase. Examples: another per-property updater next to the one you add, another interface of the same family, another style entry for a peer UI tab, another migration of the same kind. Read at least the 1–3 nearest ones.
 3. **Extract the shared convention** the analogues obey (signature shape, dispatch style, naming, where the value is read from, how siblings are wired) and make your change conform to it. Diverge only with an explicit reason captured in `## Conformance to existing code`.
 4. **Cite the analogues** by `path:line` in your output — this is evidence you actually looked, not a claim that you did.
 
@@ -447,15 +447,6 @@ This step is not optional and not satisfied by "I followed the project style" in
   - `/** Shared thumbnail loader. Invariant: all consumers read the same payload to avoid a double-decode race. */`
   - `// Cancel-order race fix: cancel + null-assignment MUST happen BEFORE resetSession — otherwise the dangling Job observes a torn state.`
   - `// detekt workaround: SwallowedException false-positive on the rethrow below.`
-
-## Self-Check Before Completing
-
-- [ ] No behaviour change: every existing test untouched and green
-- [ ] One refactoring per commit; the build is green after each
-- [ ] Analogues cited by `path:line` in `## Before`
-- [ ] Every target of the touched module still compiles (`allTests` on a KMP module)
-- [ ] DI registrations updated for every extracted type
-- [ ] No task/phase/EPIC/ticket references in comments (see `## Comment Policy`)
 
 ## Skills Reference (kotlin-platform)
 
@@ -507,6 +498,15 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - `## After` — new structure with full code for modified files
 - `## Verification` — how to confirm no behavior change (which tests, which scenarios)
 - `## Risks` — anything that might break despite tests passing
+
+## Self-Check Before Completing
+
+- [ ] No behaviour change: every existing test untouched and green
+- [ ] One refactoring per commit; the build is green after each
+- [ ] Analogues cited by `path:line` in `## Before`
+- [ ] Every target of the touched module still compiles (`allTests` on a KMP module)
+- [ ] DI registrations updated for every extracted type
+- [ ] No task/phase/EPIC/ticket references in comments (see `## Comment Policy`)
 
 ## What You Never Do
 

@@ -79,7 +79,7 @@ Examples:
 - **Network calls** — mock the HTTP client or use WireMock for integration tests.
 - **Persistence** — use in-memory database (H2), fake repository implementation, or test doubles.
 - **File system** — use `@TempDir` (JUnit) or `createTempDirectory()` for temporary directories.
-- **Time** — inject `java.time.Clock` or `kotlinx.datetime.Clock` and provide a fixed clock in tests.
+- **Time** — inject `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+, and provide a fixed clock in tests.
 - **DI container** — fresh container per test or test-specific overrides.
 - **Platform APIs** — Android context, sensors, SharedPreferences, system services.
 

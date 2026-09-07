@@ -136,7 +136,7 @@ attempt 3: FAILED — <assertion>
 → fail rate: 2/3 → status: FLAKY
 ```
 
-A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain cleanTest test --tests '<FQCN>.<method>'`.
+A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain test --rerun --tests '<FQCN>.<method>'` — `--rerun` (Gradle 7.6+) forces the task without `cleanTest` deleting the XML report of the attempt before it.
 
 Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timing-dependent assertion, shared mutable state, missing isolation, `Instant.now()` / `UUID.randomUUID()` in the production path).
 

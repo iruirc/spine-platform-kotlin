@@ -79,7 +79,7 @@ Examples:
 - **Network calls** — mock the HTTP client or use WireMock for integration tests.
 - **Persistence** — use in-memory database (H2), fake repository implementation, or test doubles.
 - **File system** — use `@TempDir` (JUnit) or `createTempDirectory()` for temporary directories.
-- **Time** — inject `java.time.Clock` or `kotlinx.datetime.Clock` and provide a fixed clock in tests.
+- **Time** — inject `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+, and provide a fixed clock in tests.
 - **DI container** — fresh container per test or test-specific overrides.
 - **Platform APIs** — Android context, sensors, SharedPreferences, system services.
 
@@ -144,7 +144,7 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 - **Kotest** (`- Tests: Kotest`): match the project's style (`StringSpec`, `FunSpec`, `BehaviorSpec`); `shouldBe` matchers; property tests with `checkAll` only where the invariant is genuinely universal; `beforeTest`/`afterTest` for cleanup.
 - **MockK**: `mockk<T>()` with `every { } returns`, `coEvery` for suspend functions, `verify` with exact `exactly =` counts; `relaxed = true` is a code smell in a unit test — it hides a missing stub.
 - **Turbine** for `Flow`: `flow.test { awaitItem(); awaitComplete() }`; assert every emission, never `first()` on a hot flow.
-- **Clock**: inject `kotlinx.datetime.Clock` or `java.time.Clock`; a fixed clock in tests, never `Clock.System` in an assertion.
+- **Clock**: inject `kotlinx.datetime.Clock`, `java.time.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+; a fixed clock in tests, never `Clock.System` in an assertion.
 
 ## What You Generate
 

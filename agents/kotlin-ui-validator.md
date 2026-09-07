@@ -116,7 +116,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 4. Find a device: `adb devices -l`. None → the drive step **cannot run**: FAILED with reason `no device or emulator` (Hard Rule 3), unless `drive_app` resolves to `off`. Do not boot an emulator yourself unless `Plan.md` names the AVD; then `emulator -avd <name> -no-snapshot-load &` and `adb wait-for-device`.
 5. Install: `adb install -r <app>/build/outputs/apk/debug/<app>-debug.apk`. Application id from `<app>/build.gradle.kts` (`applicationId`) or `aapt dump badging`.
-6. Launch: `adb shell am start -n <applicationId>/<launcherActivity>` (or `monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`). Confirm with `adb shell pidof <applicationId>`.
+6. Launch: `adb shell am start -n <applicationId>/<launcherActivity>` (or `adb shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`). Confirm with `adb shell pidof <applicationId>`.
 7. Drive through mobile MCP: `mcp__mobile__ui` with `action: 'tree', format: 'semantic'` first (cheapest), then `mcp__mobile__input` taps/text for the scenario, `mcp__mobile__ui` `action: 'find'` to assert the key element, one `mcp__mobile__screen` `action: 'capture', preset: 'low'` at the success endpoint for the record. Logcat for a crash: `adb logcat -d -s AndroidRuntime:E` after the run; an `E/AndroidRuntime` FATAL EXCEPTION is a failure entry of type `crash`.
 8. Stop: `adb shell am force-stop <applicationId>`. Never `pm clear` or `adb emu kill` unless the task asks.
 
@@ -151,7 +151,7 @@ attempt 3: FAILED — <assertion>
 → fail rate: 2/3 → status: FLAKY
 ```
 
-A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain cleanTest test --tests '<FQCN>.<method>'`.
+A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain test --rerun --tests '<FQCN>.<method>'` — `--rerun` (Gradle 7.6+) forces the task without `cleanTest` deleting the XML report of the attempt before it.
 
 Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timing-dependent assertion, shared mutable state, missing isolation, `Instant.now()` / `UUID.randomUUID()` in the production path).
 

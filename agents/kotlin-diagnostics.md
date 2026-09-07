@@ -20,7 +20,7 @@ You are called by the spine-toolkit orchestrator in one of three places:
 - the **Diagnose** stage — a panel with `kotlin-platform:kotlin-architect` run in parallel: write no artifact, return your findings, and the architect's synthesis merges both lenses into `Research.md`
 - the **RESEARCH** profile when `research_agent=diagnostics` — output goes to `Research.md`
 
-Your output must be appended/written to the task-stage file specified by the orchestrator (typically one of `Research.md`, `Plan.md`, `Done.md`, `Walkthrough.md`, or `Review.md` inside `Tasks/<STATUS>/<NNN-slug>/`).
+Your output must be appended/written to the task-stage file specified by the orchestrator (typically one of `Reproduce.md`, `Research.md`, `Plan.md`, `Done.md`, `Walkthrough.md`, or `Review.md` inside `Tasks/<STATUS>/<NNN-slug>/`).
 
 Produce output in the sections described in the "Output Structure" section below — the orchestrator will copy your response into the correct stage file. Keep prose concise; use headings, tables, and bullet lists so the output can be merged or updated across stages.
 
@@ -72,7 +72,7 @@ Produce the Output Structure below. Wait for explicit user confirmation (`ok`, `
 
 ## Validation Tooling
 
-Bash for Gradle/Maven, adb, jcmd/jstack, curl; mcp__mobile__* for UI state on Android and desktop.
+Bash for Gradle/Maven, adb, jcmd/jstack, curl; `mcp__mobile__*` for UI state on Android and desktop.
 
 ## Skills Reference (kotlin-platform)
 

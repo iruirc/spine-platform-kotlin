@@ -79,7 +79,7 @@ Examples:
 - **Network calls** — mock the HTTP client or use WireMock for integration tests.
 - **Persistence** — use in-memory database (H2), fake repository implementation, or test doubles.
 - **File system** — use `@TempDir` (JUnit) or `createTempDirectory()` for temporary directories.
-- **Time** — inject `java.time.Clock` or `kotlinx.datetime.Clock` and provide a fixed clock in tests.
+- **Time** — inject `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+, and provide a fixed clock in tests.
 - **DI container** — fresh container per test or test-specific overrides.
 - **Platform APIs** — Android context, sensors, SharedPreferences, system services.
 
@@ -258,7 +258,7 @@ class UserRepositoryIntegrationTest {
 
 A test at a higher slice than its assertion needs is a slow test that hides which layer broke.
 
-### CLI Tests
+## CLI Tests
 
 - Run the command in-process: Clikt `command.test("args")` from `com.github.ajalt.clikt.testing` returns `stdout`, `stderr` and `statusCode` in one result — never `parse()` directly, which throws `CliktError` instead of exiting; kotlinx-cli `parser.parse(args)` for valid input.
 - Assert three things: exit code (`0` / `1` / `2`), stdout content, stderr content — separately.

@@ -165,6 +165,10 @@ When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_
 
 - `kotlin-platform:kotlin-security` — co-reviews design-level risks in the FEATURE Research panel
 - `kotlin-platform:kotlin-diagnostics` — co-reviews root cause in the BUG Diagnose panel
+- `kotlin-platform:kotlin-ui-tester` — the other half of the TEST Analyze panel on an Android or Desktop target
+- `kotlin-platform:kotlin-server-tester` — the other half of the TEST Analyze panel on a Server or CLI target
+- `kotlin-platform:kotlin-kmp-tester` — the other half of the TEST Analyze panel on a KMP target
+- `kotlin-platform:kotlin-jvm-tester` — the other half of the TEST Analyze panel on every other target
 - `kotlin-platform:kotlin-init` — project bootstrapping
 
 ## Output Structure

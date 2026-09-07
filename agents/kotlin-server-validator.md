@@ -123,7 +123,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
    | Quarkus | `./gradlew quarkusDev` (prefer `java -jar build/quarkus-app/quarkus-run.jar`) | `GET /q/health` → `UP` |
    | http4k | `./gradlew run` | the first log line, or the endpoint the plan names |
    Port from `application.yml` / `application.conf` / `application.properties`; default 8080. Wait up to 90s polling the ready signal every 2s; timeout → FAILED `application did not become ready`.
-5. Smoke with `curl -s -o /tmp/body -w '%{http_code}'` against the endpoints `Plan.md` names (at least the feature's own); assert status code and, when the plan states a body shape, a `jq` expression over `/tmp/body`. Every request and response into `## HTTP Smoke` (secrets redacted).
+5. Smoke with `b="$(mktemp)"; curl -s -o "$b" -w '%{http_code}' <url>` — one temp file per endpoint, so an assertion never reads the endpoint before it — against the endpoints `Plan.md` names (at least the feature's own); assert status code and, when the plan states a body shape, a `jq` expression over `"$b"`. Every request and response into `## HTTP Smoke` (secrets redacted).
 6. Stop: kill the process group of step 4; confirm the port is free (`lsof -i :<port>` empty). Stop Testcontainers leftovers only if you started them outside the test run (`docker ps --filter label=org.testcontainers=true`).
 
 ### Run and assert (CLI)
@@ -157,7 +157,7 @@ attempt 3: FAILED — <assertion>
 → fail rate: 2/3 → status: FLAKY
 ```
 
-A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain cleanTest test --tests '<FQCN>.<method>'`.
+A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, so force each attempt: `./gradlew --console=plain test --rerun --tests '<FQCN>.<method>'` — `--rerun` (Gradle 7.6+) forces the task without `cleanTest` deleting the XML report of the attempt before it.
 
 Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timing-dependent assertion, shared mutable state, missing isolation, `Instant.now()` / `UUID.randomUUID()` in the production path).
 

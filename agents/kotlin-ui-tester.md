@@ -79,7 +79,7 @@ Examples:
 - **Network calls** — mock the HTTP client or use WireMock for integration tests.
 - **Persistence** — use in-memory database (H2), fake repository implementation, or test doubles.
 - **File system** — use `@TempDir` (JUnit) or `createTempDirectory()` for temporary directories.
-- **Time** — inject `java.time.Clock` or `kotlinx.datetime.Clock` and provide a fixed clock in tests.
+- **Time** — inject `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+, and provide a fixed clock in tests.
 - **DI container** — fresh container per test or test-specific overrides.
 - **Platform APIs** — Android context, sensors, SharedPreferences, system services.
 
@@ -261,7 +261,7 @@ fun loadData_success_updatesLiveData() {
 
 Prefer the JVM row whenever it can observe the behaviour: an instrumented test costs an emulator boot and cannot run in the validator's default lane. Name in `## Notes` every test that needs a device, so the validator knows what it will not see without one.
 
-### Desktop Specifics
+## Desktop Specifics
 
 - Compose Desktop tests use `compose.desktop.uiTestJUnit4` — the same `createComposeRule()` API, no Robolectric, no device.
 - There is no process death and no configuration change; do not write tests for them.
