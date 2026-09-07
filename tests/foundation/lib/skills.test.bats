@@ -15,3 +15,4 @@ setup() {
 @test "compose-state: shape" { assert_skill_shape "$ROOT/skills/compose-state"; }
 @test "nav-compose: shape" { assert_skill_shape "$ROOT/skills/nav-compose"; }
 @test "nav-multiplatform: shape" { assert_skill_shape "$ROOT/skills/nav-multiplatform"; }
+@test "nav-deeplinks: shape" { assert_skill_shape "$ROOT/skills/nav-deeplinks"; }

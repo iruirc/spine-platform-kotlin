@@ -153,7 +153,7 @@ dependency graph → —
 concurrency      → —
 errors           → —
 packaging        → —
-deep links       → —
+deep links       → `nav-deeplinks`
 release ops      → —
 
 ## Entrypoints
