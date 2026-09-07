@@ -71,6 +71,7 @@ sealed interface Route {
     @Serializable data object Home : Route
     @Serializable data class OrderDetail(val id: String) : Route
     @Serializable data class Search(val query: String? = null) : Route
+    // Invoice(id) and Checkout — further members of this family, elided here
 }
 
 NavHost(navController, startDestination = Route.Home) {

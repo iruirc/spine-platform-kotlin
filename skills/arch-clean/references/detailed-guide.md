@@ -636,7 +636,7 @@ fun `an offline failure renders the offline message`() = runTest {
     viewModel.state.test {
         assertEquals(OrdersUiState.Loading, awaitItem())
         viewModel.onEvent(OrdersUiEvent.Appeared)
-        assertEquals(OrdersUiState.Error(UiMessage.Offline), awaitItem())
+        assertEquals(OrdersUiState.Error(UiMessage.Resource(R.string.orders_offline)), awaitItem())
         cancelAndIgnoreRemainingEvents()
     }
 }
