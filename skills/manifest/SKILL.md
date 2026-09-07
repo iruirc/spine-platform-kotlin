@@ -145,7 +145,7 @@ architectures (`arch-layered`, `arch-hexagonal`) ride under `state management` d
 that row is the only channel through which core asks how a project is structured inside, and
 for a server the answer is its layering.
 
-state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`
+state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`, `arch-clean`
 navigation       → —
 networking       → —
 persistence      → —
