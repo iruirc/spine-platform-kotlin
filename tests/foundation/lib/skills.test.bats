@@ -12,3 +12,4 @@ setup() {
 @test "arch-clean: shape" { assert_skill_shape "$ROOT/skills/arch-clean"; }
 @test "arch-layered: shape" { assert_skill_shape "$ROOT/skills/arch-layered"; }
 @test "arch-hexagonal: shape" { assert_skill_shape "$ROOT/skills/arch-hexagonal"; }
+@test "compose-state: shape" { assert_skill_shape "$ROOT/skills/compose-state"; }
