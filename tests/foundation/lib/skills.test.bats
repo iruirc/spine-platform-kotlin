@@ -32,3 +32,6 @@ setup() {
 @test "error-architecture: shape" { assert_skill_shape "$ROOT/skills/error-architecture"; }
 @test "pkg-gradle-modules: shape" { assert_skill_shape "$ROOT/skills/pkg-gradle-modules"; }
 @test "pkg-kmp-source-sets: shape" { assert_skill_shape "$ROOT/skills/pkg-kmp-source-sets"; }
+@test "release-ops: shape" { assert_skill_shape "$ROOT/skills/release-ops"; }
+@test "release-ops-android: shape" { assert_skill_shape "$ROOT/skills/release-ops-android"; }
+@test "release-ops-server: shape" { assert_skill_shape "$ROOT/skills/release-ops-server"; }

@@ -154,7 +154,7 @@ concurrency      → `concurrency-coroutines`, `reactive-flow`
 errors           → `error-architecture`
 packaging        → `pkg-gradle-modules`, `pkg-kmp-source-sets`
 deep links       → `nav-deeplinks`
-release ops      → —
+release ops      → `release-ops`, `release-ops-android`, `release-ops-server`
 
 ## Entrypoints
 
