@@ -46,10 +46,10 @@ on four frameworks — plus the logging setup and the mapper tests. Load a secti
 
 | Need | Reference sections |
 |---|---|
-| The cancellation-safe replacement for `runCatching` | `The catching Helper` |
+| The failure-side `map` that `kotlin.Result` does not ship | `The catching Helper` |
 | The data-layer family, and the mapper that produces it | `Client — The Data Error Family`, `Client — Platform Exception to DataError` |
 | Where the data family dies and the domain family starts | `Client — DataError to Domain` |
-| The ViewModel mapper, and the `UiText` it produces | `Client — Domain to UiState` |
+| The ViewModel mapper, and the `UiMessage` it produces | `Client — Domain to UiState` |
 | A table test over a mapper, with every case named | `Client — The Mapper Golden Table` |
 | A server-side sealed error and its status table | `Server — The Domain Error Family`, `Server — Problem Details` |
 | The Spring handler, `ProblemDetail` and the framework's own exceptions | `Server — Spring @ControllerAdvice` |
@@ -75,10 +75,10 @@ prevent.
    cannot exist" is a bug, and the right response is a crash in test and a 500 with a correlation id
    in production.
 2. **The interface-or-`Throwable` question is decided by the carrier, not by taste.** A family that
-   travels in `kotlin.Result` must be a `Throwable` — `sealed class OrderError : Exception()`, the
-   form `arch-clean` and `persistence-architecture` both show, or a `sealed interface` whose members
-   each extend an exception. A family that travels in your own sealed outcome or in `Either` should
-   be a plain `sealed interface`: an error that cannot be thrown cannot be thrown by accident.
+   travels in `kotlin.Result` must be a `Throwable`: `sealed class OrderError : Exception()`, the
+   form `arch-clean` and `persistence-architecture` both show. A family that travels in your own
+   sealed outcome or in `Either` should be a plain `sealed interface` — an error that cannot be
+   thrown cannot be thrown by accident.
 3. **`kotlin.Result` is one bit until you inspect it.** `Result<T>` says success or failure and
    nothing more; `exceptionOrNull()` returns `Throwable?`, so any per-reason branching is a `when`
    over types, which is the sealed family you would have declared anyway. Promote to a sealed
@@ -101,7 +101,7 @@ the test.
 |---|---|---|---|
 | HTTP client, DAO, file → repository | `IOException`, an HTTP status or `HttpException`, `SerializationException`, `SQLiteConstraintException` | `DataError` | `:data`, `internal` |
 | repository → use case or service | `DataError` | one sealed domain family, `OrderError` | the repository implementation — the domain never imports `DataError` |
-| use case → ViewModel | `OrderError` | `UiState.Error(message: UiText)` | the ViewModel |
+| use case → ViewModel | `OrderError` | `UiState.Error(message: UiMessage)` | the ViewModel |
 | service → controller, route, CLI command | the domain family | HTTP status + problem details, or an exit code | the adapter (`arch-layered`, `arch-hexagonal`) |
 
 1. **The mapper is a top-level pure function.** `internal fun Throwable.toDataError(): DataError`,
@@ -165,7 +165,7 @@ extension members alongside them.
 | Framework | Hook | Body |
 |---|---|---|
 | Spring Boot | `@RestControllerAdvice` with `@ExceptionHandler`; extend `ResponseEntityExceptionHandler` to also cover the framework's own | `ProblemDetail`, built into Spring 6 |
-| Ktor | `install(StatusPages) { exception<OrderError> { call, e -> call.respond(status, body) } }` | your own `@Serializable ProblemDetails` |
+| Ktor | `install(StatusPages) { exception<OrderError> { call, e -> call.respondText(json, ContentType.Application.ProblemJson, status) } }` | your own `@Serializable ProblemDetails` |
 | Micronaut | `@Error(global = true)` handler, or an `ExceptionHandler<E, HttpResponse<*>>` bean | your own type |
 | Quarkus | `@Provider class OrderErrorMapper : ExceptionMapper<OrderError>` | your own type |
 
@@ -174,8 +174,9 @@ extension members alongside them.
    `arch-layered`). One handler per domain family beats one `@ExceptionHandler` per endpoint.
 2. **`type` is a stable URI and it is the identifier clients match on.**
    `https://api.example.com/problems/insufficient-funds` — not the localized `title`, and not the
-   `detail`, both of which are prose you will reword. Publish the types in the OpenAPI spec
-   (`net-openapi`).
+   `detail`, both of which are prose you will reword. It defaults to `about:blank`, which says only
+   "the status code is the whole story", so a mapped failure that leaves it unset is unidentifiable.
+   Publish the types in the OpenAPI spec (`net-openapi`).
 3. **Validation failures are 400, or 422 when the syntax was fine and the rule was not**, and they
    carry the per-field list as an extension member — `errors: [{ "field": …, "code": … }]`. A
    validation response with one flattened sentence forces the client to parse English.
@@ -206,9 +207,9 @@ does not take it.
 
 ```kotlin
 // :presentation — a message identity, not a String: the composable resolves it.
-sealed interface UiText {
-    data class Resource(@StringRes val id: Int, val args: List<Any> = emptyList()) : UiText
-    data class Literal(val value: String) : UiText   // only for text the server owns, e.g. a quota
+sealed interface UiMessage {
+    data class Resource(@StringRes val id: Int, val args: List<Any> = emptyList()) : UiMessage
+    data class Literal(val value: String) : UiMessage   // only for text the server owns, e.g. a quota
 }
 ```
 
@@ -221,10 +222,10 @@ sealed interface UiText {
    in a dialog the user must dismiss before they can see which field it meant.
 4. **Every error state has an exit.** A screen with a message and no button is a dead end the user
    escapes by force-quitting.
-5. **`UiText` keeps `Context` and `R` out of the ViewModel** — the state stays comparable in a unit
-   test with no device. `arch-mvvm` shows the closed form of the same idea under the name
-   `UiMessage`, one identity per message; `UiText` is that plus the one case a closed list cannot
-   cover, a string only the server knows.
+5. **`UiMessage` keeps `Context` and `R` out of the ViewModel** — the state stays comparable in a
+   unit test with no device. `arch-mvvm` shows the closed per-message form of the same slot, one
+   identity per message; the `Literal` case below is the one addition, for the string only the
+   server can produce.
 6. **Where the error sits in the state — a `sealed interface` member or a nullable field beside the
    content — is `arch-mvvm`'s table**, and it is the same decision as "does content survive the
    error", which rule 2 already answered for you.
@@ -244,7 +245,7 @@ sealed interface UiText {
    the day someone fixes a typo.
 5. **The one string the server owns is one it alone can produce** — a remaining quota, a next
    allowed date. It arrives as an extension member with the value, not as a rendered sentence, and
-   the client formats it: `UiText.Resource(R.string.quota_left, listOf(remaining))`.
+   the client formats it: `UiMessage.Resource(R.string.quota_left, listOf(remaining))`.
 
 ## Logging and PII
 
@@ -317,8 +318,9 @@ val OrderError.isRetryable: Boolean
    becomes an error banner, and the coroutine everyone thinks recovered stays cancelled and fails on
    its next suspension. Use the `catching` helper above.
 2. **`Result<Result<T>>`.** `runCatching { repo.load(id) }` where `load` already returns a `Result`
-   produces a success wrapping a failure, so every `onFailure` on it is dead code. Map, or use
-   `mapCatching`; never wrap a `Result` in a second one.
+   produces a success wrapping a failure, so every `onFailure` on it is dead code — and
+   `mapCatching` nests exactly the same way when its transform returns a `Result`. Call the inner
+   function directly, or `fold` over the one you have.
 3. **A `String` message crossing the domain.** Once a failure carries the sentence to display, the
    locale is decided in the layer that has no locale, the UI cannot reword per screen, and nobody
    can tell which literal the server can be trusted to send.
