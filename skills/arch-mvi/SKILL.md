@@ -132,8 +132,9 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
    intents** — `ResultsLoaded`, `LoadFailed`. Name them Results, keep them in the same sealed
    hierarchy (or a sibling one), and mark them internal so no composable can dispatch a `LoadFailed`.
 3. **One intent in, one state out.** The reducer returns a state and nothing else; it never emits an
-   effect and never starts work. Deciding *whether* to start work is the executor reading the intent
-   and the current state.
+   effect and never starts work. Deciding *whether* to start work is the executor's, and it reads the
+   whole transition — the intent plus the states either side of it — so an intent the reducer refused
+   starts nothing.
 4. **The store is the only writer.** `dispatch` runs `reduce` and assigns; every other component
    reads. If two coroutines can dispatch at once, serialize — a `MutableStateFlow.update { }` around
    `reduce`, an actor, or Orbit's own per-container dispatch queue.
@@ -202,9 +203,10 @@ fun SearchRoute(
     viewModel: SearchViewModel = hiltViewModel(),   // koinViewModel() on KMP/Desktop
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
 
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
+    LaunchedEffect(viewModel, lifecycle) {
+        viewModel.effects.flowWithLifecycle(lifecycle).collect { effect ->
             when (effect) {
                 is SearchEffect.OpenResult -> onOpenResult(effect.id)
             }
@@ -217,12 +219,12 @@ fun SearchRoute(
 1. **`collectAsStateWithLifecycle()` on Android and in `commonMain`; `collectAsState()` on Compose
    Desktop only.** Same rule, same reasons as `arch-mvvm` — it is one pattern's worth of binding, not
    two.
-2. **Key the effect `LaunchedEffect` on the store, not on `Unit`.** `LaunchedEffect(viewModel)`
-   restarts collection exactly when the store instance changes and never on an unrelated
-   recomposition; `LaunchedEffect(Unit)` in a reused composition can leave the old collector running.
-3. **On Android, collect effects lifecycle-aware** —
-   `viewModel.effects.flowWithLifecycle(lifecycle)` inside that `LaunchedEffect`, or a backgrounded
-   screen navigates under the one the user is looking at.
+2. **Key the effect `LaunchedEffect` on the store, not on `Unit`.** `LaunchedEffect(viewModel, lifecycle)`
+   restarts collection exactly when one of those changes and never on an unrelated recomposition;
+   `LaunchedEffect(Unit)` in a reused composition can leave the old collector running.
+3. **`flowWithLifecycle(lifecycle)` is not optional on Android** — without it a backgrounded screen
+   keeps consuming effects and navigates under the one the user is looking at. Compose Desktop, which
+   has no lifecycle to observe, drops it and the `lifecycle` key with it.
 4. **On Orbit, use `orbit-compose`**: `viewModel.collectAsState()` for the state and
    `viewModel.collectSideEffect { }` for effects. Both are lifecycle-aware already, so writing the
    `flowWithLifecycle` dance around them is duplicated machinery, not extra safety.
@@ -275,10 +277,11 @@ fun `transitions`() {
    arriving after the query changed. That is the bug MVI was adopted to prevent, and it is one row.
 5. **The executor is tested separately**, with `runTest` and a fake repository, asserting *which
    intents it produced* — not the state. Two tests, two seams, neither needing the other's setup.
-6. **On Orbit, use `orbit-test`**: `containerHost.test(this)` puts the container in test mode, then
-   `expectInitialState()`, `expectState { }` and `expectSideEffect { }` assert the flow the DSL
-   produced. It is the only way to reach an Orbit `reduce { }` block, which is not a standalone
-   function.
+6. **On Orbit, use `orbit-test`**: `viewModel.test(this)` puts the container in test mode, and
+   inside the block `expectInitialState()`, `expectState { copy(…) }` and
+   `expectSideEffect(effect)` assert the sequence the DSL produced — `containerHost` is the handle
+   the block gives you back for dispatching. It is the only way to reach an Orbit `reduce { }`
+   block, which is not a standalone function.
 
 ## When Appropriate
 

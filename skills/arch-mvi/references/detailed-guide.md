@@ -137,7 +137,8 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
         else state.copy(submittedQuery = state.query, status = Status.Loading)
 
     SearchIntent.RetryClicked ->
-        if (state.submittedQuery.isBlank()) state else state.copy(status = Status.Loading)
+        if (state.submittedQuery.isBlank() || state.status is Status.Loading) state
+        else state.copy(status = Status.Loading)
 
     // Pure navigation: the effect is sent by the store, the state does not move.
     is SearchIntent.ResultClicked -> state
@@ -152,8 +153,9 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
 }
 ```
 
-Three of the seven branches return `state` unchanged. Those are the pattern paying for itself: each
-one is a race that used to be a bug report, and each one is one row in the table test.
+Five of the seven branches can return `state` unchanged — every one but `QueryChanged` and
+`FilterToggled`. Those returns are the pattern paying for itself: each is a race that used to be a
+bug report, and each is one row in the table test.
 
 Two decisions worth naming:
 
@@ -184,21 +186,24 @@ class SearchViewModel @Inject constructor(
     private var searchJob: Job? = null
 
     fun dispatch(intent: SearchIntent) {
-        // One writer. `update` serializes two coroutines dispatching at the same moment.
-        val next = _state.updateAndGet { reduce(it, intent) }
-        execute(intent, next)
+        // One writer. `update` serializes two coroutines dispatching at the same moment,
+        // and may re-run its lambda, so `before` is captured inside it.
+        lateinit var before: SearchState
+        val after = _state.updateAndGet { current -> before = current; reduce(current, intent) }
+        execute(intent, before, after)
     }
 }
 ```
 
-`updateAndGet` returns the state the executor should look at: the executor's decisions read the state
-*after* the transition, never before, or a `SubmitClicked` would search the previous query.
+The executor gets the whole transition, not just its result. The new state is what it acts on — a
+`SubmitClicked` executed against the old one would search the previous query — and the pair is what
+tells it whether the reducer accepted the intent at all.
 
 ```kotlin
-    private fun execute(intent: SearchIntent, state: SearchState) {
+    private fun execute(intent: SearchIntent, before: SearchState, after: SearchState) {
         when (intent) {
             SearchIntent.SubmitClicked, SearchIntent.RetryClicked ->
-                if (state.status is Status.Loading) search(state)
+                if (after != before && after.status is Status.Loading) search(after)
 
             is SearchIntent.ResultClicked ->
                 _effects.trySend(SearchEffect.OpenResult(intent.id))
@@ -228,8 +233,10 @@ class SearchViewModel @Inject constructor(
 
 Four things this block is doing on purpose:
 
-1. **The executor reads the intent *and* the state.** `if (state.status is Status.Loading)` means the
-   reducer has already decided the submit was valid — the executor never re-implements that rule.
+1. **The executor triggers on the transition, not on the state.** `after != before` is the reducer's
+   own verdict; `after.status` alone would still read `Loading` from the search already in flight, so
+   a submit the reducer refused would cancel it and restart it for the stale `submittedQuery`. The
+   executor never re-implements the rule — it reads whether the rule fired.
 2. **It reports back by dispatching**, so the result goes through the same reducer as everything else
    and shows up in the same transition log.
 3. **`CancellationException` is rethrown before the general catch.** `runCatching` here would swallow
@@ -301,9 +308,9 @@ fun SearchScreen(state: SearchState, onIntent: (SearchIntent) -> Unit) {
 The whole UI surface is one lambda. Adding an intent adds a call site here and a branch in the
 reducer; it never widens the `Screen` signature, which is the ergonomic MVI actually delivers.
 
-Note what the composable does **not** do: no `if (state.results.isEmpty() && !loading)` deciding what
-"empty" means, no formatting a year into a subtitle. Both happened before this state existed —
-mapping in `toRow`, the decision in the reducer.
+Note what the composable does **not** do: no `try/catch`, no repository call, no formatting a year
+into a subtitle. The mapping happened in `toRow` before the state existed, and every branch rendered
+here was decided by the reducer.
 
 ## Hand-rolled — Reducer Test
 
@@ -395,10 +402,13 @@ class SearchViewModel(
     private var searchJob: Job? = null
 
     fun dispatch(action: SearchIntent) = intent {
+        val before = state
         reduce { reduceSearch(state, action) }          // the only state step
+        val after = state
         when (action) {
             SearchIntent.SubmitClicked, SearchIntent.RetryClicked ->
-                if (state.status is Status.Loading) search(state.submittedQuery, state.filters)
+                if (after != before && after.status is Status.Loading)
+                    search(after.submittedQuery, after.filters)
             is SearchIntent.ResultClicked -> postSideEffect(SearchEffect.OpenResult(action.id))
             else -> Unit
         }
@@ -406,9 +416,10 @@ class SearchViewModel(
 }
 ```
 
-`state` inside the syntax block is the container's current state, so reading it after `reduce { }`
-gives the post-transition value — the same "decide on the state the reducer just produced" rule the
-hand-rolled executor gets from `updateAndGet`.
+`state` inside the syntax block is the container's current state, so reading it either side of
+`reduce { }` gives the same transition pair the hand-rolled executor gets from `updateAndGet` — and
+with it the same rule: work starts because the reducer moved the state, not because the state looks
+a certain way.
 
 ```kotlin
     private fun search(forQuery: String, filters: Set<Filter>) {
@@ -435,7 +446,7 @@ search awaited in place delays every keystroke queued behind it; enabling parall
 container's settings is the other way out, at the cost of the ordering guarantee this screen relies
 on. Feeding the answer back keeps both.
 
-Artifacts: `orbit-viewmodel` for the `container { }` above (it binds the container to
+Artifacts: `orbit-viewmodel` for the `container(...)` call above (it binds the container to
 `viewModelScope` and to `SavedStateHandle`), `orbit-compose` for the UI side, `orbit-core` alone for
 a `commonMain` container with no `androidx.lifecycle` on the classpath — that one takes an explicit
 `CoroutineScope` instead.
@@ -479,6 +490,8 @@ can call.
 
 ```kotlin
 class SearchViewModelTest {
+    // `orbit-viewmodel` builds the container on viewModelScope, and search() launches into it.
+    @get:Rule val mainDispatcherRule = MainDispatcherRule()
 
     @Test
     fun `a submit searches and shows the rows`() = runTest {
@@ -527,7 +540,7 @@ Test-only dependencies, by what is being tested:
 |---|---|
 | `SearchReducerTest` (the table) | `kotlin-test` or JUnit — nothing else |
 | `SearchExecutorTest` (hand-rolled store) | `org.jetbrains.kotlinx:kotlinx-coroutines-test`, `app.cash.turbine:turbine` |
-| `SearchViewModelTest` (Orbit) | `org.orbit-mvi:orbit-test` plus `kotlinx-coroutines-test` |
+| `SearchViewModelTest` (Orbit) | `org.orbit-mvi:orbit-test`, `kotlinx-coroutines-test` — plus the `MainDispatcherRule` below |
 
 Production side: `org.orbit-mvi:orbit-viewmodel` (container bound to `viewModelScope` and
 `SavedStateHandle`), `org.orbit-mvi:orbit-compose` (`collectAsState`, `collectSideEffect`), or
@@ -538,7 +551,7 @@ straight into `commonTest` and runs on every KMP target (`pkg-kmp-source-sets`).
 before deciding where the store's test lives.
 
 ```kotlin
-// Android and any JVM source set with JUnit 4 — the store test needs a Main dispatcher,
+// Android and any JVM source set with JUnit 4 — both store tests need a Main dispatcher,
 // because viewModelScope runs on Dispatchers.Main.immediate and takes no parameter.
 class MainDispatcherRule(
     val dispatcher: TestDispatcher = StandardTestDispatcher(),
