@@ -77,7 +77,7 @@ between the columns — only the annotation does, which is the point.
 
 | Layer | Spring Boot | Ktor | Micronaut | Quarkus | http4k | CLI | Generic |
 |---|---|---|---|---|---|---|---|
-| Entry point | `@RestController` | Route handler | `@Controller` | JAX-RS `@Path` resource | `HttpHandler` / `routes { }` | Clikt `CliktCommand.run()`, kotlinx-cli `Subcommand.execute()` | Handler / Endpoint |
+| Entry point | `@RestController` | Route handler | `@Controller` | JAX-RS `@Path` resource | `HttpHandler` / `routes("/orders" bind POST to handler)` | Clikt `CliktCommand.run()`, kotlinx-cli `Subcommand.execute()` | Handler / Endpoint |
 | Business logic | `@Service` | UseCase / Service | `@Singleton` | `@ApplicationScoped` | plain class | service | Service / UseCase |
 | Data access | `@Repository` / Spring Data | Repository / DAO | `@Repository` / Micronaut Data | Panache repository | plain class | repository | Gateway / Repository |
 | Domain | Entity / DTO | Domain model | Entity / DTO | Entity / domain model | data class | data class | Domain model |
@@ -132,16 +132,17 @@ class OrderService(
     private val stock: StockRepository,
 ) {
     @Transactional
-    fun place(command: PlaceOrder): Order {
+    fun place(command: PlaceOrderCommand): Order {
         val reserved = stock.reserve(command.sku, command.quantity)
         return orders.save(Order.from(command, reserved))
     }
 }
 ```
 
-- **Never on the controller.** The transaction then spans response serialization, and a lazy
-  association loaded during serialization is a query inside a request-scoped transaction that nobody
-  can see in the service (`persistence-jvm-orm`).
+- **Never on the controller.** The proxy commits when the handler returns, so the boundary covers
+  argument binding and every service the handler calls but not the response body, and the read-only
+  flag, the timeout and the rollback rules end up describing a request rather than an operation
+  (`persistence-jvm-orm`).
 - **Never on the repository.** Each repository call gets its own transaction, so the two writes above
   cannot roll back together — the reservation survives an order that failed to save. This is the
   single most common layering bug that reaches production, because it looks correct in every test
@@ -155,7 +156,7 @@ class OrderService(
     private val orders: OrderRepository,
     private val stock: StockRepository,
 ) {
-    suspend fun place(command: PlaceOrder): Order = newSuspendedTransaction {
+    suspend fun place(command: PlaceOrderCommand): Order = newSuspendedTransaction {
         val reserved = stock.reserve(command.sku, command.quantity)
         orders.save(Order.from(command, reserved))
     }
@@ -209,7 +210,7 @@ data class PlaceOrderRequest(@field:NotBlank val sku: String, @field:Positive va
 
 @PostMapping("/orders")
 fun place(@Valid @RequestBody body: PlaceOrderRequest): OrderResponse =
-    service.place(PlaceOrder(Sku(body.sku), body.quantity)).toResponse()
+    service.place(PlaceOrderCommand(Sku(body.sku), body.quantity)).toResponse()
 ```
 
 ## Non-HTTP Entry Points
@@ -218,7 +219,7 @@ A scheduler, a message consumer and a CLI command are entry points, and rule 7 a
 unchanged: parse, delegate to a service, format the result. They are where layering breaks first,
 because they arrive later than the controllers and nobody thinks of them as controllers.
 
-| Entry point | Spring Boot | Ktor / http4k | Micronaut | Quarkus |
+| Entry point | Spring Boot | Ktor / http4k / no container | Micronaut | Quarkus |
 |---|---|---|---|---|
 | Scheduler | `@Scheduled` | a coroutine on the application scope | `@Scheduled` | `@Scheduled` |
 | Message consumer | `@KafkaListener`, `@RabbitListener` | client library callback | `@KafkaListener` | `@Incoming` |
@@ -242,7 +243,7 @@ class PlaceCommand(private val service: OrderService) : CliktCommand() {
     private val sku by option().required()
     private val quantity by option().int().default(1)
 
-    override fun run() = echo(service.place(PlaceOrder(Sku(sku), quantity)).id.value)
+    override fun run() = echo(service.place(PlaceOrderCommand(Sku(sku), quantity)).id.value)
 }
 ```
 
@@ -265,11 +266,11 @@ feeling about it, and each points at `arch-hexagonal`:
    neither — in ports and adapters it becomes a use case in the core with both collaborators as
    outbound ports.
 
-One signal is enough to start the conversation; two make the move overdue. `architecture-choice`
-states the same tiebreak from the other side — *Layered, until the second external system arrives or
-tests need the framework out.* The migration is incremental: extract the service's collaborators into
-interfaces it owns first, then move the interfaces and the rules into a module with no framework
-dependency. What lands there is `arch-hexagonal`, and its domain half is `arch-clean`.
+One signal is enough to move; two make the move overdue. `architecture-choice` states the same
+tiebreak from the other side — *Layered, until the second external system arrives or tests need the
+framework out.* The migration is incremental: extract the service's collaborators into interfaces it
+owns first, then move the interfaces and the rules into a module with no framework dependency. What
+lands there is `arch-hexagonal`, and its domain half is `arch-clean`.
 
 ## Common Mistakes
 
@@ -279,10 +280,12 @@ dependency. What lands there is `arch-hexagonal`, and its domain half is `arch-c
 2. **`@Transactional` on the repository** — every call gets its own transaction, so a service that
    writes twice cannot roll back as a unit, and a failure halfway leaves the first write committed.
    Every single-method test still passes.
-3. **`@Transactional` on the controller** — the transaction now spans response serialization, so a
-   lazy association is fetched during JSON writing, inside a boundary the service can neither see nor
-   close. The read-only flag, the timeout and the rollback rules end up describing a request rather
-   than an operation.
+3. **`@Transactional` on the controller** — the boundary now covers argument binding and every
+   service the handler calls, so the read-only flag, the timeout and the rollback rules describe a
+   request rather than an operation. It also hides where the session ends: the proxy commits when the
+   handler returns, and the lazy associations that still resolve while the body is written are
+   resolving through Open Session In View (`spring.jpa.open-in-view`, on by default in Boot), not
+   through your transaction.
 4. **The persistence entity as the response body** — one `@Entity` class annotated with
    `@JsonProperty` and returned from the controller. The schema is now the public contract: a column
    rename is a breaking change, a new column leaks, and the lazy fields either explode or fetch the
@@ -300,7 +303,9 @@ dependency. What lands there is `arch-hexagonal`, and its domain half is `arch-c
 8. **One service per entity, mirroring the repositories** — `OrderService` forwarding to
    `OrderRepository` method for method. The layer buys nothing except a second file to open, and the
    moment a real operation spans two entities it becomes a service-to-service call and then a cycle.
-   Name services after operations the business has a word for, not after tables.
+   Name services after operations the business has a word for, not after tables. This is not
+   `arch-clean`'s pass-through use case: a delegating service still earns its place here as the
+   transaction boundary — what is wrong is naming it after a table instead of an operation.
 9. **Blocking JDBC inside a `suspend` route** — Ktor or a coroutine-based handler calling a blocking
    repository on the request dispatcher. Layering is intact and throughput is not; the repository is
    the layer that declares its own cost with `withContext` (`concurrency-coroutines`).

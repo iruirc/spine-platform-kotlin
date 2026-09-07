@@ -45,10 +45,10 @@ Four elements and one law. Everything on the outside depends on the core; the co
 nothing:
 
 ```
-    driving adapters                  the core                       driven adapters
-  HTTP route      ─┐                                     ┌─►  OrderRepository  ─► the database
-  CLI command     ─┼─►  PlaceOrder  ─►  domain rules  ─► ─┼─►  PaymentGateway   ─► the provider API
-  queue consumer  ─┘    inbound port                      └─►  Clock            ─► the system clock
+    driving adapters              the core                   driven adapters
+  HTTP route      ─┐                                    ┌─►  OrderRepository  ─► the database
+  CLI command     ─┼─►  PlaceOrder  ─►  domain rules ───┼─►  PaymentGateway   ─► the provider API
+  queue consumer  ─┘    inbound port                    └─►  CurrentTime      ─► the system clock
                                                              outbound ports
 ```
 
@@ -58,7 +58,7 @@ nothing:
 - **Inbound ports** (driving side) are what the application offers, one interface per use case:
   `PlaceOrder`, `CancelOrder`, `QuoteShipping`. The core implements them.
 - **Outbound ports** (driven side) are what the application needs, named for the need:
-  `OrderRepository`, `PaymentGateway`, `Clock`. The core declares them and calls them; adapters
+  `OrderRepository`, `PaymentGateway`, `CurrentTime`. The core declares them and calls them; adapters
   implement them.
 - **Adapters** are the only classes that know a technology exists. A driving adapter translates a
   request, a message or a set of command-line flags into a call on an inbound port. A driven adapter
@@ -89,8 +89,9 @@ settings.gradle.kts
    in the core module's build file, ever. Nobody *can* import outward, and the failure is a compile
    error with a file and a line (`pkg-gradle-modules`).
 2. **`:core` is `kotlin("jvm")`**, never the framework's own plugin, and it declares coroutines and
-   nothing else. If a file there needs an import outside `kotlin.*`, `kotlinx.*` and your own
-   packages, either the type is wrong or the file is in the wrong module.
+   nothing else. If a file there needs an import outside `kotlin.*`, `java.*`, `kotlinx.*` and your
+   own packages, either the type is wrong or the file is in the wrong module — the rule is no
+   framework, not no JDK.
 3. **One adapter module per technology, not per feature.** `:adapters:web` plus
    `:adapters:persistence` plus `:adapters:payments` — a `:adapters:orders` holding a controller *and*
    a repository re-creates the coupling the split exists to remove.
@@ -119,7 +120,7 @@ fun interface PaymentGateway {
     fun charge(amount: Money, method: PaymentMethod): Result<PaymentId>
 }
 
-fun interface Clock {
+fun interface CurrentTime {
     fun now(): Instant
 }
 ```
@@ -158,7 +159,7 @@ and no proxy exists. Two placements are correct, and a project picks one:
 
 ```kotlin
 // :core — the port, if you need one. No framework word appears in it.
-fun interface UnitOfWork {
+interface UnitOfWork {
     fun <T> inTransaction(block: () -> T): T
 }
 
@@ -204,10 +205,10 @@ annotation processor on it, so a `:core` that declares none is enforced by the b
 configuration.
 
 **http4k.** `HttpHandler` is `(Request) -> Response` — already a port shape, which makes the whole
-framework naturally hexagonal. An inbound adapter is a `routes { }` value closing over your ports; an
-outbound HTTP adapter is an `HttpHandler` a test replaces with an in-memory function, no server and
-no port number involved. If the team is on http4k, the ceremony this skill describes is mostly
-already paid for.
+framework naturally hexagonal. An inbound adapter is a `routes("/orders" bind POST to placeOrder)`
+value closing over your ports; an outbound HTTP adapter is an `HttpHandler` a test replaces with an
+in-memory function, no server and no socket involved. If the team is on http4k, the ceremony this
+skill describes is mostly already paid for.
 
 ## Testing
 
@@ -227,7 +228,7 @@ class InMemoryOrders : OrderRepository {
 
 @Test
 fun `declines an order the payment gateway refuses`() {
-    val placeOrder = PlaceOrderUseCase(InMemoryOrders(), RefusingGateway, FixedClock(now))
+    val placeOrder = PlaceOrderUseCase(InMemoryOrders(), RefusingGateway, FixedTime(now))
     assertTrue(placeOrder(command).isFailure)
 }
 ```
@@ -253,7 +254,7 @@ than a hope.
 
 ## When Worth It
 
-Adopt when at least two hold:
+One signal is enough to move; two make the move overdue:
 
 - **A second external system**, and one of them must be swappable, sandboxed or faked — the signal
   `arch-layered` names first, and the one that most often decides it alone
