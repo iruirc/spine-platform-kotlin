@@ -151,7 +151,7 @@ networking       → `net-architecture`, `net-http-clients`, `net-openapi`
 persistence      → `persistence-architecture`, `persistence-room-sqldelight`, `persistence-jvm-orm`, `persistence-migrations`
 dependency graph → `di-composition-root`, `di-hilt`, `di-koin`, `di-spring`
 concurrency      → `concurrency-coroutines`, `reactive-flow`
-errors           → —
+errors           → `error-architecture`
 packaging        → —
 deep links       → `nav-deeplinks`
 release ops      → —

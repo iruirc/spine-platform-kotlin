@@ -29,3 +29,4 @@ setup() {
 @test "di-spring: shape" { assert_skill_shape "$ROOT/skills/di-spring"; }
 @test "concurrency-coroutines: shape" { assert_skill_shape "$ROOT/skills/concurrency-coroutines"; }
 @test "reactive-flow: shape" { assert_skill_shape "$ROOT/skills/reactive-flow"; }
+@test "error-architecture: shape" { assert_skill_shape "$ROOT/skills/error-architecture"; }
