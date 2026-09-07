@@ -152,7 +152,7 @@ persistence      → `persistence-architecture`, `persistence-room-sqldelight`, 
 dependency graph → `di-composition-root`, `di-hilt`, `di-koin`, `di-spring`
 concurrency      → `concurrency-coroutines`, `reactive-flow`
 errors           → `error-architecture`
-packaging        → —
+packaging        → `pkg-gradle-modules`, `pkg-kmp-source-sets`
 deep links       → `nav-deeplinks`
 release ops      → —
 

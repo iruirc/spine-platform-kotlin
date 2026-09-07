@@ -30,3 +30,5 @@ setup() {
 @test "concurrency-coroutines: shape" { assert_skill_shape "$ROOT/skills/concurrency-coroutines"; }
 @test "reactive-flow: shape" { assert_skill_shape "$ROOT/skills/reactive-flow"; }
 @test "error-architecture: shape" { assert_skill_shape "$ROOT/skills/error-architecture"; }
+@test "pkg-gradle-modules: shape" { assert_skill_shape "$ROOT/skills/pkg-gradle-modules"; }
+@test "pkg-kmp-source-sets: shape" { assert_skill_shape "$ROOT/skills/pkg-kmp-source-sets"; }
