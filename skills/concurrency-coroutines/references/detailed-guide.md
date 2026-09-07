@@ -63,9 +63,9 @@ class SqlDelightOrderSource(
 
 Cancellation reaches the socket: the `viewModelScope` job dies in `onCleared()`, the `await` chain
 unwinds, Retrofit cancels the underlying `Call`. Every layer above `:data` is testable with a plain
-fake and no dispatcher at all. Where Room replaces SQLDelight the `withContext` disappears — a
-`suspend` DAO function already runs on Room's executor — and comes back only for what *surrounds*
-the call: a parse, a file write, ten thousand rows (`persistence-architecture`).
+fake and no dispatcher. Where Room replaces SQLDelight the `withContext` disappears — a `suspend` DAO
+runs on Room's executor already — and returns only for what *surrounds* the call: a parse, a file
+write, ten thousand rows (`persistence-architecture`).
 
 ## Cancellation — runCatching Swallows It
 
@@ -77,11 +77,10 @@ that throw is how the coroutine unwinds. `runCatching` catches `Throwable`.
 suspend fun load(id: String): Result<Order> = runCatching { api.order(id) }
 ```
 
-Two failures at once. The caller sees `Result.failure(CancellationException)` and maps it to an
-error state, so a user who pressed Back gets an alert. And the coroutine is still cancelled — every
-later suspension throws immediately, so the "recovery" path silently does nothing. The same trap
-wears other clothes: `catch (e: Exception)` around a suspending call, a `catch (e: Throwable)` in a
-base class, a Ktor `StatusPages` handler mapping every throwable to a 500.
+Two failures at once. The caller sees `Result.failure(CancellationException)` and maps it to an error
+state, so a user who pressed Back gets an alert; and the coroutine is still cancelled, so every later
+suspension throws and the "recovery" path silently does nothing. A `catch (e: Exception)` around a
+suspending call and a `catch (e: Throwable)` in a base class are the same trap wearing other clothes.
 
 ## Cancellation — A Safe runCatching
 
@@ -91,6 +90,9 @@ One helper, used everywhere `runCatching` was reached for.
 suspend inline fun <T> catching(block: () -> T): Result<T> =
     try {
         Result.success(block())
+    } catch (e: TimeoutCancellationException) {
+        currentCoroutineContext().ensureActive()   // an outer deadline cancelled us — rethrow
+        Result.failure(e)                          // our own withTimeout expired — a real failure
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
@@ -98,10 +100,12 @@ suspend inline fun <T> catching(block: () -> T): Result<T> =
     }
 ```
 
-Cancellation is rethrown before anything else can see it, and stays a `CancellationException` — do
-not wrap it, map it, or log it as an error. `currentCoroutineContext().ensureActive()` inside the
-general `catch` is the belt-and-braces variant, covering a library that caught the cancellation
-itself and threw something else.
+Cancellation is rethrown before anything else sees it, and stays a `CancellationException` — do not
+wrap it, map it, or log it as an error. The timeout arm comes first because
+`TimeoutCancellationException` is a subtype: a `withTimeout` *inside* the block is a deadline the
+caller must see, while an outer one expiring is a cancellation that has to propagate.
+`ensureActive()` separates them — it throws only when this job is already cancelled — and the same
+call in the general `catch` covers a library that swallowed the cancellation and threw its own.
 
 What the failures become past this point — a sealed domain error, an `UiState.Error`, an RFC 9457
 body — is `error-architecture`. This helper only guarantees that cancellation never reaches it.
@@ -121,10 +125,8 @@ suspend fun parseAll(rows: List<RawRow>): List<Order> = withContext(Dispatchers.
 
 `ensureActive()` is a flag read and a throw, cheap enough to call per row. `yield()` does the same
 check *and* offers the thread to other coroutines, which a long loop on a small `Default` pool needs
-so it does not starve everything else: `yield()` when the loop is the long-running thing on that
-dispatcher, `ensureActive()` when it is one of many. A manual polling loop takes `while (isActive)`
-as its condition for the same reason. Nothing is needed when the loop already suspends — every
-standard-library `suspend` call checks on the way in.
+so it does not starve everything else. A polling loop takes `while (isActive)` for the same reason,
+and a loop that already suspends needs neither.
 
 ## Cancellation — Cleanup Under NonCancellable
 
@@ -143,10 +145,9 @@ suspend fun upload(file: File) {
 }
 ```
 
-Three constraints. The block must be short — an uncancellable section is one the caller cannot
-stop, so a retry loop inside it hangs shutdown. It must not do the work: `NonCancellable` around
-`api.upload(file)` is how an "upload keeps getting cancelled" ticket becomes an upload nobody can
-cancel. And non-suspending cleanup needs none of this; a plain `finally` already runs.
+Three constraints. The block must be short — an uncancellable section is one the caller cannot stop.
+It must not do the work: `NonCancellable` around `api.upload(file)` turns an "upload keeps getting
+cancelled" ticket into an upload nobody can cancel. And non-suspending cleanup needs none of this.
 
 ## Cancellation — withTimeout and withTimeoutOrNull
 
@@ -160,15 +161,16 @@ val orders = withTimeout(5.seconds) { loadOrders(userId) }
 val orders = withTimeoutOrNull(5.seconds) { loadOrders(userId) } ?: emptyList()
 ```
 
-`TimeoutCancellationException` is a `CancellationException`, with two consequences. A generic
+`TimeoutCancellationException` is a `CancellationException`, with three consequences. A generic
 `catch (e: Exception)` inside the block swallows the timeout and the block runs on past the deadline
-— the same trap as `runCatching`. And a timeout caught *outside* does not cancel the enclosing
-coroutine: the exception belongs to the scope `withTimeout` created, not to its parent.
+— the same trap as `runCatching`. A timeout caught *outside* does not cancel the enclosing
+coroutine: the exception belongs to the scope `withTimeout` created, not to its parent. And a
+wrapper rethrowing every `CancellationException` rethrows a real expiry too, so the deadline never
+becomes a visible failure — the arm `Cancellation — A Safe runCatching` adds.
 
-The deadline is a business decision, so it goes in the use case or the handler, never in a
-repository. The client's connect/read/write timeouts answer a different question — they bound one
-attempt and throw an `IOException` a retry layer can act on, while `withTimeout` bounds the whole
-operation including its retries (`net-architecture`).
+The client's connect/read/write timeouts answer a different question — they bound one attempt and
+throw an `IOException` a retry layer can act on, while `withTimeout` bounds the whole operation
+including its retries (`net-architecture`).
 
 ## Fan-out — coroutineScope and async
 
@@ -202,9 +204,8 @@ suspend fun details(ids: List<String>): List<Order> =
     coroutineScope { ids.map { async { orders.byId(it) } }.awaitAll() }
 ```
 
-Bound it when the list can be large — a thousand `async`es against one API is a self-inflicted
-outage. Chunk the input, or route the calls through a source already limited by a
-`Semaphore` or `Dispatchers.IO.limitedParallelism(n)`.
+Bound it when the list can be large: chunk the input, or route the calls through a source already
+limited by a `Semaphore` or `Dispatchers.IO.limitedParallelism(n)`.
 
 ## Fan-out — supervisorScope and Per-Child Failure
 
@@ -226,10 +227,10 @@ suspend operator fun invoke(userId: String): Dashboard = supervisorScope {
 
 Two rules make this correct rather than merely compiling. Under `supervisorScope` a failed `async`
 holds its exception until someone calls `await()`, so an `async` nobody awaits is a lost failure:
-await every child exactly once, inside a `catching` if it is allowed to fail. An await that is *not*
-wrapped behaves as before — `profile.await()` throwing cancels the block, because supervision
-isolates children from each other, not the parent from its children. If every child ends up wrapped,
-this was a `coroutineScope` whose calls already return a `Result`.
+await every child exactly once, inside `catching` if it may fail — `catching`, not `runCatching`,
+because `await()` suspends. An await that is *not* wrapped behaves as before: `profile.await()`
+throwing cancels the block, because supervision isolates children from each other, not from the
+parent.
 
 ## App Scope — A Service That Outlives the Screen
 
@@ -249,7 +250,7 @@ class OutboxUploader(private val scope: CoroutineScope, private val api: OrderAp
 
     fun enqueue(order: Order): Job {
         val job = scope.launch { api.upload(order) }
-        inFlight.put(order.id, job)?.cancel()          // a second attempt replaces the first
+        inFlight.put(order.id, job)?.cancel()          // re-enqueueing supersedes the running attempt
         job.invokeOnCompletion { inFlight.remove(order.id, job) }
         return job
     }
@@ -257,11 +258,11 @@ class OutboxUploader(private val scope: CoroutineScope, private val api: OrderAp
 ```
 
 `SupervisorJob` is what makes the scope survive its first failure: on a plain `Job` one uncaught
-throw cancels the scope, and every later `launch` returns a job that never runs — a bug that
-presents as "uploads stopped working after some earlier error". The handler sits in the scope's
-context, the only place it takes effect; on a child `async` it would be ignored. The screen calls
-`enqueue` and navigates away, and the returned `Job` lets a screen that *does* care cancel what it
-started without owning the scope. Shut down with `appScope.cancel()` (`release-ops-server`).
+throw cancels the scope, and every later `launch` returns a job that never runs — a bug that presents
+as "uploads stopped working after some earlier error". The handler sits in the scope's context, the
+only place it takes effect. Most callers enqueue and are done; the returned `Job` is there for the
+rarer one that wants to stop what it started, without holding the scope. Shut the scope down with
+`appScope.cancel()` (`release-ops-server`).
 
 ## Android — WorkManager CoroutineWorker
 
@@ -289,12 +290,10 @@ class SyncWorker(
 `doWork()` is `suspend` and runs on `Dispatchers.Default` unless the worker overrides
 `coroutineContext`; the framework cancels it when its constraints stop holding, which is why the
 `CancellationException` branch rethrows instead of returning `Result.failure()`. Injecting `sync`
-needs a `WorkerFactory` binding (`di-hilt` covers `@HiltWorker`, `di-koin` the equivalent).
-
-The request built around it carries the constraints and the backoff — `NetworkType.CONNECTED`,
+needs a `WorkerFactory` binding (`di-hilt` covers `@HiltWorker`, `di-koin` the equivalent). The
+request built around it carries the constraints and the backoff — `NetworkType.CONNECTED`,
 `BackoffPolicy.EXPONENTIAL` — and goes in through `enqueueUniqueWork(name, KEEP, request)`, so a
-second trigger does not start a second sync. User-visible ongoing work is a foreground service
-instead; fire-and-forget within the process lifetime is the app scope.
+second trigger does not start a second sync.
 
 ## Shared State — Mutex
 
@@ -305,8 +304,10 @@ class TokenCache(private val api: AuthApi) {
     private val mutex = Mutex()
     private var token: Token? = null
 
-    suspend fun current(): Token = mutex.withLock {
-        token ?: api.issue().also { token = it }
+    suspend fun current(): Token {
+        mutex.withLock { token }?.let { return it }
+        val fresh = api.issue()                          // the network call is outside the lock
+        return mutex.withLock { token ?: fresh.also { token = it } }
     }
 }
 ```
@@ -314,9 +315,13 @@ class TokenCache(private val api: AuthApi) {
 `withLock` suspends rather than parking a thread, which is the reason not to reach for
 `synchronized` — a blocked thread on `Dispatchers.Default` is one of very few. It is *not*
 reentrant: a locked section calling another function that takes the same `Mutex` deadlocks, and the
-stack trace names neither. Keep the critical section to the mutation and never do I/O inside it; the
-single-flight refresh that does this properly, with a cached `Deferred` so N concurrent 401s produce
-one call, is `net-architecture`'s `## Auth Refresh`.
+stack trace names neither.
+
+The shape above is what "keep the critical section to the mutation" costs: two short locked sections
+with `api.issue()` between them, not one lock held across a network round trip that every other
+caller queues behind. What it does not buy is single flight — two callers arriving together both call
+`issue()` and one result is dropped. Collapsing that into one call, with a cached `Deferred` so N
+concurrent 401s produce one refresh, is `net-architecture`'s `## Auth Refresh`.
 
 Two alternatives are often better. Confinement — state written from one coroutine only — needs no
 lock. And `StateFlow.update { }`, an atomic compare-and-set loop, for state that is also observed:
@@ -331,8 +336,9 @@ with; the moment two atomics must agree, they are one state object behind a `Mut
 
 ## Shared State — limitedParallelism for Blocking JDBC
 
-`Dispatchers.IO` is elastic to 64 threads. A connection pool of 10 is not, so 64 coroutines calling
-JDBC means 54 threads blocked inside `DataSource.getConnection()`, invisible to every pool metric.
+`Dispatchers.IO` is elastic, up to 64 threads or the processor count, whichever is larger. A
+connection pool of 10 is not, so dozens of coroutines calling JDBC means dozens of threads blocked
+inside `DataSource.getConnection()`, invisible to every pool metric.
 
 ```kotlin
 // one dispatcher per bounded resource, sized to it
@@ -345,10 +351,9 @@ class JdbcOrderRepository(private val ds: DataSource) : OrderRepository {
 }
 ```
 
-`limitedParallelism(n)` is a **view** of `Dispatchers.IO`, not a new pool: it borrows the same
-threads and caps how many this call site may hold at once. Create it once — a fresh view per call
-defeats the point. Under Exposed this is `newSuspendedTransaction(Dispatchers.IO) { }` around the
-service body (`persistence-jvm-orm`).
+`limitedParallelism(n)` is a **view** of `Dispatchers.IO`, not a new pool: it borrows the same threads
+and caps how many this call site may hold at once. Create it once — a fresh view per call defeats the
+point. Under Exposed this is `newSuspendedTransaction(Dispatchers.IO) { }` (`persistence-jvm-orm`).
 
 ## Server — Ktor Handlers
 
@@ -358,17 +363,23 @@ Every route body is already `suspend`, on the engine's dispatcher, inside the ca
 routing {
     get("/orders/{id}") {
         val id = call.parameters.getOrFail("id")
-        val order = withTimeoutOrNull(3.seconds) { orders.byId(id) }
-            ?: return@get call.respond(HttpStatusCode.GatewayTimeout)
-        call.respond(order)
+        val order = try {
+            withTimeout(3.seconds) { orders.byId(id) }    // null here means "no such order"
+        } catch (e: TimeoutCancellationException) {
+            return@get call.respond(HttpStatusCode.GatewayTimeout)
+        }
+        if (order == null) call.respond(HttpStatusCode.NotFound) else call.respond(order)
     }
 }
 ```
 
-The call's job is cancelled when the client disconnects, so the handler and everything it awaits
-stop — provided nothing swallowed the `CancellationException`. A `StatusPages` handler mapping every
-`Throwable` to a 500 is exactly that swallow; exclude cancellation explicitly. Work that must finish
-regardless of the client belongs on the application scope, not on the call.
+`withTimeoutOrNull` would be shorter and wrong: it returns `null` for the deadline and the lookup
+returns `null` for a missing row, so the handler cannot tell a slow database from an order that was
+never there. When the block can itself return `null`, take `withTimeout` and catch.
+
+The call's job is cancelled when the client disconnects, so the handler and everything it awaits stop
+— provided nothing swallowed the `CancellationException`. A `StatusPages` handler mapping every
+`Throwable` to a 500 is exactly that swallow; exclude cancellation explicitly.
 
 ## Server — Spring WebFlux and Reactor Interop
 
@@ -402,10 +413,9 @@ event-loop thread — `runBlocking` under another name, stalling every request t
 
 ## Server — Spring MVC and Virtual Threads
 
-Spring MVC also accepts `suspend` handler methods, since Spring Framework 6.0 / Boot 3, through the
-same `kotlinx-coroutines-reactor` bridge: the handler is adapted and the servlet request is handled
-asynchronously. It is not WebFlux, and everything below the controller — JDBC, JPA, blocking clients
-— still blocks a thread.
+Spring MVC also accepts `suspend` handler methods, through the same `kotlinx-coroutines-reactor`
+bridge and only when it is on the classpath: the handler is adapted and the request handled
+asynchronously. It is not WebFlux — everything below the controller still blocks a thread.
 
 ```kotlin
 // spring.threads.virtual.enabled=true makes the servlet container's threads virtual;
@@ -415,9 +425,9 @@ val loom = Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()
 
 What Loom changes and what it does not:
 
-- **Changes:** a blocking call parks a virtual thread, not a platform one, so the 64-thread ceiling
-  on `Dispatchers.IO` stops being the constraint and `limitedParallelism` is no longer needed *for
-  thread economy*.
+- **Changes:** a blocking call parks a virtual thread, not a platform one, so `Dispatchers.IO`'s
+  thread limit stops being the constraint and `limitedParallelism` is no longer needed *for thread
+  economy*.
 - **Does not change:** anything with a real ceiling — a ten-connection pool is still ten
   connections, and unbounded callers only move the wait somewhere with no metric on it.
 - **Watch out:** before JDK 24 a virtual thread blocking inside `synchronized` pins its carrier,
@@ -440,10 +450,10 @@ control — an OkHttp `Interceptor` or `Authenticator` (`net-http-clients`).
 
 `runTest` runs the body on a `TestScope` whose scheduler drives virtual time: the two 30-second
 backoff delays complete instantly. A test that actually waits is one where something escaped the
-scheduler — a real dispatcher, a `Thread.sleep`, an executor. Driving time by hand:
-`advanceUntilIdle()` runs everything queued, `advanceTimeBy(d)` what is due within `d`,
-`runCurrent()` only what is due now. Under `StandardTestDispatcher` nothing runs until one of them
-is called, which is what makes intermediate states assertable.
+scheduler — a real dispatcher, a `Thread.sleep`, an executor. `advanceUntilIdle()` runs everything
+queued, `advanceTimeBy(d)` what is due within `d`, `runCurrent()` only what is due now; under
+`StandardTestDispatcher` nothing runs until one of them is called, which is what makes intermediate
+states assertable.
 
 ## Testing — Injected Dispatchers and setMain
 
@@ -463,14 +473,13 @@ class OrdersViewModelTest {
 }
 ```
 
-Two seams, sharing one scheduler. `viewModelScope` runs on `Dispatchers.Main.immediate` and takes
-no parameter, so `Dispatchers.setMain` through a JUnit rule is the only way in — `arch-mvvm`'s
-reference carries the rule body. Every *other* dispatcher is a constructor parameter, and what goes
-in must be `StandardTestDispatcher(testScheduler)` from `runTest`'s own scheduler
+Two seams, sharing one scheduler. `viewModelScope` runs on `Dispatchers.Main.immediate` and takes no
+parameter, so `Dispatchers.setMain` through a JUnit rule is the only way in — `arch-mvvm`'s reference
+carries the rule body. Every *other* dispatcher is a constructor parameter, and what goes in must be
+`StandardTestDispatcher(testScheduler)` from `runTest`'s own scheduler
 (`mainDispatcherRule.dispatcher` is the same one). A dispatcher on any other scheduler is one
 `advanceUntilIdle()` never reaches: the test hangs, times out, or passes because the assertion ran
-before the work did. `UnconfinedTestDispatcher` skips the queueing — convenient exactly when
-ordering does not matter, misleading the rest of the time.
+before the work did.
 
 ## Testing — backgroundScope for Endless Collectors
 
@@ -493,8 +502,7 @@ test forever.
 
 `backgroundScope` is cancelled when the test body ends, so the collector is torn down instead of
 awaited. The `UnconfinedTestDispatcher` is deliberate: the collector must be subscribed before the
-first emission, and an unconfined dispatcher starts it eagerly at the `launch`.
-
-Cancellation deserves a test of its own — cancel the job, then assert the effect: request aborted,
-cleanup ran, no state written. That bug is invisible in a suite where everything runs to completion.
-Flow assertions with Turbine are `reactive-flow`.
+first emission, and an unconfined dispatcher starts it eagerly at the `launch`. Cancellation deserves
+a test of its own — cancel the job, then assert the effect: request aborted, cleanup ran, no state
+written. That bug is invisible in a suite where everything runs to completion. Flow assertions with
+Turbine are `reactive-flow`.

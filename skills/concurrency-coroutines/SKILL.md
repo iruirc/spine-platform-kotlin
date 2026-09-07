@@ -70,7 +70,7 @@ failure modes, every time:
   dies, the request finishes, the result is written into a cleared ViewModel — or, worse, the work
   keeps running for the rest of the process.
 - **Cancellation caught as failure.** A `runCatching` in the repository turns a Back press into
-  `UiState.Error`, and the cancelled coroutine keeps going because nothing rethrew.
+  `UiState.Error`, and nothing rethrew, so the cancelled coroutine keeps going.
 - **One failure taking down the wrong tree.** A background refresh started on a shared scope with a
   plain `Job` throws, and every other coroutine on that scope dies with it, permanently.
 
@@ -95,14 +95,14 @@ belongs to whatever owns the lifetime, and cancellation is never caught — only
 
 1. **`withContext` goes where the blocking actually happens, and nowhere above it.** Main-safety is
    the data layer's contract: a `suspend` function is safe to call from any dispatcher, and making
-   that true is the callee's job. A use case that names a dispatcher has an opinion about a
-   collaborator's cost (`arch-clean`); a ViewModel that wraps a repository call is being told which
-   layer blocks (`persistence-architecture`).
+   that true is the callee's job. `arch-clean` bars the use case from naming a dispatcher and
+   `persistence-architecture` bars the ViewModel from wrapping a repository call; both hold for one
+   reason, which is that neither layer can see what the call beneath it actually costs.
 2. **Three dispatchers, three jobs.** `Dispatchers.Default` for CPU — a pool sized to the core
-   count. `Dispatchers.IO` for calls that block a thread — elastic, capped at 64 threads by default,
-   and sharing its threads with `Default`, so switching between the two is often not a thread hop at
-   all. `Dispatchers.IO.limitedParallelism(n)` when a resource has a real ceiling: a connection
-   pool, a device, a rate limit.
+   count. `Dispatchers.IO` for calls that block a thread — elastic, limited to 64 threads or the
+   processor count, whichever is larger, and sharing its threads with `Default`, so switching
+   between the two is often not a thread hop at all. `Dispatchers.IO.limitedParallelism(n)` when a
+   resource has a real ceiling: a connection pool, a device, a rate limit.
 3. **Inject the dispatcher; do not hard-code it inside the method.** A constructor parameter
    defaulting to `Dispatchers.IO` is replaced in one line under test; a literal buried in a function
    body makes every test of it depend on real thread scheduling.
@@ -141,9 +141,8 @@ this stop".
 5. **Flow collection is scope-bound like anything else.** Collect in `repeatOnLifecycle(STARTED)`
    on Views, or with `collectAsStateWithLifecycle()` in Compose, so a backgrounded screen stops the
    upstream (`arch-mvvm`). What the upstream does meanwhile is a `stateIn` policy (`reactive-flow`).
-6. **`launch` versus `async`.** `launch` starts work whose result nobody awaits and reports failure
-   to its parent immediately. `async` produces a value, and holds its exception until `await()` — an
-   `async` nobody awaits on a supervised scope is a lost exception.
+6. **`launch` versus `async`.** `launch` reports failure to its parent immediately; `async` produces
+   a value and holds its exception until `await()`, so one nobody awaits is a lost exception.
 
 ## Cancellation
 
@@ -157,16 +156,25 @@ Cancellation is cooperative: it sets a flag and makes the *next* suspension poin
 val result = runCatching { repository.load(id) }
 
 // right: rethrow it, then handle the rest
-suspend fun <T> catching(block: suspend () -> T): Result<T> =
-    try { Result.success(block()) }
-    catch (e: CancellationException) { throw e }
-    catch (e: Throwable) { Result.failure(e) }
+suspend inline fun <T> catching(block: () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (e: TimeoutCancellationException) {
+        currentCoroutineContext().ensureActive()   // an outer deadline cancelled us — rethrow
+        Result.failure(e)                          // our own withTimeout expired — a real failure
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
 ```
 
 `runCatching` catches `Throwable`, so it catches the cancellation the machinery uses to unwind: the
 coroutine stays cancelled, every later suspension throws, and the user is shown a real error. Same
-trap in a `catch (e: Exception)` around a suspending call — rethrow first, or catch the specific
-exception you meant. `error-architecture` owns what the remaining failures become.
+trap in a `catch (e: Exception)` around a suspending call. The timeout arm is there because
+`TimeoutCancellationException` is a subtype: a deadline the block set for itself is a failure the
+caller must see, one set outside it is a cancellation to rethrow, and `ensureActive()` tells them
+apart. `error-architecture` owns what the remaining failures become.
 
 **2. A loop with no suspension point is not cancellable — call `ensureActive()` or `yield()`.**
 
@@ -214,7 +222,7 @@ together?**"
 | A screen means profile + orders + unread count, fixed set | use case | `coroutineScope { async … }` |
 | N independent items, count known at runtime | use case | `coroutineScope` + `map { async { } }` + `awaitAll()` |
 | Each piece renders as it arrives, no business meaning | ViewModel | `viewModelScope.launch` per piece |
-| One piece may fail without failing the screen | use case | `supervisorScope` + per-child `runCatching` on the `await` |
+| One piece may fail without failing the screen | use case | `supervisorScope` + per-child `catching` on the `await` |
 | Two sources merged into one stream | repository | flow operators (`reactive-flow`) |
 | Prefetch on app start | app-scoped service | its own scope |
 
@@ -236,11 +244,11 @@ class LoadDashboard(
 2. **Fan-out in the ViewModel when it is pure UI choreography.** Three thumbnails that each appear
    when ready is a rendering decision, not a domain one.
 3. **Never in a repository.** A repository that assembles a screen-shaped object has taken a
-   presentation concept into `:data`, and the use case above it becomes a passthrough
+   presentation concept into `:data`, and the use case left above it shrinks to one forwarding line
    (`arch-clean`).
 4. **`coroutineScope` is the default; `supervisorScope` is the exception you can name.** If you
-   cannot say which child is allowed to fail alone and what the screen shows instead, you want
-   everything to fail together.
+   cannot say which child may fail alone and what the screen shows instead, you want everything to
+   fail together — and the per-child wrapper is `catching`, because `await()` suspends.
 5. **Two sequential `await()` calls are not sequential work.** `async { }` starts immediately, so
    `a.await()` then `b.await()` still overlaps — while `async { }.await()` on one line does not.
 
@@ -252,9 +260,8 @@ it is not reentrant, so a locked section calling another locked section on the s
 deadlocks. Keep the critical section to the mutation; never do I/O inside it.
 
 **Confinement beats locking when it is available.** State owned by exactly one coroutine — a
-ViewModel's fields, written only from `viewModelScope` on `Dispatchers.Main.immediate`; a server
-component that mutates only inside one request — needs no lock at all, because there is one writer
-by construction. Most "thread-safety" problems are ownership problems that were never stated.
+ViewModel's fields written only from `viewModelScope`, a server component that mutates only inside
+one request — needs no lock, because there is one writer by construction.
 
 **`StateFlow.update { }` is the right tool for state that is also observed.** It is an atomic
 compare-and-set loop, so two concurrent updates cannot lose one, and readers get the result without
@@ -278,16 +285,16 @@ needs a **wider owner**.
 | Long, cancellable, and the caller may want it back | a service method returning the `Job` | any |
 | Per-request only | the request scope | server |
 
-1. **On Android, "must survive the process" means `WorkManager`.** An app-scoped
-   `CoroutineScope` dies with the process, and the system kills backgrounded processes without
-   asking. `CoroutineWorker.doWork()` is `suspend`, runs on `Dispatchers.Default` unless
-   `coroutineContext` is overridden, and returns `Result.retry()` for the framework to reschedule.
+1. **On Android, "must survive the process" means `WorkManager`.** An app-scoped `CoroutineScope`
+   dies with the process, and the system kills backgrounded processes without asking.
+   `CoroutineWorker.doWork()` is `suspend`, runs on `Dispatchers.Default` unless `coroutineContext`
+   is overridden, and returns `Result.retry()` for the framework to reschedule.
 2. **On desktop and the server, the app-scoped service is the answer** — one
    `CoroutineScope(SupervisorJob() + Dispatchers.Default + handler)` created in the composition root
    and cancelled on shutdown (`di-composition-root`).
-3. **The screen kicks it off and forgets.** A ViewModel that calls `uploader.enqueue(file)` and
-   navigates away is correct; a ViewModel that `viewModelScope.launch { upload(file) }` and
-   navigates away has cancelled the upload mid-body.
+3. **Starting the work and owning it are two different jobs.** A ViewModel that calls
+   `uploader.enqueue(file)` has handed ownership over and may navigate away; one that writes
+   `viewModelScope.launch { upload(file) }` kept it, and navigating away kills the upload mid-body.
 4. **Hand the `Job` back when the caller may need to stop it.** A service that returns
    `Job` from `start()` lets a screen cancel what it started without owning the scope it runs in.
 5. **Bootstrap is not background work.** `runBlocking { }` in `Application.onCreate` or in a Spring
@@ -300,18 +307,18 @@ needs a **wider owner**.
    WebFlux supports `suspend` controller methods and `Flow<T>` return types when
    `kotlinx-coroutines-reactor` is on the classpath — the flow is adapted to a reactive stream and
    streamed to the client.
-2. **Spring MVC also takes `suspend` controller methods**, since Spring Framework 6.0 / Boot 3, and
-   through the same `kotlinx-coroutines-reactor` bridge — the handler is adapted and the servlet
-   request is handled asynchronously. It is not WebFlux, and the rest of the MVC stack below it is
-   still blocking.
+2. **Spring MVC also takes `suspend` controller methods**, through the same
+   `kotlinx-coroutines-reactor` bridge and only when it is on the classpath — the handler is adapted
+   and the servlet request is handled asynchronously. It is not WebFlux, and the rest of the MVC
+   stack below it is still blocking.
 3. **Blocking JDBC gets a bounded dispatcher.** `Dispatchers.IO.limitedParallelism(n)` with `n`
    matched to the connection pool: more coroutines than connections only queues them somewhere less
-   observable. Under Exposed this is `newSuspendedTransaction(Dispatchers.IO)`
-   (`persistence-jvm-orm`).
+   observable. Under Exposed, `newSuspendedTransaction(Dispatchers.IO)` (`persistence-jvm-orm`).
 4. **Virtual threads change the cost, not the model.** With `spring.threads.virtual.enabled=true`,
    or a dispatcher built from `Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()`,
-   a blocking call parks a virtual thread instead of a platform one, so the 64-thread ceiling stops
-   being the limit and `limitedParallelism` is no longer needed *for thread economy*. It is still
+   a blocking call parks a virtual thread instead of a platform one, so `Dispatchers.IO`'s thread
+   limit stops being the constraint and `limitedParallelism` is no longer needed *for thread
+   economy*. It is still
    needed for anything with a real ceiling — a connection pool is still finite. Before JDK 24 a
    virtual thread that blocks inside `synchronized` pins its carrier, which is exactly where old
    JDBC drivers block; `ReentrantLock` does not pin.
@@ -322,15 +329,13 @@ needs a **wider owner**.
    an OkHttp `Interceptor` or `Authenticator` (`net-http-clients`). On a request thread it hands
    back the thread pooling the framework just gave you.
 7. **Cancellation on the server means a disconnect.** Ktor cancels the call's `Job` when the client
-   goes away, so a long query stops instead of finishing into a closed socket — which is only true
-   if nothing in the chain swallowed the `CancellationException`.
+   goes away — true only if nothing in the chain swallowed the `CancellationException`.
 
 ## Testing
 
 1. **`runTest { }` is the entry point, and it runs on virtual time.** `delay(10.minutes)` completes
    instantly; a test that actually takes ten minutes is one that escaped the test scheduler.
-2. **Every dispatcher under test comes from the same `testScheduler`.** Pass
-   `StandardTestDispatcher(testScheduler)` into the component under test — a dispatcher built on any
+2. **Every dispatcher under test comes from the same `testScheduler`.** A dispatcher built on any
    other scheduler is one `advanceUntilIdle()` never reaches, and the test hangs or flakes.
 3. **`StandardTestDispatcher` queues; `UnconfinedTestDispatcher` runs eagerly.** Default to the
    first: ordering is explicit, and `advanceUntilIdle()` / `runCurrent()` say when work may proceed.
@@ -339,8 +344,7 @@ needs a **wider owner**.
    JUnit rule and reset it after; `arch-mvvm`'s reference carries the rule body, and it is not
    repeated here.
 5. **A collector that never ends goes on `backgroundScope`.** `runTest` waits for its own children,
-   so `launch { flow.collect { } }` inside the test body hangs forever;
-   `backgroundScope.launch { }` is cancelled when the test ends.
+   so `launch { flow.collect { } }` in the test body hangs forever.
 6. **Test cancellation explicitly.** Cancel the `Job`, then assert the effect — request aborted,
    cleanup ran, no state written. That bug is invisible in a test that runs to completion. Flow
    assertions themselves are Turbine's job, and `reactive-flow` owns that setup.
@@ -360,8 +364,7 @@ needs a **wider owner**.
    on any `async`, it does nothing — the exception propagates to the parent. It only takes effect in
    a root scope's context.
 6. **A shared scope built on a plain `Job`.** The first uncaught failure cancels the scope, and every
-   later `launch` on it returns an already-cancelled `Job` that never runs. Shared scopes are
-   `SupervisorJob`.
+   later `launch` on it returns an already-cancelled `Job`. Shared scopes are `SupervisorJob`.
 7. **A CPU loop with no `ensureActive()`.** Cancellation is cooperative: a loop that never suspends
    runs to the end after the screen is gone, holding a `Default` thread while it does.
 8. **`withContext(NonCancellable)` around real work.** It was reached for because "the write kept
@@ -370,13 +373,13 @@ needs a **wider owner**.
 9. **Fan-out inside a repository.** The repository returns a screen-shaped object, the use case has
     nothing left to do, and the parallelism cannot be changed without touching `:data`.
 10. **`runBlocking` outside `main()`, tests and blocking callbacks.** On Android's main thread it is
-    an ANR; on a server thread it is the thread the framework was pooling. In
-    `Application.onCreate` it is a blank screen before the first frame (`di-composition-root`).
+    an ANR; on a server thread it hands back the thread the framework had pooled for you. Reached
+    for during graph construction, it is the bootstrap mistake `di-composition-root` names.
 11. **A screen-scoped upload.** `viewModelScope.launch { upload(photo) }` followed by navigation
     cancels the upload mid-body. The work needs a longer-lived owner, not a wider `try`.
 12. **Collecting a flow in `lifecycleScope.launch` without `repeatOnLifecycle`.** The collection
-    survives the screen going to background and keeps the upstream — a database cursor, a socket —
-    alive behind it (`arch-mvvm`).
+    survives backgrounding and holds the upstream — a cursor, a socket — open behind it
+    (`arch-mvvm`).
 13. **A test dispatcher built on its own scheduler.** `StandardTestDispatcher()` passed in while
     `runTest` drives a different one: `advanceUntilIdle()` never reaches it, and the test hangs,
     times out, or passes for the wrong reason.
@@ -388,7 +391,7 @@ needs a **wider owner**.
 | a blocking call | `withContext(Dispatchers.IO)` | the data source, never above it |
 | heavy CPU work | `withContext(Dispatchers.Default)` | where the work is |
 | two independent loads that belong together | `coroutineScope { async … }` | the use case |
-| one of them may fail alone | `supervisorScope` + `runCatching` on the `await` | the use case |
+| one of them may fail alone | `supervisorScope` + `catching` on the `await` | the use case |
 | a loop that may run long | `ensureActive()` (or `yield()`) | inside the loop |
 | cleanup after a cancel | `withContext(NonCancellable)` in `finally` | where the resource is |
 | a deadline a human is waiting on | `withTimeout` / `withTimeoutOrNull` | the use case |
