@@ -19,3 +19,5 @@ setup() {
 @test "net-architecture: shape" { assert_skill_shape "$ROOT/skills/net-architecture"; }
 @test "net-http-clients: shape" { assert_skill_shape "$ROOT/skills/net-http-clients"; }
 @test "net-openapi: shape" { assert_skill_shape "$ROOT/skills/net-openapi"; }
+@test "persistence-architecture: shape" { assert_skill_shape "$ROOT/skills/persistence-architecture"; }
+@test "persistence-room-sqldelight: shape" { assert_skill_shape "$ROOT/skills/persistence-room-sqldelight"; }

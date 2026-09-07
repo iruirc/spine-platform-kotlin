@@ -1,0 +1,500 @@
+# persistence-room-sqldelight — detailed guide
+
+One feature — orders for a customer with their lines, observed as a `Flow`, refreshed
+transactionally, tested in memory — built twice, in Room and in SQLDelight, then the Room-on-KMP
+setup that makes the first one multiplatform. Load a section, not the file.
+
+The domain side is the same in both halves and belongs to no engine: an `Order` with an `Instant`,
+an `OrderStatus` and a list of `OrderLine`, behind one port.
+
+```kotlin
+// :domain — nothing below this block appears in it.
+interface OrderRepository {
+    fun observe(customer: CustomerId): Flow<List<Order>>
+    suspend fun byId(id: OrderId): Order?
+    suspend fun replace(order: Order)
+}
+```
+
+Dependencies are version-catalog aliases; each artifact is named where it is first used.
+
+## Room — Entity and DAO
+
+```kotlin
+@Entity(
+    tableName = "orders",
+    indices = [Index("customer_id"), Index("sync_state")],
+)
+data class OrderEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "customer_id") val customerId: String,
+    @ColumnInfo(name = "placed_at") val placedAt: Long,
+    val status: String,
+    @ColumnInfo(name = "sync_state") val syncState: String,
+)
+
+@Entity(
+    tableName = "order_lines",
+    foreignKeys = [ForeignKey(
+        entity = OrderEntity::class, parentColumns = ["id"], childColumns = ["order_id"],
+        onDelete = ForeignKey.CASCADE,
+    )],
+    indices = [Index("order_id")],
+)
+data class OrderLineEntity(
+    @PrimaryKey val id: String,
+    @ColumnInfo(name = "order_id") val orderId: String,
+    val sku: String,
+    val quantity: Int,
+    @ColumnInfo(name = "unit_price_minor") val unitPriceMinor: Long,
+)
+```
+
+The parent-and-children read is one declared shape, and every query returning it is `@Transaction`
+because Room satisfies it with two statements:
+
+```kotlin
+data class OrderWithLines(
+    @Embedded val order: OrderEntity,
+    @Relation(parentColumn = "id", entityColumn = "order_id")
+    val lines: List<OrderLineEntity>,
+)
+
+@Dao
+interface OrderDao {
+
+    @Transaction
+    @Query("SELECT * FROM orders WHERE customer_id = :customerId ORDER BY placed_at DESC")
+    fun observeByCustomer(customerId: String): Flow<List<OrderWithLines>>
+
+    @Transaction
+    @Query("SELECT * FROM orders WHERE id = :id")
+    suspend fun byId(id: String): OrderWithLines?
+
+    @Query("SELECT * FROM orders WHERE sync_state = :state")
+    suspend fun bySyncState(state: String): List<OrderEntity>
+
+    @Upsert suspend fun upsertOrder(order: OrderEntity)
+    @Upsert suspend fun upsertLines(lines: List<OrderLineEntity>)
+
+    @Query("DELETE FROM order_lines WHERE order_id = :orderId")
+    suspend fun deleteLines(orderId: String)
+}
+```
+
+- `@Upsert` (Room 2.5+) updates in place. `@Insert(onConflict = REPLACE)` would delete the row
+  first, and `ON DELETE CASCADE` would take the lines with it.
+- `status` and `sync_state` are `String` columns because SQLite has no enum; the mapper below is
+  where they become one, and a `TypeConverter` only moves that same code into an annotation.
+
+## Room — Database and Wiring
+
+```kotlin
+@Database(
+    entities = [OrderEntity::class, OrderLineEntity::class],
+    version = 1,
+    exportSchema = true,
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun orderDao(): OrderDao
+}
+```
+
+`build.gradle.kts` — the KSP plugin, the Room Gradle plugin, and the schema directory the exported
+JSON lands in:
+
+```kotlin
+plugins {
+    alias(libs.plugins.ksp)              // com.google.devtools.ksp
+    alias(libs.plugins.androidx.room)    // androidx.room
+}
+
+room { schemaDirectory("$projectDir/schemas") }
+
+dependencies {
+    implementation(libs.androidx.room.runtime)  // androidx.room:room-runtime
+    implementation(libs.androidx.room.ktx)      // androidx.room:room-ktx
+    ksp(libs.androidx.room.compiler)            // androidx.room:room-compiler
+}
+```
+
+```kotlin
+// Composition root, one instance per process — a Hilt module here, a Koin `single` elsewhere.
+@Provides
+@Singleton
+fun database(@ApplicationContext context: Context): AppDatabase =
+    Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
+        .addMigrations(MIGRATION_1_2)
+        .build()
+```
+
+- `exportSchema = true` plus `schemaDirectory` is what writes `schemas/<db>/1.json`. Commit it: an
+  auto-migration is computed from the difference between two of those files.
+- No `fallbackToDestructiveMigration()` anywhere in this builder. It belongs to a debug variant or
+  to nothing.
+
+## Room — Repository and Flow Queries
+
+The mapper and the repository together are the whole of what the layer above sees. `toEntity` is
+its mirror, one field at a time, and lives in the same file:
+
+```kotlin
+internal fun OrderWithLines.toDomain() = Order(
+    id = OrderId(order.id),
+    customer = CustomerId(order.customerId),
+    placedAt = Instant.fromEpochMilliseconds(order.placedAt),
+    status = OrderStatus.valueOf(order.status),
+    lines = lines.map { OrderLine(it.sku, it.quantity, it.unitPriceMinor) },
+)
+```
+
+```kotlin
+internal class RoomOrderRepository(
+    private val db: AppDatabase,
+    private val dao: OrderDao,
+    private val io: CoroutineDispatcher,
+) : OrderRepository {
+
+    override fun observe(customer: CustomerId): Flow<List<Order>> =
+        dao.observeByCustomer(customer.value)
+            .map { rows -> rows.map(OrderWithLines::toDomain) }
+            .flowOn(io)
+
+    override suspend fun byId(id: OrderId): Order? = withContext(io) {
+        dao.byId(id.value)?.toDomain()
+    }
+
+    override suspend fun replace(order: Order) = withContext(io) {
+        db.withTransaction {
+            dao.upsertOrder(order.toEntity(syncState = "PENDING"))
+            dao.deleteLines(order.id.value)
+            dao.upsertLines(order.lines.map { it.toEntity(order.id) })
+        }
+    }
+}
+```
+
+- The DAO's `Flow` already emits on Room's query executor; `flowOn(io)` is there for the *mapping*,
+  which would otherwise occupy that executor while a list of rows is turned into domain objects.
+
+## Room — Transactions
+
+```kotlin
+// Inside one DAO: a default body calling other methods of the same DAO, wrapped by Room.
+@Dao
+interface OrderDao {
+
+    @Transaction
+    suspend fun replaceLines(orderId: String, lines: List<OrderLineEntity>) {
+        deleteLines(orderId)
+        upsertLines(lines)
+    }
+}
+```
+
+```kotlin
+// Across DAOs, or with logic between the writes: withTransaction, from room-ktx.
+suspend fun drainOutbox(db: AppDatabase, api: OrdersApi) {
+    for (entity in db.orderDao().bySyncState("PENDING")) {
+        api.place(entity.toDto())                     // outside the transaction, on purpose
+        db.withTransaction {
+            db.orderDao().upsertOrder(entity.copy(syncState = "SYNCED"))
+            db.outboxDao().delete(entity.id)
+        }
+    }
+}
+```
+
+- `withTransaction` is `suspend`, runs the block on Room's transaction dispatcher, and rolls back
+  if it throws — cancellation included.
+- The network call is deliberately outside the block. A transaction held across an HTTP request
+  blocks every other write for as long as the server is slow.
+- `runBlocking` inside `withTransaction` deadlocks: the block already occupies the transaction
+  thread the nested call would need.
+
+## Room — In-Memory Test
+
+```kotlin
+// A JVM test: Robolectric supplies the Context the in-memory builder wants.
+@RunWith(RobolectricTestRunner::class)
+class OrderDaoTest {
+
+    private lateinit var db: AppDatabase
+    private lateinit var dao: OrderDao
+
+    @Before fun setUp() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()           // tests only: never in production code
+            .build()
+        dao = db.orderDao()
+    }
+
+    @After fun tearDown() = db.close()
+
+    @Test fun `observe re-emits when a line is added to an observed order`() = runTest {
+        dao.upsertOrder(orderEntity(id = "o-1", customerId = "c-1"))
+
+        dao.observeByCustomer("c-1").test {
+            assertEquals(0, awaitItem().single().lines.size)
+            dao.upsertLines(listOf(lineEntity(id = "l-1", orderId = "o-1")))
+            assertEquals(1, awaitItem().single().lines.size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}
+```
+
+- `allowMainThreadQueries()` is here so a synchronous assertion needs no dispatcher choreography.
+  It is the single legitimate use of that call, and it never leaves a test source set.
+- `close()` in teardown: an in-memory database that is never closed leaks its executor into the
+  next test and the suite starts failing in an order-dependent way.
+
+## SQLDelight — The .sq File
+
+`src/commonMain/sqldelight/com/example/db/Order.sq` — the directory under `sqldelight/` has to
+match the `packageName` configured in Gradle:
+
+```sql
+CREATE TABLE orderRecord (
+  id            TEXT    NOT NULL PRIMARY KEY,
+  customerId    TEXT    NOT NULL,
+  placedAt      INTEGER AS Instant NOT NULL,
+  status        TEXT    AS OrderStatus NOT NULL,
+  syncState     TEXT    NOT NULL
+);
+
+CREATE TABLE orderLineRecord (
+  id            TEXT    NOT NULL PRIMARY KEY,
+  orderId       TEXT    NOT NULL REFERENCES orderRecord(id) ON DELETE CASCADE,
+  sku           TEXT    NOT NULL,
+  quantity      INTEGER AS Int NOT NULL,
+  unitPriceMinor INTEGER NOT NULL
+);
+
+CREATE INDEX orderRecord_customer ON orderRecord(customerId);
+CREATE INDEX orderLineRecord_order ON orderLineRecord(orderId);
+
+selectByCustomer:
+SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
+
+selectById:
+SELECT * FROM orderRecord WHERE id = ?;
+
+selectLinesFor:
+SELECT * FROM orderLineRecord WHERE orderId IN ?;
+
+upsertOrder:
+INSERT INTO orderRecord(id, customerId, placedAt, status, syncState) VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  customerId = excluded.customerId, placedAt = excluded.placedAt,
+  status = excluded.status, syncState = excluded.syncState;
+
+deleteLinesFor:
+DELETE FROM orderLineRecord WHERE orderId = ?;
+
+insertLine:
+INSERT INTO orderLineRecord VALUES ?;
+```
+
+- Each label generates one function on `OrderQueries`, typed against the schema: `selectByCustomer`
+  returns `Query<OrderRecord>`, `insertLine` takes a whole `OrderLineRecord` because its `VALUES ?`
+  binds the row, and a `SELECT` of two columns would generate a data class for exactly those two.
+- `AS Instant` and `AS OrderStatus` declare a column's Kotlin type; SQLDelight then wants a
+  `ColumnAdapter` for each, supplied where the database is constructed — the one place a timestamp
+  or an enum is parsed.
+- `ON CONFLICT … DO UPDATE` is the upsert; `INSERT OR REPLACE` would delete first and take the
+  cascading lines with it — Room's `OnConflictStrategy.REPLACE` trap in SQL. The cascade itself needs
+  `PRAGMA foreign_keys = ON`, which SQLite leaves off by default and each driver below turns on.
+
+## SQLDelight — Gradle and Drivers
+
+```kotlin
+plugins { alias(libs.plugins.sqldelight) }        // app.cash.sqldelight
+
+sqldelight { databases { create("AppDatabase") { packageName.set("com.example.db") } } }
+
+kotlin.sourceSets {
+    commonMain.dependencies {
+        implementation(libs.sqldelight.runtime)      // app.cash.sqldelight:runtime
+        implementation(libs.sqldelight.coroutines)   // app.cash.sqldelight:coroutines-extensions
+    }
+    androidMain.dependencies { implementation(libs.sqldelight.android) }  // :android-driver
+    iosMain.dependencies { implementation(libs.sqldelight.native) }       // :native-driver
+    jvmMain.dependencies { implementation(libs.sqldelight.sqlite) }       // :sqlite-driver
+}
+```
+
+The database is `commonMain`; only the driver is per target. The adapters declared by `AS Instant`
+and `AS OrderStatus` are supplied here, once:
+
+```kotlin
+// commonMain
+expect class DriverFactory { fun create(): SqlDriver }
+
+fun appDatabase(factory: DriverFactory) = AppDatabase(
+    driver = factory.create(),
+    // Long <-> Instant and TEXT <-> enum, written once
+    orderRecordAdapter = OrderRecord.Adapter(instantAdapter, EnumColumnAdapter()),
+)
+```
+
+```kotlin
+// androidMain — foreign keys are off by default in SQLite; the callback turns them on
+actual class DriverFactory(private val context: Context) {
+    actual fun create(): SqlDriver = AndroidSqliteDriver(
+        schema = AppDatabase.Schema, context = context, name = "app.db",
+        callback = object : AndroidSqliteDriver.Callback(AppDatabase.Schema) {
+            override fun onOpen(db: SupportSQLiteDatabase) =
+                db.setForeignKeyConstraintsEnabled(true)
+        },
+    )
+}
+
+// iosMain
+actual class DriverFactory {
+    actual fun create(): SqlDriver = NativeSqliteDriver(AppDatabase.Schema, "app.db")
+}
+
+// jvmMain — the JDBC driver creates nothing on its own
+actual class DriverFactory(private val path: String) {
+    actual fun create(): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$path").also { driver ->
+        if (isFreshFile) AppDatabase.Schema.create(driver)
+    }
+}
+```
+
+- `AndroidSqliteDriver` and `NativeSqliteDriver` create and migrate the schema themselves from the
+  `AppDatabase.Schema` they are given. `JdbcSqliteDriver` does not: creating and version-checking
+  is the caller's job, which is why the desktop `actual` is the longest of the three.
+- A web target takes `WebWorkerDriver` from `app.cash.sqldelight:web-worker-driver`, pointed at a
+  worker script; it is the row Room has no answer for.
+
+## SQLDelight — Repository and Flow Queries
+
+```kotlin
+internal class SqlDelightOrderRepository(
+    private val db: AppDatabase,
+    private val io: CoroutineDispatcher,
+) : OrderRepository {
+
+    private val queries = db.orderQueries
+
+    override fun observe(customer: CustomerId): Flow<List<Order>> =
+        queries.selectByCustomer(customer.value)
+            .asFlow()
+            .mapToList(io)                       // io, never Dispatchers.Main
+            .map { records -> records.map { it.toDomain(linesFor(it.id)) } }
+            .flowOn(io)
+
+    override suspend fun byId(id: OrderId): Order? = withContext(io) {
+        queries.selectById(id.value).executeAsOneOrNull()
+            ?.let { it.toDomain(linesFor(it.id)) }
+    }
+
+    private fun linesFor(orderId: String): List<OrderLine> =
+        queries.selectLinesFor(listOf(orderId)).executeAsList().map(OrderLineRecord::toDomain)
+}
+```
+
+- `executeAsList()`, `executeAsOne()` and `executeAsOneOrNull()` are blocking. Every call site above
+  is already inside `withContext(io)` or inside `mapToList(io)`'s dispatcher.
+- The child fetch per parent is the N+1 this shape invites. For a list, select the lines for the
+  whole page in one `IN ?` query and group in Kotlin; for a detail screen, one extra query is
+  cheaper than the join.
+
+## SQLDelight — Transactions
+
+```kotlin
+override suspend fun replace(order: Order) = withContext(io) {
+    db.transaction {
+        queries.upsertOrder(
+            id = order.id.value, customerId = order.customer.value,
+            placedAt = order.placedAt, status = order.status, syncState = "PENDING",
+        )
+        queries.deleteLinesFor(order.id.value)
+        order.lines.forEach { queries.insertLine(it.toRecord(order.id)) }  // domain -> row
+        afterCommit { analytics.orderQueued(order.id) }   // only if the write actually landed
+    }
+}
+```
+
+`transactionWithResult { }` is the same block when the unit of work produces a value.
+
+- `transaction { }` is not `suspend`: a suspending call cannot be written inside it, which is the
+  library preventing a network round trip from being awaited with a write transaction open. The
+  whole block goes inside `withContext(io)` instead.
+- `rollback()` aborts explicitly; a thrown exception rolls back too. `afterRollback { }` is the
+  mirror of `afterCommit { }` for compensating work.
+
+## SQLDelight — In-Memory Test
+
+```kotlin
+class OrderQueriesTest {
+
+    private lateinit var driver: SqlDriver
+    private lateinit var db: AppDatabase
+
+    @BeforeTest fun setUp() {
+        driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        AppDatabase.Schema.create(driver)
+        db = AppDatabase(driver, OrderRecord.Adapter(instantAdapter, EnumColumnAdapter()))
+    }
+
+    @AfterTest fun tearDown() = driver.close()
+
+    @Test fun `selectByCustomer re-emits when a matching order is inserted`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        db.orderQueries.selectByCustomer("c-1").asFlow().mapToList(dispatcher).test {
+            assertEquals(0, awaitItem().size)
+            db.orderQueries.upsertOrder("o-1", "c-1", placedAt, OrderStatus.PLACED, "SYNCED")
+            assertEquals(1, awaitItem().size)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+}
+```
+
+- A plain JVM test: no `Context`, no Robolectric, no emulator, because the schema is created by an
+  explicit call rather than by a framework at open time.
+- `JdbcSqliteDriver.IN_MEMORY` is the JDBC URL constant; the database dies with the driver, so
+  `close()` in teardown is what makes each test independent.
+
+## Room on KMP
+
+Room 2.7+ in `commonMain`: the entities, DAOs and queries above move unchanged, and what is new is
+the generated constructor plus an explicit driver.
+
+```kotlin
+// commonMain
+@Database(entities = [OrderEntity::class, OrderLineEntity::class], version = 1)
+@ConstructedBy(AppDatabaseConstructor::class)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun orderDao(): OrderDao
+}
+
+// The actual is generated per target by the Room compiler.
+@Suppress("NO_ACTUAL_FOR_EXPECT")
+expect object AppDatabaseConstructor : RoomDatabaseConstructor<AppDatabase> {
+    override fun initialize(): AppDatabase
+}
+```
+
+```kotlin
+// iosMain — a path from the platform, SQLite shipped with the app, an explicit query context
+fun appDatabase(): AppDatabase =
+    Room.databaseBuilder<AppDatabase>(name = "${documentsDirectory()}/app.db")
+        .setDriver(BundledSQLiteDriver())          // androidx.sqlite:sqlite-bundled
+        .setQueryCoroutineContext(Dispatchers.IO)
+        .build()
+```
+
+- The build applies the `androidx.room` Gradle plugin once and `ksp(libs.androidx.room.compiler)`
+  per target; `androidx.sqlite:sqlite-bundled` supplies the driver everywhere except Android, and
+  `setQueryCoroutineContext` replaces the executor Room picks for you there.
+- The target list is Android, iOS, JVM and native. There is no web target: a browser build is
+  SQLDelight's `WebWorkerDriver` or nothing.
+- Exported schemas and `Migration` objects work as on Android. Whether `MigrationTestHelper`, the
+  Paging integration and every corner of the annotation surface are available on a given target is
+  version-sensitive — check the release notes for the version in your catalog before promising it
+  (`persistence-migrations`).
