@@ -10,3 +10,5 @@ setup() {
 @test "arch-mvvm: shape" { assert_skill_shape "$ROOT/skills/arch-mvvm"; }
 @test "arch-mvi: shape" { assert_skill_shape "$ROOT/skills/arch-mvi"; }
 @test "arch-clean: shape" { assert_skill_shape "$ROOT/skills/arch-clean"; }
+@test "arch-layered: shape" { assert_skill_shape "$ROOT/skills/arch-layered"; }
+@test "arch-hexagonal: shape" { assert_skill_shape "$ROOT/skills/arch-hexagonal"; }
