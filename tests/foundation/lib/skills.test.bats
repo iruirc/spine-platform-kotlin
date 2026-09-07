@@ -18,3 +18,4 @@ setup() {
 @test "nav-deeplinks: shape" { assert_skill_shape "$ROOT/skills/nav-deeplinks"; }
 @test "net-architecture: shape" { assert_skill_shape "$ROOT/skills/net-architecture"; }
 @test "net-http-clients: shape" { assert_skill_shape "$ROOT/skills/net-http-clients"; }
+@test "net-openapi: shape" { assert_skill_shape "$ROOT/skills/net-openapi"; }
