@@ -76,27 +76,32 @@ version = (providers.gradleProperty("releaseVersion").orNull ?: describe).remove
 android {
     defaultConfig {
         versionName = project.version.toString()
-        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: commits).toInt()
+        versionCode = providers.environmentVariable("GITHUB_RUN_NUMBER").getOrElse(commits).toInt()
     }
 }
 ```
 
 1. **One source of truth, and it is git.** A version typed into a build file is a merge conflict on
-   every release branch and a number that disagrees with the tag exactly when it matters. The
-   `releaseVersion` property above exists so a release lane can pin an exact value; nothing else
-   overrides the tag.
-2. **`versionCode` is monotonic and machine-derived.** Play refuses a bundle whose `versionCode` is
-   not greater than the highest already uploaded on that track, and the number is never shown to a
-   user — so it has no business being meaningful. A CI run number is monotonic by construction; the
-   commit count is monotonic on a branch that only fast-forwards.
-3. **`versionName` is the semver string and nothing else.** It is what the user reads in Settings
-   and what the crash reporter groups by; a build metadata suffix there splits one release into two
-   groups in the dashboard.
-4. **A server image tag carries both the semver and the sha, and is immutable.** That is what makes
+   every release branch and a number that disagrees with the tag exactly when it matters; the
+   `releaseVersion` property is there so the release lane, and nothing else, can pin an exact value.
+2. **Every read above is a configuration-time input, so read it through `providers`.**
+   `providers.environmentVariable` and `providers.gradleProperty` are tracked by the configuration
+   cache (`## CI Lanes` rule 2); `System.getenv` is not, and bakes whatever it saw into the cached
+   task graph. Tracked also means the entry is invalidated whenever the commit or the run number
+   changes — free on CI, where nothing was warm anyway, and a miss on every local commit, which is
+   the reason to keep the git reads in the one module that needs them.
+3. **`versionCode` is monotonic and machine-derived.** Play requires a number no build of this app
+   has used before — the constraint is app-wide, not per track, so a bundle pushed to internal
+   testing burns that number for production too. The user never sees it, so it has no business being
+   meaningful: a CI run number is monotonic by construction, and the commit count is monotonic on a
+   branch that only fast-forwards.
+4. **`versionName` is the semver string and nothing else.** It is what the user reads in Settings and
+   what the crash reporter groups by, so a build-metadata suffix splits one release into two groups
+   in the dashboard — which means `git describe` output (`1.4.2-7-gab12cd-dirty`) is an artifact
+   name, not a `versionName`. Let it through in every lane except release; the release lane passes
+   `-PreleaseVersion=1.4.2` so the shipped build carries the plain tag.
+5. **A server image tag carries both the semver and the sha, and is immutable.** That is what makes
    rollback "deploy the previous tag" rather than "rebuild and hope" (`release-ops-server`).
-5. **A dirty or untagged build says so.** `git describe --dirty` yields `1.4.2-7-gab12cd-dirty`;
-   let it through to the artifact name in every lane except release, so nobody ships a local build
-   believing it was 1.4.2.
 
 ## CI Lanes
 
@@ -137,8 +142,8 @@ lint  →  unit  →  integration  →  assemble  →  release
 5. **The release lane is the only one with credentials**, which is what lets every other lane run on
    a pull request from a fork (`## Secrets in CI`).
 6. **The release build gets assembled on every push, not on release day.** R8, resource shrinking
-   and the signing config only run in the release configuration; a lane that never builds it finds
-   out what it strips at the worst moment (`release-ops-android` `## Binary`).
+   and the signing config only run in that configuration, and a lane that never builds it finds out
+   what R8 strips at the worst moment (`release-ops-android` `## Binary`).
 
 ## Crash and Error Reporting
 
@@ -149,13 +154,11 @@ lint  →  unit  →  integration  →  assemble  →  release
 
 1. **One reporter per surface.** Two SDKs both installing an uncaught-exception handler produce two
    partial truths and one argument about which dashboard is right.
-2. **The mapping file is uploaded by the release lane, automatically.** The Crashlytics Gradle
-   plugin and `sentry-android-gradle-plugin` both hook `assembleRelease`/`bundleRelease` and upload
-   R8's `mapping.txt`; a manual upload is a step someone skips. Add the NDK symbols too if the app
-   ships a native library.
-3. **A build shipped without its mapping is a build with no crash reports** — the frames are
-   `a.b.c`, the grouping is nonsense, and it cannot be fixed after the fact for builds already in
-   the field.
+2. **The mapping file is uploaded by the release lane, automatically.** The Crashlytics Gradle plugin
+   and `sentry-android-gradle-plugin` both hook `assembleRelease`/`bundleRelease` and upload R8's
+   `mapping.txt`; a manual upload is a step someone skips. Add NDK symbols if there is a native lib.
+3. **A build shipped without its mapping is a build with no crash reports** — the frames are `a.b.c`,
+   the grouping is nonsense, and it cannot be fixed for builds already in the field.
 4. **Send bugs, not outcomes.** A handled, expected failure is a log line; what belongs in the
    reporter is the unmapped and the unexpected. The taxonomy is `error-architecture`.
 5. **No PII in breadcrumbs, user properties or the message** — a crash reporter is a third party
@@ -210,17 +213,17 @@ val keystorePassword: String? = System.getenv("KEYSTORE_PASSWORD")
     KEYSTORE_PASSWORD: "${{ secrets.KEYSTORE_PASSWORD }}"
 ```
 
-1. **Never a secret in a committed `gradle.properties`, and never in `local.properties`.**
-   `local.properties` is kept out of git by a convention and by nothing enforcing it; the first
-   person to commit it publishes the key to everyone who ever clones the repo.
+1. **Never a secret in a committed `gradle.properties`, and never in `local.properties`.** The latter
+   is kept out of git by convention and by nothing enforcing it, and the first person to commit it
+   publishes the key to everyone who clones the repo.
 2. **A binary secret travels as base64.** The signing keystore, `google-services.json`, a
    service-account JSON: one CI secret each, decoded into the runner's temp directory inside the
    lane, never into the working tree where a later step can archive it.
 3. **Read it once.** A password reached for in three build files is a password printed by whichever
    of them someone adds a `println` to.
-4. **Print nothing.** `--info` and `--debug` dump properties; a task that echoes its own
-   configuration echoes the password with it. Keep secrets out of Gradle properties whose name the
-   log prints, and rely on the CI masker as a second line, not the first.
+4. **Print nothing.** `--info` and `--debug` dump properties, and a task that echoes its own
+   configuration echoes the password with it. The CI masker is the second line of defence, not the
+   first.
 5. **A leaked secret is rotated, not deleted.** Rewriting history does not un-publish what a fork,
    a mirror or a cache already has: revoke the key, issue a new one, then clean up.
 
@@ -270,29 +273,27 @@ compose.desktop {
    `skills/nav-deeplinks/references/detailed-guide.md` before promising a desktop deep link, because
    the answer constrains which packager the build can use.
 7. **Unsigned means a warning the user has to click past** — Gatekeeper quarantine on macOS,
-   SmartScreen on Windows. For an internal tool that may be acceptable; decide it, rather than
-   discovering it from the first support ticket.
+   SmartScreen on Windows. Acceptable for an internal tool; decide it rather than learn it from the
+   first support ticket.
 
 ## Common Mistakes
 
 1. **A hand-edited `versionCode`.** It conflicts on every release branch, goes backwards exactly
    once, and the upload that rejects it is the one under time pressure.
-2. **A release build with no mapping upload.** The crash reports arrive obfuscated and cannot be
-   symbolicated afterwards for builds already installed — the mapping for that build no longer
-   exists anywhere.
-3. **A `BuildConfig` boolean called a kill switch.** It cannot be turned off without shipping a new
-   binary, so the feature carries the no-rollback tier, not the flag tier — and the estimate that
-   claimed +10% was wrong by a whole rollback path.
+2. **A release build with no mapping upload.** The reports arrive obfuscated and cannot be
+   symbolicated afterwards — the mapping for that build no longer exists anywhere.
+3. **A `BuildConfig` boolean called a kill switch.** The feature carries the no-rollback tier, not
+   the flag tier, and the estimate that claimed +10% was wrong by a whole rollback path.
 4. **Secrets in `gradle.properties` or `local.properties`.** Committed once, public forever; the fix
    is rotation, and the rotation is a release.
 5. **Every lane in one `./gradlew build`.** One red line hides the other four, the slow integration
    suite runs before the lint that would have failed in eight seconds, and nothing is cached
    because the job never repeats.
-6. **CI with no Gradle cache.** Every push pays a cold configuration and a full compile; the team
-   concludes the build is slow and starts skipping the lane.
+6. **CI with no Gradle cache.** Every push pays a cold configuration and a full compile, the team
+   concludes the build is slow, and the lane starts getting skipped.
 7. **Two crash reporters, installed by two SDKs nobody chose together.** The second handler either
    never fires or swallows what the first would have reported.
 8. **`packageVersion` taken from `git describe`.** The desktop packaging step fails on the suffix,
    in the release lane, on the day of the release.
-9. **A flag with no expiry.** Two years later the code has four live combinations, tests cover one,
-   and no one dares delete any of them.
+9. **A flag with no expiry.** Two years on the code has four live combinations, tests cover one, and
+   nobody dares delete any of them.

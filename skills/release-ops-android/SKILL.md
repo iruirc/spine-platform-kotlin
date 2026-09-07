@@ -40,7 +40,9 @@ Not for the shared build concerns (`release-ops`), not for the URL parser behind
 
 **`Release review` — the platform's answer to core's calendar-buffer key, for Play:** typically
 same-day to 3 days; **+3–7 calendar days** for a first submission, a sensitive permission, or a
-policy-adjacent feature; the internal testing track skips it — 0 calendar days.
+policy-adjacent feature; the internal testing track skips it — 0 calendar days. This figure
+replaces core's generic `+2–7 calendar days` default for the key — apply one or the other, never
+both.
 
 | Track | Review | For |
 |---|---|---|
@@ -53,15 +55,19 @@ policy-adjacent feature; the internal testing track skips it — 0 calendar days
    accessibility services, `QUERY_ALL_PACKAGES`, and any change to the data-safety form each pull in
    a declaration form and often a demo video. That paperwork, not the review queue, is where the
    +3–7 calendar days go.
-2. **The pre-launch report is free device-matrix coverage.** Promoting to a testing track runs the
+2. **A brand-new personal developer account owes a closed test first.** Before its first production
+   release Play requires a closed test running at least 14 continuous days with at least 12 testers
+   opted in — a 14-calendar-day buffer landing on exactly the first-submission case, on top of the
+   review itself. An organisation account does not owe it.
+3. **The pre-launch report is free device-matrix coverage.** Promoting to a testing track runs the
    app on real devices and returns crashes, accessibility findings and security warnings. Read it
    before promoting further; it catches the OEM-specific crash that the team's four phones do not.
-3. **A staged rollout can be halted, not reversed.** Android does not downgrade an installed app, so
+4. **A staged rollout can be halted, not reversed.** Android does not downgrade an installed app, so
    the only way back is a new, higher `versionCode` — which is exactly why the rollback path sets
    core's `Binary distribution risk` tier (`release-ops` `## Feature Flags` holds the tiers).
-4. **Play App Signing changes what a lost key costs.** The upload key is the team's and is
+5. **Play App Signing changes what a lost key costs.** The upload key is the team's and is
    replaceable through support; the app signing key is Play's and is not the thing that gets lost.
-5. **The data-safety form is part of the release, not of the paperwork afterwards.** A new SDK that
+6. **The data-safety form is part of the release, not of the paperwork afterwards.** A new SDK that
    collects an identifier changes the declaration, and a declaration that disagrees with the binary
    is a takedown risk, not a review delay.
 
@@ -148,23 +154,26 @@ density and language on Play's side.
 
 | Reached by | Keep rules |
 |---|---|
-| `kotlinx.serialization` generated serializers | none — the plugin ships consumer rules |
-| Moshi or Room with codegen (KSP) | none — the generated code is referenced statically |
+| `kotlinx.serialization` generated serializers | none — the compiler rewrites `Foo.serializer()` into a static reference, so R8 keeps it by reachability |
+| Moshi or Room with codegen (KSP) | none — the generated adapter is found by name at runtime, and both artifacts ship the consumer rules that keep it |
 | Gson, Jackson, or Moshi's reflective adapter | yes: the model classes **and** their fields, or the field names are renamed out from under the parser |
 | a class named from a string, a manifest entry, JNI, or a reflective DI lookup | `@Keep`, or an explicit rule in `proguard-rules.pro` |
 
 1. **R8 full mode is the default since AGP 8**, and it is more aggressive than the old one: it
    renames and repackages classes the previous mode left alone. A build that "worked before the
    upgrade" needs its keep rules re-checked, not the mode turned off.
-2. **A keep rule is a debt.** Every rule keeps code, names and metadata in the shipped binary;
+2. **The residual `kotlinx.serialization` trap is the reflective path.** `serializer(typeOf<T>())`
+   resolves the serializer by looking the type up at runtime, so a type nothing references
+   statically gives R8 no reason to keep it — and the lookup throws in the release build only.
+3. **A keep rule is a debt.** Every rule keeps code, names and metadata in the shipped binary;
    `-keep class com.example.** { *; }` is a way of not shrinking at all.
-3. **`mapping.txt` goes to the crash reporter from the release lane** (`release-ops`
+4. **`mapping.txt` goes to the crash reporter from the release lane** (`release-ops`
    `## Crash and Error Reporting`). Keep the file as a build artifact too — the reporter is not an
    archive.
-4. **Assemble the release build on every push.** R8, resource shrinking and the signing config only
+5. **Assemble the release build on every push.** R8, resource shrinking and the signing config only
    run in that configuration, so a lane that never builds it discovers what was stripped on release
    day.
-5. **Play App Signing means two keys**, and only the upload one is in CI (`release-ops`
+6. **Play App Signing means two keys**, and only the upload one is in CI (`release-ops`
    `## Secrets in CI`). The App Link fingerprint must match the *signing* key Play uses, not the
    upload key — the source of the `assetlinks.json` mismatch that only reproduces from Play
    (`nav-deeplinks`).
@@ -201,6 +210,9 @@ density and language on Play's side.
   `debug-overrides` only — so a developer's proxy works and a user's does not.
 
 ```xml
+<!-- AndroidManifest.xml -->
+<application android:networkSecurityConfig="@xml/network_security_config" ... />
+
 <!-- res/xml/network_security_config.xml -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
@@ -212,10 +224,11 @@ density and language on Play's side.
 </network-security-config>
 ```
 
-- **Pinning is OkHttp's `CertificatePinner`**, on the client `net-http-clients` configures. Pin the
-  public-key hash, never the leaf certificate, and always with **a backup pin and a written expiry
-  plan** — a pin that outlives its certificate is an app that cannot reach its own backend and
-  cannot be fixed without a release that the users it locked out will not receive.
+- **Pinning is OkHttp's `CertificatePinner`**, on the client `net-http-clients` configures. It takes
+  SPKI hashes and nothing else, so the only choice is *whose* key: pin an intermediate's key with a
+  backup, not only the leaf's, and always with **a written expiry plan** — a pin that outlives its
+  certificate is an app that cannot reach its own backend and cannot be fixed without a release the
+  users it locked out will never receive.
 - **`BiometricPrompt` plus a Keystore key that requires user authentication** for a secret that must
   stay unreadable while the device is locked; the biometric result is worthless on its own if the key
   is not bound to it.

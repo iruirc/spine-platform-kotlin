@@ -49,8 +49,8 @@ one is in force that window, not a review queue, is the value core's key takes.
    estimate that missed it; a declared one is a date range in the plan.
 2. **A freeze is calendar time, never engineering days.** It is wall-clock waiting on the same line
    as any other release buffer, and it is never folded into the day range.
-3. **Internal gates count.** A change-advisory board, a mandatory soak in staging, or a security
-   sign-off is the same kind of wait as a store review, and belongs on the same line.
+3. **Internal gates count.** A change-advisory board, a mandatory soak, or a security sign-off is the
+   same kind of wait as a store review and belongs on the same line.
 
 ## Containers
 
@@ -76,16 +76,14 @@ jib {
 ```
 
 The Dockerfile route keeps the same layering by hand: Spring Boot's `bootJar` is already layered, so
-extract it in the build stage (`java -Djarmode=tools -jar app.jar extract --layers`) and `COPY` each
-layer separately; a Ktor build produces the same shape from `installDist` (the `application` plugin)
-or a `shadowJar`.
+extract it in the build stage — `java -Djarmode=tools -jar app.jar extract --layers` on Boot 3.3+,
+`java -Djarmode=layertools -jar app.jar extract` before that — and `COPY` each layer separately; a
+Ktor build produces the same shape from `installDist` (the `application` plugin) or a `shadowJar`.
 
-1. **Pin the base image by digest, not by tag.** `eclipse-temurin:21-jre` is a moving target; a
-   rebuild of the same commit that produces a different runtime is a build that cannot be trusted to
-   reproduce an incident.
-2. **Non-root, and no shell if you can take it.** A distroless image has no shell, which removes a
-   whole class of container escape and also removes `exec`-ing in to debug — accept the trade and
-   keep a debug-tagged variant for when it matters.
+1. **Pin the base image by digest, not by tag.** `eclipse-temurin:21-jre` is a moving target, and a
+   rebuild of one commit that produces a different runtime cannot reproduce an incident.
+2. **Non-root, and no shell if you can take it.** A distroless image has no shell: a whole class of
+   container escape goes, and so does `exec`-ing in to debug. Keep a debug-tagged variant instead.
 3. **`-XX:MaxRAMPercentage`, not `-Xmx`.** The container's memory limit is the fact; a hard-coded
    heap either wastes the limit or is killed by it when the limit changes.
 4. **Layer ordering is the whole build-time story.** Dependencies change rarely and classes change
@@ -121,16 +119,19 @@ routing {
     }
 }
 
-Flyway.configure().dataSource(ds).load().migrate()
-ready.set(true)
+// An init container or a Job already migrated (see Migrations on Deploy).
+// A replica verifies the schema it was built against; it never migrates.
+val schema = Flyway.configure().dataSource(ds).load().info().current()?.version
+ready.set(schema != null && schema >= MigrationVersion.fromVersion(EXPECTED_SCHEMA))
 ```
 
 1. **Liveness must not touch a dependency.** A liveness probe that queries the database restarts
    every replica the moment the database blinks, turning a brief outage into a full restart storm.
 2. **Readiness must touch exactly the dependencies it needs to serve** — and nothing else. A
    readiness check on an optional downstream removes a healthy replica from rotation.
-3. **Readiness gates on the migration having run** (`## Migrations on Deploy`); serving against a
-   half-migrated schema is worse than not serving.
+3. **Readiness gates on the migration having run — checked here, never run here**
+   (`## Migrations on Deploy`). The replica compares the schema version it finds against the one its
+   build expects; serving against a half-migrated schema is worse than not serving.
 4. **Use the startup probe for slow boots.** A JVM with a large context that takes 40 s to start
    under a 30 s liveness probe never becomes live, and the symptom looks like a crash loop.
 5. **Probe endpoints stay cheap and unauthenticated** on the internal port; a probe that allocates or
@@ -158,7 +159,7 @@ ready.set(true)
    hot-reloading configuration is a feature with its own failure modes — take it only when the
    restart genuinely cannot be afforded.
 4. **Log the effective configuration once at startup, with secrets redacted.** Half of the "but it
-   works in staging" incidents are answered by that one line.
+   works in staging" incidents end at that one line.
 
 ## Shutdown
 
@@ -204,8 +205,8 @@ The discipline — expand/contract, additive first, never a rename in one deploy
    against the same schema at the same time; the expand step is what makes that legal, and the
    contract step is what makes it temporary (`persistence-migrations` `## Zero-Downtime`).
 5. **Failure stops the rollout; it does not roll the schema back.** The previous image has to keep
-   running against the migrated schema, which is exactly why the expand step is additive — a
-   destructive migration removes the option to stop.
+   running against the migrated schema — which is why the expand step is additive, and why a
+   destructive one removes the option to stop.
 6. **A long backfill is not a migration step.** It is a job you can watch, throttle and stop, run
    after the deploy that added the column.
 
@@ -224,8 +225,7 @@ The discipline — expand/contract, additive first, never a rename in one deploy
 3. **No PII in logs, and this is a release gate, not a style preference** — logs leave the process and
    land in a third party's index. The redaction rule is `error-architecture` `## Logging and PII`.
 4. **Cardinality is what kills a metrics backend.** A user id, an order id or a raw path as a tag
-   creates a series per value; template the path (`/orders/{id}`) and keep identifiers in traces and
-   logs, where they belong.
+   creates a series per value; template the path (`/orders/{id}`) and keep identifiers in the traces.
 5. **A health endpoint is not a metric.** Alert on the RED series and on saturation; alerting on the
    probe only tells you what the orchestrator already acted on.
 
@@ -245,8 +245,8 @@ The discipline — expand/contract, additive first, never a rename in one deploy
    to be atomic with a schema step.
 4. **A canary with no metric gate is a slow rolling update.** Name the comparison and the threshold
    before starting, or the canary is just the first pod.
-5. **A rollout nobody watches is a deploy with extra steps.** Define the observation window and who
-   holds it; halting early is the cheapest action available and only works if someone is looking.
+5. **A rollout nobody watches is a deploy with extra steps.** Name the observation window and who
+   holds it — halting early is the cheapest action there is, and only works if someone is looking.
 
 ## Fragmentation
 
