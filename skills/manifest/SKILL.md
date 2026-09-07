@@ -149,7 +149,7 @@ state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`, `arch-clean
 navigation       → `nav-compose`, `nav-multiplatform`
 networking       → `net-architecture`, `net-http-clients`, `net-openapi`
 persistence      → `persistence-architecture`, `persistence-room-sqldelight`, `persistence-jvm-orm`, `persistence-migrations`
-dependency graph → —
+dependency graph → `di-composition-root`, `di-hilt`
 concurrency      → —
 errors           → —
 packaging        → —

@@ -23,3 +23,5 @@ setup() {
 @test "persistence-room-sqldelight: shape" { assert_skill_shape "$ROOT/skills/persistence-room-sqldelight"; }
 @test "persistence-jvm-orm: shape" { assert_skill_shape "$ROOT/skills/persistence-jvm-orm"; }
 @test "persistence-migrations: shape" { assert_skill_shape "$ROOT/skills/persistence-migrations"; }
+@test "di-composition-root: shape" { assert_skill_shape "$ROOT/skills/di-composition-root"; }
+@test "di-hilt: shape" { assert_skill_shape "$ROOT/skills/di-hilt"; }
