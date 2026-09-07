@@ -1,11 +1,8 @@
 # persistence-jvm-orm — detailed guide
 
 One aggregate — an `Order` with its `OrderLine`s, read by customer, written whole, tested against
-real Postgres — built four times: Spring Data JPA, Exposed on Ktor, jOOQ, Spring Data JDBC. Then
-the two things that go wrong after the engine is chosen: an N+1 nobody measured and a pool nobody
-sized. Load a section, not the file.
-
-The domain side is the same in all four and belongs to no engine:
+real Postgres — built four times: Spring Data JPA, Exposed on Ktor, jOOQ, Spring Data JDBC; then an
+N+1 nobody measured and a pool nobody sized. The domain side belongs to no engine:
 
 ```kotlin
 // :domain — nothing below this block appears in it.
@@ -22,7 +19,7 @@ interface OrderRepository {
 ```
 
 The schema is owned by Flyway or Liquibase in all four; nothing here creates a table
-(`persistence-migrations`). Artifacts are named where first used.
+(`persistence-migrations`), and artifacts are named where first used.
 
 ## JPA — Entity and Gradle Plugins
 
@@ -43,10 +40,9 @@ allOpen {
 ```
 
 With `org.springframework.boot:spring-boot-starter-data-jpa` and `org.postgresql:postgresql` at
-runtime. `plugin.jpa` synthesises the no-arg constructor Hibernate instantiates rows with; `plugin.spring`
-opens container-managed classes so `@Transactional` can be proxied. `allOpen` on the JPA
-annotations is separate and optional — it is what lets Hibernate build a lazy proxy for a
-`@ManyToOne`, and without it a lazy to-one silently loads eagerly.
+runtime. `plugin.jpa` synthesises the no-arg constructor Hibernate instantiates rows with;
+`plugin.spring` opens container-managed classes so `@Transactional` can be proxied. `allOpen` is
+separate: without it Hibernate cannot subclass an entity, so a lazy `@ManyToOne` loads eagerly.
 
 ```kotlin
 @Entity
@@ -89,9 +85,9 @@ class OrderLineEntity(
 }
 ```
 
-No `data class`, no `copy`, no generated `toString`, no `@GeneratedValue`: a `UUID` assigned in
-Kotlin is valid before the insert, which keeps `equals`/`hashCode` stable across the flush. With a
-sequence the id is `@GeneratedValue @Id var id: Long? = null` and the overrides change as noted.
+No `data class`, no `copy`, no `@GeneratedValue`: a `UUID` assigned in Kotlin is valid before the
+insert, which keeps `equals`/`hashCode` stable across the flush. With a sequence the id is
+`@GeneratedValue @Id var id: Long? = null` and the overrides change as the comment says.
 
 ```properties
 spring.jpa.hibernate.ddl-auto=validate
@@ -103,8 +99,7 @@ spring.jpa.open-in-view=false
 ```kotlin
 interface OrderJpaRepository : JpaRepository<OrderEntity, UUID> {
 
-    // One statement: the parent and its lines together. Without this, one query for the orders
-    // and one per order for the lines.
+    // One statement: parent and lines together. Without it, one query per order for the lines.
     @Query("""
         select distinct o from OrderEntity o
         left join fetch o.lines
@@ -119,9 +114,9 @@ interface OrderJpaRepository : JpaRepository<OrderEntity, UUID> {
 ```
 
 `left join fetch` with `distinct` is the workhorse; a `select new com.example.OrderSummary(...)`
-constructor expression, or a projection interface, is the read that needs no entities at all. Two
-collection fetch joins in one query are a cartesian product — Hibernate rejects a second `bag` and
-silently multiplies rows for `Set`s — so fetch one per query, `@BatchSize(size = 50)` on the other.
+constructor expression, or a projection interface, is the read that needs no entities. Two
+collection fetch joins in one query are a cartesian product — so one per query, `@BatchSize(size =
+50)` on the other.
 
 ```kotlin
 @Repository
@@ -181,22 +176,19 @@ Four things this test does that a slice against H2 would not:
 - **Real Postgres**, so types, casing, `ON CONFLICT`, partial indexes and array columns behave as
   they will in production.
 - **Real migrations.** `@DataJpaTest` runs Flyway or Liquibase before the slice starts, so the test
-  proves the migrated schema and the mapping agree — the check `ddl-auto=validate` performs at
-  startup (`persistence-migrations`).
+  proves the migrated schema and the mapping agree — as `ddl-auto=validate` does at startup.
 - **`flush()` then `clear()`.** The slice wraps each test in a transaction that rolls back: without
-  the flush nothing reached the database, and without the clear the read comes from the persistence
-  context rather than from SQL.
-- **`PostgreSQLContainer<Nothing>`** — the Java class is self-typed for builder chaining, and
-  `<Nothing>` is Kotlin's way of saying there is no subclass.
+  the flush nothing reached the database, without the clear the read never becomes SQL.
+- **`PostgreSQLContainer<Nothing>`** — self-typed for Java's builder chaining, so `<Nothing>` is
+  Kotlin's way of saying there is no subclass.
 
-For a suite, put the container in a shared base class and turn on reuse (`withReuse(true)` plus
-`testcontainers.reuse.enable=true`) so local runs do not pay the startup cost per class.
+For a suite, hoist that companion into a shared base class and turn on reuse (`withReuse(true)`
+plus `testcontainers.reuse.enable=true`) so local runs do not pay one startup per class.
 
 ## Exposed — Tables and DSL
 
 `org.jetbrains.exposed:exposed-core` and `exposed-jdbc`, plus `exposed-java-time` (or
-`exposed-kotlin-datetime`) for the timestamp column type, `com.zaxxer:HikariCP` for the pool and
-`org.postgresql:postgresql` at runtime.
+`exposed-kotlin-datetime`), `com.zaxxer:HikariCP` and `org.postgresql:postgresql` at runtime.
 
 ```kotlin
 object Orders : Table("orders") {
@@ -217,34 +209,38 @@ object OrderLines : Table("order_lines") {
 }
 ```
 
-The `object` *describes* a table a migration created; `SchemaUtils.create(Orders)` exists and
-belongs in throwaway tests only, and `references(...)` declares the foreign key for the DSL's
-benefit — the constraint itself is in the migration. Reads join explicitly: with no lazy loading,
-the shape of the SQL is the shape of the code.
+The `object` *describes* a table a migration created; `SchemaUtils.create(Orders)` belongs in
+throwaway tests only, and `references(...)` declares the foreign key for the DSL's benefit — the
+constraint is in the migration. With no lazy loading, the SQL's shape is the code's shape.
 
 ```kotlin
+// One mapper, two queries: the same join, a different predicate.
+private fun List<ResultRow>.toOrders(): List<Order> =
+    groupBy { it[Orders.id] }.map { (id, rows) ->
+        val head = rows.first()
+        Order(
+            id = OrderId(id), customerId = CustomerId(head[Orders.customerId]),
+            placedAt = head[Orders.placedAt], status = OrderStatus.valueOf(head[Orders.status]),
+            lines = rows.filter { it.getOrNull(OrderLines.id) != null }.map {
+                OrderLine(it[OrderLines.sku], it[OrderLines.quantity],
+                    Money.ofCents(it[OrderLines.unitPriceCents]))
+            },
+        )
+    }
+
 private fun ordersOf(customer: UUID): List<Order> =
     (Orders leftJoin OrderLines)
-        .selectAll()
-        .where { Orders.customerId eq customer }
+        .selectAll().where { Orders.customerId eq customer }
         .orderBy(Orders.placedAt to SortOrder.DESC)
-        .toList()                                  // materialised inside the transaction
-        .groupBy { it[Orders.id] }
-        .map { (id, rows) ->
-            val head = rows.first()
-            Order(
-                id = OrderId(id), customerId = CustomerId(head[Orders.customerId]),
-                placedAt = head[Orders.placedAt],
-                status = OrderStatus.valueOf(head[Orders.status]),
-                lines = rows.filter { it.getOrNull(OrderLines.id) != null }.map {
-                    OrderLine(it[OrderLines.sku], it[OrderLines.quantity],
-                        Money.ofCents(it[OrderLines.unitPriceCents]))
-                },
-            )
-        }
+        .toList().toOrders()                       // materialised inside the transaction
+
+private fun orderById(id: UUID): Order? =
+    (Orders leftJoin OrderLines)
+        .selectAll().where { Orders.id eq id }
+        .toList().toOrders().singleOrNull()
 ```
 
-Writes are statements, not state:
+Writes are statements, not state; an update names its own predicate, nothing dirty-checks it:
 
 ```kotlin
 private fun insert(order: Order) {
@@ -258,15 +254,11 @@ private fun insert(order: Order) {
         this[OrderLines.unitPriceCents] = line.price.cents
     }
 }
-
-// An update names its predicate; there is no dirty checking to do it for you.
-private fun markShipped(id: UUID) =
-    Orders.update({ Orders.id eq id }) { it[status] = OrderStatus.SHIPPED.name }
 ```
 
 Exposed also ships a DAO API (`UUIDTable` plus `class Order(id: EntityID<UUID>) : UUIDEntity(id)`)
-with an identity map and lazy references — closer to JPA, and carrying the same class of surprise.
-Start with the DSL; take the DAO API only for a reason you can name.
+with an identity map and lazy references — closer to JPA, same class of surprise. Start with the
+DSL; take the DAO API only for a reason you can name.
 
 ## Exposed — Repository on Ktor
 
@@ -278,19 +270,18 @@ fun Application.configureDatabase(config: DbConfig) {
         isAutoCommit = false
     })
     Flyway.configure().dataSource(pool).load().migrate()   // before any route is installed
+    // Registers the database globally for transaction { }. The URL overload would open a fresh
+    // connection per transaction — a scratch script, not a server.
     Database.connect(pool)                                 // exactly once per process
     monitor.subscribe(ApplicationStopped) { pool.close() }
 }
 ```
 
-`Database.connect(dataSource)` registers the database globally for the `transaction { }` functions.
-The overload taking a URL opens a fresh connection per transaction: a scratch script, not a server.
-
 ```kotlin
 class ExposedOrderRepository : OrderRepository {
     // No transaction here: the caller owns the boundary (arch-layered). These run inside it.
     override fun byCustomer(customer: CustomerId): List<Order> = ordersOf(customer.value)
-    override fun byId(id: OrderId): Order? = ordersOf(id)
+    override fun byId(id: OrderId): Order? = orderById(id.value)
     override fun save(order: Order): Order = order.also(::insert)
 }
 
@@ -310,15 +301,15 @@ class OrderService(private val orders: OrderRepository) {
 }
 ```
 
-- **`transaction { }` blocks the calling thread** for the whole round trip — in a Ktor handler,
-  an event-loop thread taken out of circulation. Wrap it in `withContext(Dispatchers.IO)` or use
-  the suspending form (`concurrency-coroutines`).
+- **`transaction { }` blocks the calling thread** for the whole round trip — in a Ktor handler, an
+  event-loop thread taken out of circulation. Wrap it in `withContext(Dispatchers.IO)`, or use the
+  suspending form (`concurrency-coroutines`).
 - **`newSuspendedTransaction` still needs a dispatcher.** JDBC blocks whichever function opened the
   transaction; the argument says where, and `Dispatchers.IO` is the answer until virtual threads.
-- **Nothing lazily evaluated may escape the block.** A returned `Query` or `SizedIterable` executes
-  against a closed connection; call `.toList()` or `.map { }` inside.
-- **`rollback()` aborts the block explicitly**, and an exception does the same. There is no
-  "rollback only on unchecked" — there are no checked exceptions to distinguish.
+- **Nothing lazily evaluated may escape the block** — a returned `Query` or `SizedIterable` executes
+  against a closed connection, so call `.toList()` or `.map { }` inside.
+- **`rollback()` aborts the block explicitly**, as an exception does. There is no "rollback only on
+  unchecked": there are no checked exceptions to distinguish.
 
 ## Exposed — Testcontainers Test
 
@@ -356,17 +347,16 @@ class ExposedOrderRepositoryTest {
 ```
 
 Each test opens its own `transaction { }` and ends with `rollback()` — the isolation `@DataJpaTest`
-gets from Spring's rollback rule. Truncating tables in an `@AfterEach` is the fallback once the code
-under test commits on its own.
+gets from Spring. Truncating tables in an `@AfterEach` is the fallback once the code commits.
 
 ## jOOQ — Codegen and a Typed Query
 
 jOOQ generates Kotlin from the database, so codegen runs *after* the migrations, against a schema a
 migration tool produced — a Testcontainers instance in the build, or a dedicated schema database.
-Generating from a hand-maintained DDL file is how the generated code and the deployed schema drift
-apart. The Gradle plugin is `org.jooq:jooq-codegen-gradle` (jOOQ 3.19+; `nu.studer.jooq` before
-that), configured with `generator.name = "org.jooq.codegen.KotlinGenerator"`, the JDBC URL of the
-migrated database and a `target.packageName`.
+Generating from a hand-maintained DDL file is how generated code and deployed schema drift apart.
+The Gradle plugin is `org.jooq:jooq-codegen-gradle` (jOOQ 3.19+; `nu.studer.jooq` before that), with
+`generator.name = "org.jooq.codegen.KotlinGenerator"`, the migrated database's JDBC URL and a
+`target.packageName`.
 
 ```kotlin
 class JooqOrderRepository(private val dsl: DSLContext) : OrderRepository {
@@ -376,23 +366,33 @@ class JooqOrderRepository(private val dsl: DSLContext) : OrderRepository {
             ORDERS.ID, ORDERS.PLACED_AT, ORDERS.STATUS,
             multiset(
                 select(ORDER_LINES.SKU, ORDER_LINES.QUANTITY, ORDER_LINES.UNIT_PRICE_CENTS)
-                    .from(ORDER_LINES).where(ORDER_LINES.ORDER_ID.eq(ORDERS.ID))
-            ).convertFrom { r -> r.map { OrderLine(it.value1(), it.value2(), Money.ofCents(it.value3())) } },
+                    .from(ORDER_LINES).where(ORDER_LINES.ORDER_ID.eq(ORDERS.ID)),
+            ).convertFrom { rows ->
+                rows.map { OrderLine(it.value1(), it.value2(), Money.ofCents(it.value3())) }
+            },
         )
             .from(ORDERS).where(ORDERS.CUSTOMER_ID.eq(customer.value))
             .orderBy(ORDERS.PLACED_AT.desc())
-            .fetch { Order(OrderId(it.value1()), customer, it.value2(), OrderStatus.valueOf(it.value3()), it.value4()) }
+            .fetch { r ->
+                Order(
+                    id = OrderId(r.value1()),
+                    customerId = customer,
+                    placedAt = r.value2(),
+                    status = OrderStatus.valueOf(r.value3()),
+                    lines = r.value4(),
+                )
+            }
 }
 ```
 
 A renamed column is now a compile error, and `MULTISET` gives the nested read JPA needed a fetch
 join for. `spring-boot-starter-jooq` provides the `DSLContext` and enlists it in the ambient
-`@Transactional` transaction, so jOOQ can sit beside JPA for the queries JPQL cannot express.
+transaction, so jOOQ can sit beside JPA for the queries JPQL cannot express.
 
 ## Spring Data JDBC — Aggregate Root
 
 One repository per aggregate root, no session, no lazy loading, no dirty checking: `save()` writes
-the root and its children, and deletes the children that are gone.
+the root and its children, and deletes the ones that are gone.
 
 ```kotlin
 @Table("orders")
@@ -414,8 +414,7 @@ interface OrderRecordRepository : CrudRepository<OrderRecord, UUID> {
 
 - **The child has no back-reference.** `@MappedCollection(idColumn = ...)` names the FK column;
   `keyColumn` makes the list ordered and requires that column in the schema.
-- **`save()` on an existing aggregate deletes and re-inserts the children** — the root owns them,
-  and there is no partial update of a child.
+- **`save()` on an existing aggregate deletes and re-inserts the children** — the root owns them.
 - **A new aggregate with a client-assigned `@Id` needs `Persistable.isNew`**, or Spring Data issues
   an `UPDATE` that matches no row; without an assigned id it infers "new" from a null id.
 - **References across aggregates are ids** — `AggregateReference<Customer, UUID>`, never a
@@ -435,6 +434,11 @@ class OrderReadPathQueryCountTest(
     @Autowired private val jpa: OrderJpaRepository,
     @Autowired private val em: EntityManager,
 ) {
+    companion object {
+        @Container @ServiceConnection @JvmStatic
+        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+    }
+
     @Test
     fun `reading orders with lines costs one statement`() {
         val stats = em.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
@@ -445,15 +449,12 @@ class OrderReadPathQueryCountTest(
 }
 ```
 
-Swap `findByCustomerWithLines` for the derived `findByCustomerId` and the assertion reports 11 —
-the point being that the number is a fact checked by the build, not a judgement about SQL somebody
-scrolled past. Against Exposed or jOOQ the same test counts statements through a `datasource-proxy`
-wrapper, since there is no `SessionFactory` to ask.
-
-In production the two settings that matter are
-`spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50`, which names the
-slow statement, and the `org.hibernate.SQL` logger left at `INFO` so nothing writes SQL to stdout
-per request.
+Swap `findByCustomerWithLines` for the derived `findByCustomerId` and the assertion reports 11: the
+number is a fact checked by the build, not a judgement about SQL somebody scrolled past. Against
+Exposed or jOOQ the same test counts through a `datasource-proxy` wrapper, there being no
+`SessionFactory` to ask. In production the two settings that matter are
+`…session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50`, which names the slow statement, and the
+`org.hibernate.SQL` logger left at `INFO` so nothing writes SQL to stdout per request.
 
 ## HikariCP Sizing
 
@@ -468,13 +469,12 @@ spring:
       leak-detection-threshold: 20000  # staging: logs the stack that held a connection
 ```
 
-The arithmetic that matters is the total, not one pool's. Eight replicas × 10, plus a worker's
-pool, plus migrations on deploy, against a Postgres `max_connections` of 100 — which is why a
-service that looks idle reports `FATAL: sorry, too many clients already` during a rolling deploy,
-when old and new pods hold pools at once. Keep the total under the limit with headroom for a
-deploy, or put PgBouncer in front and size against it.
+The arithmetic that matters is the total, not one pool's. Eight replicas × 10, plus a worker's pool,
+plus migrations on deploy, against a Postgres `max_connections` of 100 — which is why a service that
+looks idle reports `FATAL: sorry, too many clients already` during a rolling deploy, when old and
+new pods hold pools at once. Keep the total under the limit with headroom for a deploy, or put
+PgBouncer in front and size against it.
 
 Two sizing mistakes share a symptom and have opposite fixes: too small queues callers in
-`connectionTimeout`, too large queues them inside the database, where the wait reads as slower
-statements rather than as a pool metric. Measure `hikaricp.connections.pending` and
-`hikaricp.connections.usage` (Micrometer publishes both) before changing the number.
+`connectionTimeout`, too large queues them inside the database. Measure
+`hikaricp.connections.pending` and `hikaricp.connections.usage` before changing the number.

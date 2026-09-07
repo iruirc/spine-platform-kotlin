@@ -182,7 +182,7 @@ SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
    of the file, the `ColumnAdapter` passed to the database constructor. Keeping that mapping in one
    place is what stops half the codebase parsing timestamps by hand.
 8. **Schema changes are `.sqm` files** numbered by version, verified by the plugin's
-   `verifySqlDelightMigration` task — `persistence-migrations`.
+   `verify<SourceSet><Database>Migration` task — `persistence-migrations`.
 
 ## Transactions
 
@@ -240,7 +240,7 @@ SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
 
 Everything about changing a schema that has already shipped — Room's `exportSchema`, `Migration`
 objects and `@AutoMigration` with its `@DeleteColumn`/`@RenameTable` specs, SQLDelight's numbered
-`.sqm` files and `verifySqlDelightMigration`, fixture-based tests at each old version, and the
+`.sqm` files and their verification task, fixture-based tests at each old version, and the
 progressive chain a user two releases behind will walk — is `persistence-migrations`.
 
 Two things belong here, because they are decided while the database is being written:

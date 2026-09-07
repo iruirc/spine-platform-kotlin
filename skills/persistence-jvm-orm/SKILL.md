@@ -154,8 +154,9 @@ fun Application.configureDatabase(dataSource: DataSource) {
 1. **Tables are objects, columns are properties.** `Table("orders")` for the DSL, or
    `UUIDTable`/`LongIdTable` when you want the DAO API's `Entity` classes on top. The DSL is the
    one to reach for first: it has no identity map, no dirty checking and therefore no surprises.
-2. **`Database.connect(dataSource)` runs once**, at startup, over a pooled `DataSource` — not
-   `Database.connect(url, driver, user, password)`, which builds a connection per transaction.
+2. **`Database.connect(dataSource)` runs once**, at startup, over a pooled `DataSource`. The
+   `Database.connect(url, driver, user, password)` overload builds a connection per transaction:
+   fine in a test, where there is one, and never in a server.
 3. **`transaction { }` is blocking.** It borrows a connection from the pool and holds it for the
    block, so on Ktor's event loop it is a thread you have taken out of circulation: run it inside
    `withContext(Dispatchers.IO)`, or on a virtual-thread executor.
@@ -212,16 +213,16 @@ spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50
    read path, and the regression is caught by the build rather than by a customer.
 2. **`spring.jpa.show-sql=true` is a test-only switch.** In production it writes unstructured SQL
    to stdout with no bind parameters and no timing; use the `org.hibernate.SQL` logger, or
-   `datasource-proxy` / `p6spy` when you need parameters and durations, and
-   `LOG_QUERIES_SLOWER_THAN_MS` to name the slow statement without logging every one.
+   `datasource-proxy` / `p6spy` when you need parameters and durations.
+3. **`LOG_QUERIES_SLOWER_THAN_MS` names the slow statement in production** without turning every
+   statement into a log line.
 4. **The fix is on the query, not the mapping.** A `join fetch`, an `@EntityGraph` on the
    repository method, or a projection. Turning the association EAGER trades one N+1 for a join on
    every read path in the application, including the ones that did not want the children.
-5. **`@BatchSize(size = n)` on a collection turns N queries into N/n.** It is the right answer when
-   the association is read on many paths and a fetch join would multiply rows.
+5. **`@BatchSize(size = n)` on a collection turns N queries into N/n** — the right answer when the
+   association is read on many paths and a fetch join would multiply rows.
 6. **Two collection fetch joins in one query is a cartesian product.** Hibernate refuses more than
-   one bag; with `Set` semantics it will happily return `lines × payments` rows. Fetch one
-   collection per query.
+   one bag; with `Set` semantics it returns `lines × payments` rows. One collection per query.
 7. **Exposed, jOOQ and Spring Data JDBC have no lazy loading and therefore no ORM N+1** — but a
    `map { findLinesFor(it.id) }` over a result set is the same bug, written out by hand, and the
    statistics test above is what catches it there too.
@@ -264,8 +265,7 @@ HikariCP is the pool Spring Boot configures by default and the one to use on Kto
 @Testcontainers
 class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
     companion object {
-        @Container
-        @ServiceConnection
+        @Container @ServiceConnection @JvmStatic
         val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
     }
 }
@@ -273,8 +273,8 @@ class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
 
 3. **`PostgreSQLContainer<Nothing>` is the Kotlin form.** The class is self-typed for Java's
    builder chaining, and `<Nothing>` is how Kotlin says "no subclass" without a raw-type warning.
-4. **One container per suite, not per test.** A `companion object` `@Container` is static and starts
-   once; a member `@Container` restarts per test method. Testcontainers reuse (`withReuse(true)` plus
+4. **One container per suite, not per test.** A `@JvmStatic` `companion object` `@Container` starts
+   once; a member `@Container` restarts per test method. Reuse (`withReuse(true)` plus
    `testcontainers.reuse.enable`) is the next step when local runs still hurt.
 5. **The migration tool runs in the test.** That is a feature: the test proves the schema the
    migrations produce is the schema the mapping expects, which is what `ddl-auto=validate` checks
@@ -285,8 +285,8 @@ class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
 7. **Exposed needs no slice.** `Database.connect(container.jdbcUrl, driver = "org.postgresql.Driver",
    user = container.username, password = container.password)` in a JUnit 5 `@BeforeAll`, run the
    migrations, and the repository tests are plain JVM tests.
-8. **The layer above the repository is tested with a fake port**, no database at all — that is what
-   the boundary in `persistence-architecture` is for, and where most of the tests belong.
+8. **The layer above the repository is tested with a fake port**, no database at all — what the
+   boundary in `persistence-architecture` is for, and where most of the tests belong.
 
 ## Common Mistakes
 

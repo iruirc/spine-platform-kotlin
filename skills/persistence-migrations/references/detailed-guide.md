@@ -78,7 +78,8 @@ migration Room validates the resulting schema against the exported JSON for the 
 mismatch is `IllegalStateException: Migration didn't properly handle: orders(...)` naming the
 column that differs — usually a missing index or a nullability that does not match the entity.
 
-Dropping a column needs SQLite 3.35 (API 35) or the four-step dance:
+Dropping a column needs SQLite 3.35, which arrives with Android 14 (API 34, SQLite 3.39). Below
+that baseline it is the four-step dance:
 
 ```kotlin
 db.execSQL("CREATE TABLE orders_new (id TEXT NOT NULL PRIMARY KEY, total_cents INTEGER NOT NULL)")
@@ -101,15 +102,16 @@ SQL:
     entities = [OrderEntity::class],
     version = 2,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2, spec = AppDatabase.RenameTotal::class)],
+    autoMigrations = [AutoMigration(from = 1, to = 2, spec = AppDatabase.RenameNote::class)],
 )
 abstract class AppDatabase : RoomDatabase() {
-    @RenameColumn(tableName = "orders", fromColumnName = "total", toColumnName = "total_cents")
-    @DeleteColumn(tableName = "orders", columnName = "legacy_note")
-    class RenameTotal : AutoMigrationSpec {
+    // A rename only: TEXT stays TEXT, so the renamed column still fits the entity's field.
+    @RenameColumn(tableName = "orders", fromColumnName = "note", toColumnName = "customer_note")
+    @DeleteColumn(tableName = "orders", columnName = "legacy_flag")
+    class RenameNote : AutoMigrationSpec {
         // Optional: runs after the generated statements, for data work the diff cannot express.
         override fun onPostMigrate(db: SupportSQLiteDatabase) {
-            db.execSQL("UPDATE orders SET total_cents = total_cents * 100")
+            db.execSQL("UPDATE orders SET customer_note = trim(customer_note)")
         }
     }
 }
@@ -120,9 +122,12 @@ abstract class AppDatabase : RoomDatabase() {
 - **A spec is required the moment the diff is ambiguous.** A rename is indistinguishable from a drop
   plus an add, so without `@RenameColumn` Room generates the destructive reading and the build
   reports that it cannot determine what happened.
+- **A rename keeps the column's type.** `@RenameColumn` emits a rename, not a conversion, which is
+  why `total` (REAL) cannot become `total_cents` (INTEGER) this way: the migration would run and
+  then fail Room's validation against a `Long` field. That change is the hand migration above.
 - **The annotations available are `@RenameColumn`, `@DeleteColumn`, `@RenameTable` and
   `@DeleteTable`.** Anything else — a type change, a split, a value computed from another table — is
-  a hand migration or an `onPostMigrate` body.
+  a hand migration, or an `onPostMigrate` body on columns whose type did not move.
 - **An auto-migration and a hand migration for the same version pair is an error.** Pick one per
   pair.
 - **Auto-migrations still need tests.** They are generated from JSON, not from your intent, and
@@ -209,20 +214,22 @@ ALTER TABLE orderRecord ADD COLUMN totalCents INTEGER NOT NULL DEFAULT 0;
 - **The filename is the source version.** `1.sqm` runs against version 1 and produces version 2.
   The database version is the count of migration files plus one, and SQLDelight derives it — you
   never write a version constant.
-- **`schemaOutputDirectory` holds the generated `.db` snapshots.** The `generateAppDatabaseSchema`
-  task writes one per version; commit them. They are what verification migrates *from*.
-- **`verifyMigrations = true` wires the check into the build.** The task is
-  `verifySqlDelightMigration` on 1.x and `verifyAppDatabaseMigration` — `verify<DatabaseName>Migration`
-  — on 2.x. It replays the `.sqm` files onto the previous snapshot and fails when the result does
-  not match the current `.sq` schema.
+- **`schemaOutputDirectory` holds the generated `.db` snapshots.** The task writes one per version
+  and they are committed; they are what verification migrates *from*.
+- **`verifyMigrations = true` wires the check into the build.** It replays the `.sqm` files onto the
+  previous snapshot and fails when the result does not match the current `.sq` schema.
+- **The task names carry the source set on 2.x** — `verifyCommonMainAppDatabaseMigration` and
+  `generateCommonMainAppDatabaseSchema` for a database named `AppDatabase` in `commonMain`, against
+  1.x's flat `verifySqlDelightMigration`. The exact spelling is version-sensitive, so read it off
+  `./gradlew tasks` rather than from memory.
 - **Verification checks shape, never data.** A `.sqm` that adds the column but leaves it empty
   passes; a JVM test with `JdbcSqliteDriver`, an old snapshot and real rows is what catches that.
 - **`deriveSchemaFromMigrations = true` flips the model**: the `.sq` files hold queries only, the
   schema is whatever replaying every `.sqm` produces. It suits a database SQLDelight adopted rather
   than created, and it is not a setting to change twice.
-- **Migration runs through the driver.** `AndroidSqliteDriver(AppDatabase.Schema, context, "app.db")`
-  calls `Schema.migrate(...)` for you; `JdbcSqliteDriver` and `NativeSqliteDriver` need
-  `AppDatabase.Schema.migrate(driver, oldVersion, newVersion)` called explicitly, and the old
+- **Migration runs through the driver.** `AndroidSqliteDriver(Schema, context, "app.db")` calls
+  `Schema.migrate(...)` for you; `JdbcSqliteDriver` and `NativeSqliteDriver` need
+  `AppDatabase.Schema.migrate(driver, oldVersion, newVersion)` called explicitly, with the old
   version read from `PRAGMA user_version`.
 
 ## Flyway — Scripts and Wiring
@@ -361,8 +368,13 @@ still on the old version during deploy 2, have `total_cents` null — which is w
 cannot exist yet.
 
 ```sql
--- Deploy 3 — V11__backfill_total_cents.sql is the *schema* half only.
-ALTER TABLE orders ALTER COLUMN total_cents SET NOT NULL;   -- after the backfill job finishes
+-- Deploy 3 — V11__enforce_total_cents.sql, the *schema* half only, after the backfill job.
+-- SET NOT NULL alone takes ACCESS EXCLUSIVE and scans the table. Validating a NOT VALID check
+-- first takes only SHARE UPDATE EXCLUSIVE, and Postgres 12+ then trusts it: no second scan.
+ALTER TABLE orders ADD CONSTRAINT total_cents_nn CHECK (total_cents IS NOT NULL) NOT VALID;
+ALTER TABLE orders VALIDATE CONSTRAINT total_cents_nn;
+ALTER TABLE orders ALTER COLUMN total_cents SET NOT NULL;
+ALTER TABLE orders DROP CONSTRAINT total_cents_nn;
 ```
 
 The backfill itself runs as a job between deploy 2 and deploy 3, in batches:
@@ -380,19 +392,28 @@ deploy 3's `SET NOT NULL` succeed — and deploy 3's code reads `total_cents` wh
 both.
 
 ```sql
--- Deploy 4 — V12__contract_total.sql, once nothing writes the old column.
+-- Deploy 4 — V12__contract_total.sql, run only once deploy 4 has fully rolled out.
 ALTER TABLE orders DROP COLUMN total;
 ```
 
+Deploy 4 is the one step whose code must land before its migration. While the rollout is in
+progress, deploy 3's pods are still writing `total`, so a drop applied at the start of the deploy —
+which is where Boot, Ktor and every CI pipeline apply migrations by default — breaks them for the
+length of the rollout. Ship deploy 4 as code only, wait for the last old pod to go, then apply the
+drop: triggered by hand at the end of the deploy, or carried as the first migration of the next
+release.
+
 - **Each deploy is independently revertable.** Reverting deploy 3's code lands on a database deploy
   2's code can still serve, because both columns are present and both are written.
-- **Deploy 4 waits for evidence, not for a calendar.** Check that no code path writes `total` —
-  grep, plus a log line or a metric on the write path in deploy 3 — before dropping it.
+- **The drop waits for evidence, not for a calendar.** Check that no code path writes `total` —
+  grep, plus a log line or a metric on the write path in deploy 3 — and that no pod from deploy 3
+  is left, before dropping it.
 - **`ALTER TABLE … RENAME COLUMN` would have been one line and an outage.** It is atomic, and every
   pod on the previous version starts failing the instant it commits.
-- **Adding `NOT NULL` with a `DEFAULT` is a metadata-only change on Postgres 11+** but rewrites the
-  whole table on older versions and on some other engines. Know which you are on before assuming
-  the step is free.
+- **`ADD COLUMN … NOT NULL DEFAULT <non-volatile>` is metadata-only on Postgres 11+** and a full
+  table rewrite before that, and on some other engines still. That is a different statement from
+  deploy 3's `SET NOT NULL`, which has its own cost and its own workaround above — know which one
+  you are writing before assuming a step is free.
 - **On a client the same shape applies to a different clock**: the "previous version" is the app
   release users have not installed yet, and deploy 4 is the release after the one where telemetry
   says the old column is unread.

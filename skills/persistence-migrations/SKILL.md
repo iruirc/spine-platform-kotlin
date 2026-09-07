@@ -185,8 +185,13 @@ time. Every migration must therefore be compatible with the version before it, w
 |---|---|---|
 | 1 — expand | add `total_cents`, nullable, no constraint | unchanged; still reads and writes `total` |
 | 2 — dual write | none | writes both columns, reads `total` |
-| 3 — backfill and switch | backfill `total_cents` in batches, then add the `NOT NULL` constraint | reads `total_cents`, still writes both |
-| 4 — contract | drop `total` | writes only `total_cents` |
+| 3 — backfill and switch | backfill `total_cents` in batches, then a `CHECK … NOT VALID`, `VALIDATE CONSTRAINT` and `SET NOT NULL` | reads `total_cents`, still writes both |
+| 4 — contract | drop `total`, **after** the deploy has fully rolled out | writes only `total_cents` |
+
+Step 4 is the one step whose migration must not run at the start of its deploy: while it rolls,
+deploy 3's pods are still writing `total`. Ship step 4's code, wait for the rollout to finish, and
+only then apply the drop — as a migration triggered at the end of the deploy, or as the first
+migration of the next release.
 
 1. **Additive changes are safe; destructive ones are not.** Adding a nullable column, adding a
    table, adding an index concurrently — all compatible with running code. Dropping, renaming,
@@ -201,8 +206,12 @@ time. Every migration must therefore be compatible with the version before it, w
    `Long Migrations And Recovery`.
 5. **`CREATE INDEX CONCURRENTLY` on Postgres, outside a transaction.** A plain `CREATE INDEX` takes
    a write lock for the duration; Flyway needs the script marked so it does not wrap it in one.
-6. **Adding a `NOT NULL DEFAULT` is cheap on modern Postgres and expensive elsewhere.** Check what
-   your version rewrites the whole table for before assuming a step is free.
+6. **`SET NOT NULL` scans the table under `ACCESS EXCLUSIVE`.** Add a
+   `CHECK (col IS NOT NULL) NOT VALID` first, `VALIDATE CONSTRAINT` it under a lock that lets reads
+   and writes through, and the `SET NOT NULL` that follows is metadata-only on Postgres 12+.
+7. **`ADD COLUMN … NOT NULL DEFAULT <non-volatile>` is metadata-only on Postgres 11+**, and a full
+   table rewrite before that and on some other engines. It is a different statement from the one
+   above, with a different cost; check your version before assuming either step is free.
 
 ## Progressive Migration
 
@@ -290,9 +299,10 @@ A user can be on any previously shipped version, and a database can be restored 
    environment matches another.
 8. **No test until the first migration goes wrong.** The migration that needed the test is the one
    already on users' devices, and the test written afterwards proves only that the fix works.
-9. **The `.sqm` numbered for the version it produces.** `2.sqm` written for "the change that makes
-   version 2" is applied to databases at version 2, so users on version 1 never get it and users on
-   version 2 get it twice.
+9. **The `.sqm` numbered for the version it produces.** A file written as `2.sqm` for "the change
+   that makes version 2" runs on the 2→3 transition instead of 1→2: the change lands a version
+   late, the 1→2 step is empty, and a database walking the chain arrives at the current version
+   with exactly that column missing.
 10. **Migrations skipped in the test database.** A suite that builds its schema from
     `SchemaUtils.create` or `ddl-auto=create-drop` tests a schema no environment has, and the first
     thing it stops catching is a migration that never ran.
