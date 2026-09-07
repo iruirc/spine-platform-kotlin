@@ -71,8 +71,9 @@ Start here. Every section below refines one row of this table.
 2. **`rememberSaveable` survives configuration change and process death** on Android, because it
    writes through the platform's saved-instance-state mechanism; a value that is not `Bundle`-able
    needs a `Saver` (see the reference). On Compose Desktop and on any Multiplatform target with no
-   saved-state host behind it, it degrades to `remember` semantics — the value survives
-   recomposition and nothing more.
+   saved-state host behind it, the value does not survive a process restart — but under a
+   `SaveableStateHolder`, which a navigation back stack or a tab host installs, it survives leaving
+   the composition on every platform.
 3. **Screen state belongs to the ViewModel**, not to a `rememberSaveable`. Saved instance state is a
    small, synchronously-written transaction; a list of orders in it is a `TransactionTooLargeException`
    waiting for a slow device. Restore it from `SavedStateHandle` plus a reload (`arch-mvvm`).
@@ -219,10 +220,10 @@ composeCompiler {
 }
 ```
 
-2. **Read the two report files.** `*-classes.txt` marks every class `stable`, `unstable` or
-   `runtime`, naming the property responsible; `*-composables.txt` marks each function `skippable`,
-   `restartable` and lists each parameter as `stable` or `unstable`. A hot composable that is not
-   `skippable` is where the work goes.
+2. **Read the two report files.** `<module>_<variant>-classes.txt` marks every class `stable`,
+   `unstable` or `runtime`, naming the property responsible; `<module>_<variant>-composables.txt`
+   marks each function `skippable`, `restartable` and lists each parameter as `stable` or `unstable`.
+   A hot composable that is not `skippable` is where the work goes.
 3. **Confirm on device with Layout Inspector.** Android Studio shows a recomposition count and a skip
    count per composable while the app runs — the count that keeps climbing while nothing changes is
    the bug.

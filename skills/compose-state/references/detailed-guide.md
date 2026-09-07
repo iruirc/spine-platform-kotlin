@@ -185,7 +185,8 @@ needs a `Saver` telling Compose how to reduce the value to a savable one and reb
 ```kotlin
 data class DateRange(val from: LocalDate, val to: LocalDate)
 
-val DateRangeSaver: Saver<DateRange, List<String>> = listSaver(
+// listSaver returns Saver<Original, Any>: the type arguments go on the call, not on the property
+val DateRangeSaver = listSaver<DateRange, String>(
     save = { listOf(it.from.toString(), it.to.toString()) },
     restore = { DateRange(LocalDate.parse(it[0]), LocalDate.parse(it[1])) },
 )
@@ -212,9 +213,11 @@ Rules the compiler will not enforce:
 - **Keep it small.** Everything saved is written on every stop, synchronously, on the main thread,
   into a transaction shared with the rest of the process. A list of orders belongs in a ViewModel
   plus a reload.
-- **On Compose Desktop and on Multiplatform targets with no saved-state host, this degrades to
-  `remember`.** The `Saver` is still correct code and still runs on Android; do not build a
-  desktop-only feature on the assumption that the value comes back after a restart.
+- **Outside Android there is no process-death story.** On Compose Desktop and on Multiplatform
+  targets with no saved-state host, the value does not survive a process restart; under a
+  `SaveableStateHolder` — installed by a navigation back stack or a tab host — it still survives
+  leaving the composition, on every platform. The `Saver` is correct code either way; just do not
+  build a desktop-only feature on the assumption that the value comes back after a restart.
 
 ## Stability — The Unstable Class
 
@@ -248,33 +251,28 @@ Three separate defects, and each alone is enough to stop skipping:
    anything about its own contents.
 2. `tags: List<String>` — the stdlib `List` interface carries no immutability promise; the instance
    behind it may be a `MutableList`.
-3. `total: Money` — a class from a module the Compose compiler never saw, so its stability is unknown
-   at compile time.
+3. `total: Money` — a class from a module the Compose compiler never saw, so it cannot be analysed
+   and is treated as unstable.
 
 ## Stability — The Compiler Report
 
 Turn on the reports (`Diagnosing — Compiler Metrics` has the Gradle block) and the compiler names all
-three without guessing. From `<module>-classes.txt`:
+three without guessing. From `<module>_<variant>-classes.txt`:
 
 ```
 unstable class OrderRow {
   stable val id: String
   stable val title: String
-  runtime val total: Money
+  unstable val total: Money
   unstable val tags: List<String>
   unstable var seen: Boolean
   <runtime stability> = Unstable
 }
-
-runtime class Money {
-  stable val cents: Long
-  stable val currency: String
-  <runtime stability> = Uncertain(Money)
-}
 ```
 
-`unstable` is a verdict; `runtime` means "cannot be decided here, ask at runtime" — which is what a
-type from a non-Compose module gets. From `<module>-composables.txt`:
+Every defect gets its own line, `total` included: a class from another module is unstable unless that
+module also applies the Compose compiler, or a stability configuration file names it — and `:domain`
+does neither, so no report is emitted for `Money` at all. From `<module>_<variant>-composables.txt`:
 
 ```
 restartable scheme("[androidx.compose.ui.UiComposable]") fun OrderList(
@@ -292,8 +290,8 @@ pays, the classes file says *why*.
 Each defect has one honest repair.
 
 ```kotlin
-// 1. mutable property → observable state, and the class stops lying
-//    (or, if it never changes, make it a `val` and the problem disappears)
+// 1. `var seen` → `val`: it never changed after construction, so the mutability was the whole defect
+//    (if it must change, back it with mutableStateOf and mark the class @Stable, not @Immutable)
 @Immutable
 data class OrderRow(
     val id: String,
@@ -333,8 +331,9 @@ java.time.LocalDate
 
 ```kotlin
 composeCompiler {
-    // list-valued (`stabilityConfigurationFiles`) in newer versions of the plugin
-    stabilityConfigurationFile = rootProject.layout.projectDirectory.file("compose_compiler_config.conf")
+    // singular `stabilityConfigurationFile` is the pre-2.0.20 spelling and is deprecated
+    stabilityConfigurationFiles =
+        listOf(rootProject.layout.projectDirectory.file("compose_compiler_config.conf"))
 }
 ```
 
@@ -352,16 +351,24 @@ instance identity (`===`) instead of `equals`. The `OrderList` above skips *if a
 hands it the very same `List` instance.
 
 ```kotlin
-// ViewModel — same instance across emissions, so OrderList skips under strong skipping
-private val _state = MutableStateFlow(OrdersUiState(rows = persistentListOf()))
+// `rows: List<OrderRow>` is unstable, so strong skipping compares it with `===`
+private val _state = MutableStateFlow(OrdersUiState(rows = emptyList()))
 
-// …and this defeats it: a new List every emission, equal but not identical
-_state.update { it.copy(rows = orders.map(::toRow)) }   // new instance, `===` fails
+// defeats the skip: a fresh list instance on every emission — equal, but not identical
+_state.update { it.copy(rows = orders.map(::toRow)) }
+
+// earns it: the previous instance is kept when the mapping produced nothing new, so `===` holds
+_state.update { current ->
+    val rows = orders.map(::toRow)
+    if (rows == current.rows) current else current.copy(rows = rows)
+}
 ```
 
 That is the whole reason stability still matters: strong skipping does **not** make an unstable type
-stable, and most real screens rebuild their list on every emission. With `ImmutableList` and a stable
-state class the comparison falls back to structural equality and the skip actually happens.
+stable, and most real screens rebuild their list on every emission. Holding the instance by hand, as
+the second update does, works and has to be remembered at every write site. Make `rows` an
+`ImmutableList` in an `@Immutable` state class instead and the parameter is stable again, so the
+comparison goes back to structural equality and the skip happens with nobody maintaining it.
 
 **2. Lambdas that capture unstable values are memoised** — the `onClick = { onClick(row.id) }` written
 inside a `LazyColumn` item no longer allocates a new, unequal lambda per composition, so it stops
@@ -375,8 +382,9 @@ What it does not change:
 - Nothing about correctness: a `@Immutable` annotation that lies produces a stale screen with or
   without strong skipping.
 
-It can be turned off through the plugin's `featureFlags` (`ComposeFeatureFlag.StrongSkipping`), which
-is worth knowing only to explain a codebase that already did it.
+It can be turned off through the plugin's `featureFlags` —
+`featureFlags.add(ComposeFeatureFlag.StrongSkipping.disabled())` — which is worth knowing only to
+explain a codebase that already did it.
 
 ## Side Effect Handlers
 
@@ -388,14 +396,16 @@ changes:
 
 ```kotlin
 @Composable
-fun OrderDetail(orderId: String, viewModel: OrderDetailViewModel) {
+fun OrderDetailRoute(orderId: String, viewModel: OrderDetailViewModel = hiltViewModel()) {
     LaunchedEffect(orderId) { viewModel.load(orderId) }   // NOT LaunchedEffect(Unit)
-    // …
+    // …then collect the state and render the stateless OrderDetailScreen
 }
 ```
 
 With `Unit` as the key this loads the first order and never any other, because the navigation library
-reuses the composable when only the argument changes. Key on what the work depends on.
+reuses the composable when only the argument changes. Key on what the work depends on. The route-level
+composable is the one that may hold a ViewModel — the stateless `OrderDetailScreen` below it takes a
+state and a lambda (`arch-mvvm`).
 
 **`rememberCoroutineScope()`** — for work started from a *callback*, not from composition:
 
@@ -468,7 +478,6 @@ value read inside actually changes:
 fun EndlessOrders(listState: LazyListState, onLoadMore: () -> Unit) {
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
-            .distinctUntilChanged()
             .collect { last -> if (last != null && last >= listState.layoutInfo.totalItemsCount - 5) onLoadMore() }
     }
 }
@@ -590,10 +599,13 @@ Four files land in the destinations:
 
 | File | What it answers |
 |---|---|
-| `<module>-composables.txt` | per function: `restartable`, `skippable`, `readonly`, and each parameter's stability |
-| `<module>-classes.txt` | per class: `stable` / `unstable` / `runtime`, with the property responsible |
-| `<module>-composables.csv` | the same functions as rows, for sorting and diffing between builds |
-| `<module>-module.json` | totals — composables, of which skippable and restartable |
+| `<module>_<variant>-composables.txt` | per function: `restartable`, `skippable`, `readonly`, and each parameter's stability |
+| `<module>_<variant>-classes.txt` | per class: `stable` / `unstable` / `runtime`, with the property responsible |
+| `<module>_<variant>-composables.csv` | the same functions as rows, for sorting and diffing between builds |
+| `<module>_<variant>-module.json` | totals — composables, of which skippable and restartable |
+
+For the build above that is `feature-orders_release-composables.csv` and its three siblings — the
+variant is part of the name, so a debug run does not overwrite a release one.
 
 The working loop, in order:
 
@@ -624,7 +636,9 @@ between attempts, or the numbers describe the whole session rather than the inte
 **`Modifier.recomposeHighlighter()`.** A border drawn around whatever just recomposed — the fastest
 way to see a whole subtree invalidating together. This is a snippet from the official Compose
 samples, **not a library dependency**: copy it into a `debug` source set and never let it reach
-release code.
+release code. It is written with `Modifier.composed { }`, as the sample is; a modifier written today
+should be a `Modifier.Node`, but this one is debug-only and copied verbatim, so diverging from the
+sample buys nothing.
 
 ```kotlin
 // debug source set only — trimmed from the Compose samples' RecomposeHighlighter
