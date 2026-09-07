@@ -21,3 +21,5 @@ setup() {
 @test "net-openapi: shape" { assert_skill_shape "$ROOT/skills/net-openapi"; }
 @test "persistence-architecture: shape" { assert_skill_shape "$ROOT/skills/persistence-architecture"; }
 @test "persistence-room-sqldelight: shape" { assert_skill_shape "$ROOT/skills/persistence-room-sqldelight"; }
+@test "persistence-jvm-orm: shape" { assert_skill_shape "$ROOT/skills/persistence-jvm-orm"; }
+@test "persistence-migrations: shape" { assert_skill_shape "$ROOT/skills/persistence-migrations"; }

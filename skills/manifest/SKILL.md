@@ -148,7 +148,7 @@ for a server the answer is its layering.
 state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`, `arch-clean`, `arch-layered`, `arch-hexagonal`, `compose-state`
 navigation       → `nav-compose`, `nav-multiplatform`
 networking       → `net-architecture`, `net-http-clients`, `net-openapi`
-persistence      → `persistence-architecture`, `persistence-room-sqldelight`
+persistence      → `persistence-architecture`, `persistence-room-sqldelight`, `persistence-jvm-orm`, `persistence-migrations`
 dependency graph → —
 concurrency      → —
 errors           → —
