@@ -66,16 +66,14 @@ interface OrderRepository {
 2. **What crosses is a domain value.** `arch-clean` owns the three model families and the mapping
    rule; this skill only insists that the *entity* family stops here, exactly as the DTO family
    does, and for the same reason — an entity is shaped by the schema, a domain model by the rules.
-3. **One repository per aggregate, not per data source.** `OrderRepository` decides between the
-   local rows and the API. `OrderLocalSource` and `OrderRemoteSource` are `internal` collaborators;
-   a domain that has to call `local` and then `remote` has had the policy handed to it.
-4. **The port says what, the implementation decides where.** Staleness, retry, write-through,
-   conflict resolution and the offline queue are all `:data` — invisible in the port, and therefore
-   changeable without touching a caller.
-5. **A repository returns `Result` or throws a domain error, never a storage exception.**
+3. **One repository per aggregate, and the port says what while the implementation decides where**
+   — both are `arch-clean`'s (`## Repositories`). The delta this skill adds is *what* does the
+   deciding: the source-of-truth policy below, picked once per aggregate, is the reason the local
+   and remote sources can stay `internal`.
+4. **A repository returns `Result` or throws a domain error, never a storage exception.**
    `SQLiteConstraintException`, `IOException` and `PersistenceException` are engine facts;
    `error-architecture` names what they become.
-6. **Fakes are the point.** The layer above is tested against an in-memory implementation of the
+5. **Fakes are the point.** The layer above is tested against an in-memory implementation of the
    port with no database at all; the real implementation gets its own integration test
    (`persistence-room-sqldelight`).
 
@@ -117,6 +115,7 @@ One policy per aggregate, written down, chosen by one question: **must this work
 
 ```kotlin
 // :data — database-first. The Flow is the whole read path; refresh only writes.
+// DataError is a sealed Throwable family (`error-architecture`): kotlin.Result carries nothing else.
 internal class OfflineFirstOrderRepository(
     private val dao: OrderDao,
     private val api: OrdersApi,
@@ -144,9 +143,10 @@ internal class OfflineFirstOrderRepository(
 1. **The storage API is `suspend` and `Flow`, and nothing else crosses the boundary.** Room and
    SQLDelight both offer that shape; a blocking call above `:data` is a choice, not a constraint.
 2. **`Dispatchers.IO` is a `:data` word.** The `withContext(Dispatchers.IO)` goes in the repository
-   or its local source — never in a ViewModel, never in a use case, never in `commonMain` domain
-   code. A ViewModel that switches dispatchers has been told which layer does blocking work, which
-   is the one thing the port exists to hide (`concurrency-coroutines`, `arch-mvvm`).
+   or its local source — never in a use case (`arch-clean`, `## Use Cases`) and never in
+   `commonMain` domain code. A ViewModel may *hold* an injected dispatcher, which is how
+   `arch-mvvm` makes its own coroutines testable; what it must not do is wrap a repository call in
+   a `withContext`, because that is it being told which layer blocks (`concurrency-coroutines`).
 3. **Inject the dispatcher, do not name it.** A constructor parameter defaulting to `Dispatchers.IO`
    is replaced by a test dispatcher in one line; a hard-coded `Dispatchers.IO` inside the method
    makes every repository test depend on real thread scheduling.
@@ -219,9 +219,12 @@ internal class OfflineFirstOrderRepository(
 2. **A `commonMain` repository must not name a platform store.** The moment `SharedPreferences`
    appears in shared code the module has stopped being shared, and the compiler will say so on the
    second target rather than the first.
-3. **iOS has no "just write a file wherever".** The path comes from the OS's own directory API, and
-   whether that directory is backed up is a decision with a privacy answer; make it once, in the
-   `actual`.
+3. **Neither platform has a "just write a file wherever".** On iOS the path comes from the OS's own
+   directory API; on Android it is `filesDir` for what must survive, `cacheDir` for what the system
+   may reclaim without asking, and `getExternalFilesDir` for what the user or another app may see.
+   Whether the directory is backed up is a privacy decision either way — on Android, exclude a
+   database holding anything sensitive from Auto Backup through `dataExtractionRules`. Decide once,
+   in the `actual`.
 
 ## Encryption
 
@@ -267,10 +270,10 @@ throw and the change tracking is gone.
 
 ## Common Mistakes
 
-1. **A Room entity, a `.sq`-generated class or a JPA entity used as the UI model.** It compiles, it
-   saves a mapper, and it welds the screen to the schema: every column rename is a UI change, every
-   nullable column becomes a `?` in the composable, and the entity grows a `displayName` that the
-   database now stores. The mapping is the cheapest file in the layer.
+1. **A persistence entity used as the UI model.** `arch-clean` mistake 3 states it and the mapping
+   rule behind it; what this skill adds is that the entity family leaks the *schema* rather than the
+   wire, so the price is paid on every column rename. The engine-specific spelling — a Room
+   `@Entity`, a `.sq`-generated row — is `persistence-room-sqldelight` mistake 3.
 2. **Two sources of truth for one aggregate.** The repository returns the network response *and*
    writes it to the database that the screen also observes; the list renders twice, in an order
    that depends on the connection, and the "flash of old data" bug is unreproducible on wifi.
@@ -292,6 +295,8 @@ throw and the change tracking is gone.
 8. **A large blob in a column.** Images and documents belong in files with their paths in the
    database; a database that carries them is slow to query, expensive to back up, and now needs a
    migration strategy for bytes that never change.
-9. **Storage created lazily at the first call.** The database is opened, migrated and warmed once,
-   in the composition root, where a failure is one handled path — not on the first repository call
-   from a random screen, where a migration failure is a crash with a stack trace naming the UI.
+9. **A database instance per call site.** `Room.databaseBuilder(...).build()` or
+   `AppDatabase(driver)` inside a repository constructor gives every consumer its own connection,
+   its own cache and its own view of an open transaction. Both engines open the file lazily on
+   first use, which is correct and not the bug; what has to be a singleton is the instance, built
+   once in the composition root.

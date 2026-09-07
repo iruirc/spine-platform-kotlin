@@ -16,7 +16,7 @@ interface OrderRepository {
 }
 ```
 
-Dependencies are version-catalog aliases; each artifact is named where it is first used.
+Dependencies are version-catalog aliases, each artifact named where it is first used.
 
 ## Room — Entity and DAO
 
@@ -50,8 +50,7 @@ data class OrderLineEntity(
 )
 ```
 
-The parent-and-children read is one declared shape, and every query returning it is `@Transaction`
-because Room satisfies it with two statements:
+The parent-and-children read is one declared shape, `@Transaction` because Room runs two statements:
 
 ```kotlin
 data class OrderWithLines(
@@ -82,8 +81,6 @@ interface OrderDao {
 }
 ```
 
-- `@Upsert` (Room 2.5+) updates in place. `@Insert(onConflict = REPLACE)` would delete the row
-  first, and `ON DELETE CASCADE` would take the lines with it.
 - `status` and `sync_state` are `String` columns because SQLite has no enum; the mapper below is
   where they become one, and a `TypeConverter` only moves that same code into an annotation.
 
@@ -92,7 +89,7 @@ interface OrderDao {
 ```kotlin
 @Database(
     entities = [OrderEntity::class, OrderLineEntity::class],
-    version = 1,
+    version = 2,                 // MIGRATION_1_2 below carries the devices still on 1
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -100,8 +97,7 @@ abstract class AppDatabase : RoomDatabase() {
 }
 ```
 
-`build.gradle.kts` — the KSP plugin, the Room Gradle plugin, and the schema directory the exported
-JSON lands in:
+`build.gradle.kts` — KSP, the Room plugin, and the directory the exported schema JSON lands in:
 
 ```kotlin
 plugins {
@@ -130,13 +126,11 @@ fun database(@ApplicationContext context: Context): AppDatabase =
 
 - `exportSchema = true` plus `schemaDirectory` is what writes `schemas/<db>/1.json`. Commit it: an
   auto-migration is computed from the difference between two of those files.
-- No `fallbackToDestructiveMigration()` anywhere in this builder. It belongs to a debug variant or
-  to nothing.
+- No `fallbackToDestructiveMigration()` in this builder: it belongs to a debug variant or nowhere.
 
 ## Room — Repository and Flow Queries
 
-The mapper and the repository together are the whole of what the layer above sees. `toEntity` is
-its mirror, one field at a time, and lives in the same file:
+The mapper and the repository are the whole of what the layer above sees; `toEntity` is its mirror:
 
 ```kotlin
 internal fun OrderWithLines.toDomain() = Order(
@@ -199,14 +193,12 @@ suspend fun drainOutbox(db: AppDatabase, api: OrdersApi) {
         api.place(entity.toDto())                     // outside the transaction, on purpose
         db.withTransaction {
             db.orderDao().upsertOrder(entity.copy(syncState = "SYNCED"))
-            db.outboxDao().delete(entity.id)
+            db.outboxDao().delete(entity.id)          // a second DAO on the same @Database
         }
     }
 }
 ```
 
-- `withTransaction` is `suspend`, runs the block on Room's transaction dispatcher, and rolls back
-  if it throws — cancellation included.
 - The network call is deliberately outside the block. A transaction held across an HTTP request
   blocks every other write for as long as the server is slow.
 - `runBlocking` inside `withTransaction` deadlocks: the block already occupies the transaction
@@ -252,10 +244,12 @@ class OrderDaoTest {
 
 ## SQLDelight — The .sq File
 
-`src/commonMain/sqldelight/com/example/db/Order.sq` — the directory under `sqldelight/` has to
-match the `packageName` configured in Gradle:
+`src/commonMain/sqldelight/com/example/db/Order.sq` — that directory must match `packageName`:
 
 ```sql
+import com.example.orders.OrderStatus;
+import kotlinx.datetime.Instant;
+
 CREATE TABLE orderRecord (
   id            TEXT    NOT NULL PRIMARY KEY,
   customerId    TEXT    NOT NULL,
@@ -312,7 +306,15 @@ INSERT INTO orderLineRecord VALUES ?;
 ```kotlin
 plugins { alias(libs.plugins.sqldelight) }        // app.cash.sqldelight
 
-sqldelight { databases { create("AppDatabase") { packageName.set("com.example.db") } } }
+sqldelight {
+    databases {
+        create("AppDatabase") {
+            packageName.set("com.example.db")
+            // ON CONFLICT ... DO UPDATE is SQLite 3.24; SQLDelight 2.x compiles against 3.18.
+            dialect("app.cash.sqldelight:sqlite-3-24-dialect:<version>")
+        }
+    }
+}
 
 kotlin.sourceSets {
     commonMain.dependencies {
@@ -325,8 +327,7 @@ kotlin.sourceSets {
 }
 ```
 
-The database is `commonMain`; only the driver is per target. The adapters declared by `AS Instant`
-and `AS OrderStatus` are supplied here, once:
+The database is `commonMain`, only the driver per target; the two declared adapters are supplied once:
 
 ```kotlin
 // commonMain
@@ -356,17 +357,19 @@ actual class DriverFactory {
     actual fun create(): SqlDriver = NativeSqliteDriver(AppDatabase.Schema, "app.db")
 }
 
-// jvmMain — the JDBC driver creates nothing on its own
+// jvmMain
 actual class DriverFactory(private val path: String) {
-    actual fun create(): SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$path").also { driver ->
-        if (isFreshFile) AppDatabase.Schema.create(driver)
-    }
+    actual fun create(): SqlDriver =
+        JdbcSqliteDriver("jdbc:sqlite:$path", Properties(), AppDatabase.Schema)
 }
 ```
 
-- `AndroidSqliteDriver` and `NativeSqliteDriver` create and migrate the schema themselves from the
-  `AppDatabase.Schema` they are given. `JdbcSqliteDriver` does not: creating and version-checking
-  is the caller's job, which is why the desktop `actual` is the longest of the three.
+- All three create and migrate the schema themselves from the `AppDatabase.Schema` they are handed
+  — the JDBC one only when it is passed to the constructor, which is why the desktop `actual` names
+  it there rather than calling `Schema.create` separately.
+- The dialect above is a compile-time decision; the runtime SQLite is the platform's. Android at API
+  30 ships 3.28, comfortably past upsert's 3.24, but a lower `minSdk` reaches devices whose SQLite
+  is older, and those need a bundled SQLite distribution or an insert-then-update fallback.
 - A web target takes `WebWorkerDriver` from `app.cash.sqldelight:web-worker-driver`, pointed at a
   worker script; it is the row Room has no answer for.
 
@@ -397,11 +400,9 @@ internal class SqlDelightOrderRepository(
 }
 ```
 
-- `executeAsList()`, `executeAsOne()` and `executeAsOneOrNull()` are blocking. Every call site above
-  is already inside `withContext(io)` or inside `mapToList(io)`'s dispatcher.
-- The child fetch per parent is the N+1 this shape invites. For a list, select the lines for the
-  whole page in one `IN ?` query and group in Kotlin; for a detail screen, one extra query is
-  cheaper than the join.
+- The child fetch per parent is the N+1 this shape invites, and `executeAsList()` is blocking. For a
+  list, select the page's lines in one `IN ?` query and group in Kotlin; for one screen, an extra
+  query beats the join.
 
 ## SQLDelight — Transactions
 
@@ -419,9 +420,8 @@ override suspend fun replace(order: Order) = withContext(io) {
 }
 ```
 
-`transactionWithResult { }` is the same block when the unit of work produces a value.
-
-- `transaction { }` is not `suspend`: a suspending call cannot be written inside it, which is the
+- `transactionWithResult { }` is the same block when the unit of work produces a value, and
+  `transaction { }` is not `suspend`: a suspending call cannot be written inside it, which is the
   library preventing a network round trip from being awaited with a write transaction open. The
   whole block goes inside `withContext(io)` instead.
 - `rollback()` aborts explicitly; a thrown exception rolls back too. `afterRollback { }` is the
@@ -462,8 +462,8 @@ class OrderQueriesTest {
 
 ## Room on KMP
 
-Room 2.7+ in `commonMain`: the entities, DAOs and queries above move unchanged, and what is new is
-the generated constructor plus an explicit driver.
+Room 2.7+ in `commonMain`: the entities, DAOs and queries above move unchanged; the constructor and
+the driver are new.
 
 ```kotlin
 // commonMain
@@ -485,16 +485,16 @@ expect object AppDatabaseConstructor : RoomDatabaseConstructor<AppDatabase> {
 fun appDatabase(): AppDatabase =
     Room.databaseBuilder<AppDatabase>(name = "${documentsDirectory()}/app.db")
         .setDriver(BundledSQLiteDriver())          // androidx.sqlite:sqlite-bundled
-        .setQueryCoroutineContext(Dispatchers.IO)
+        .setQueryCoroutineContext(Dispatchers.IO)  // no default outside Android
         .build()
 ```
 
-- The build applies the `androidx.room` Gradle plugin once and `ksp(libs.androidx.room.compiler)`
-  per target; `androidx.sqlite:sqlite-bundled` supplies the driver everywhere except Android, and
-  `setQueryCoroutineContext` replaces the executor Room picks for you there.
+- The build applies the `androidx.room` plugin once and `ksp(libs.androidx.room.compiler)` per
+  target; `androidx.sqlite:sqlite-bundled` is the driver everywhere except Android.
 - The target list is Android, iOS, JVM and native. There is no web target: a browser build is
   SQLDelight's `WebWorkerDriver` or nothing.
-- Exported schemas and `Migration` objects work as on Android. Whether `MigrationTestHelper`, the
-  Paging integration and every corner of the annotation surface are available on a given target is
-  version-sensitive — check the release notes for the version in your catalog before promising it
+- Exported schemas and `Migration` objects work as on Android, and `androidx.room:room-testing` is
+  published for the KMP targets from 2.7, so `MigrationTestHelper` is reachable from a
+  multiplatform test — it takes the schema directory, the file name and a driver. Verify that
+  signature, and the Paging integration's target list, against the 2.7 release notes
   (`persistence-migrations`).

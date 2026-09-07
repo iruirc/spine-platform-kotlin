@@ -86,10 +86,12 @@ Room on KMP (2.7 and later) is a real third option, with edges worth knowing bef
    RoomDatabaseConstructor<AppDatabase>` beside it; the `actual` is generated per target.
 5. **`@Query` is validated at compile time on every target.** That is Room's central benefit and it
    survives the move: a typo in a column name is a build failure, not a runtime crash on a device.
-6. **Migrations and their testing are the version-sensitive part.** Exported schemas and `Migration`
-   objects work; `MigrationTestHelper` began as an Android-instrumented tool and its multiplatform
-   availability has moved between releases. Check the release notes for the version in the catalog
-   before promising a KMP migration test (`persistence-migrations`).
+6. **Migrations work, and so does testing them — check the constructor.** Exported schemas and
+   `Migration` objects behave as on Android, and `androidx.room:room-testing` is published for the
+   KMP targets from 2.7, so `MigrationTestHelper` is available in a multiplatform test: it takes the
+   exported schema directory, the database file name and a driver instead of the instrumented
+   `Context` the Android-only form took. Verify that signature against the 2.7 release notes before
+   writing the test (`persistence-migrations`).
 7. **Paging and `@Relation` are the other two to check, not to assume.** Room's Paging integration
    is an Android-shaped dependency, and support for parts of the annotation surface has landed
    target by target. Verify against the version you are on rather than against a blog post.
@@ -141,6 +143,8 @@ interface OrderDao {
 
 ```sql
 -- src/commonMain/sqldelight/com/example/db/Order.sq
+import kotlinx.datetime.Instant;
+
 CREATE TABLE orderRecord (
   id         TEXT NOT NULL PRIMARY KEY,
   customerId TEXT NOT NULL,
@@ -174,9 +178,9 @@ SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
    actually runs; passing `Dispatchers.Main` there is an ANR with no warning. `mapToOne`,
    `mapToOneOrNull` and `mapToOneNotNull` are the single-row forms.
 7. **SQLite has no date, no boolean and no enum**, so the schema declares an adapter:
-   `createdAt TEXT AS Instant NOT NULL` in the `.sq` file, with a `columnAdapter` passed to the
-   database constructor. Keeping that mapping in one place is what stops half the codebase parsing
-   timestamps by hand.
+   `createdAt INTEGER AS Instant NOT NULL` in the `.sq` file — the Kotlin type imported at the top
+   of the file, the `ColumnAdapter` passed to the database constructor. Keeping that mapping in one
+   place is what stops half the codebase parsing timestamps by hand.
 8. **Schema changes are `.sqm` files** numbered by version, verified by the plugin's
    `verifySqlDelightMigration` task — `persistence-migrations`.
 
