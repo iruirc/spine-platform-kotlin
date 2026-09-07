@@ -40,7 +40,7 @@ inside a multiplatform module (`pkg-kmp-source-sets`).
 ## When To Load The Reference
 
 `references/detailed-guide.md` carries one complete build: the settings file, the `build-logic`
-included build with its three convention plugins, the catalog, one module file per archetype, the
+included build with its convention plugins, the catalog, one module file per archetype, the
 graph-rule test and the performance properties. Each section stands alone; load the section, not the
 file: `rg -n "^## " skills/pkg-gradle-modules/references/detailed-guide.md`.
 
@@ -48,7 +48,7 @@ file: `rg -n "^## " skills/pkg-gradle-modules/references/detailed-guide.md`.
 |---|---|
 | `settings.gradle.kts`, the included build, where the catalog is declared | `Settings and the Included Build` |
 | The `build-logic` build file, `kotlin-dsl`, and registering plugin ids | `The build-logic Build File` |
-| Three convention plugins written as `Plugin<Project>` classes | `Convention Plugins` |
+| The Android conventions as `Plugin<Project>` classes, and the helper they share | `Convention Plugins` |
 | The same thing as a `*.gradle.kts` script named after its id | `Precompiled Script Plugins` |
 | A catalog with `[versions]`, `[libraries]`, `[bundles]`, `[plugins]` | `The Version Catalog` |
 | One build file per archetype, with only the lines that archetype may have | `Module Build Files` |
@@ -95,10 +95,15 @@ outside its row is either the wrong archetype or the graph is wrong.
 |---|---|---|---|
 | app | `:app` | the entry point, the composition root, the manifest or `main()` | everything |
 | feature | `:feature:orders` | screens, ViewModels, feature-local navigation | core, data, api-contract |
-| core | `:core:ui`, `:core:common` | design system, shared utilities, shared domain types | nothing internal |
+| core | `:core:ui`, `:core:model` | design system, shared utilities, shared domain types | nothing internal |
 | data | `:data:orders` | DTOs, DAOs, API services, mappers, repository implementations | core, api-contract |
 | api-contract | `:api:orders` | interfaces and DTOs two modules must agree on; no implementation | nothing |
 | test-fixtures | the `testFixtures` source set of the module it fixtures | fakes, builders, test dispatchers | the module it fixtures |
+
+The `feature → data` edge is in the table because a build may legitimately use it, but a Clean layout
+does not: there a feature depends on interfaces that live in `core` and `:app` binds the
+implementation (`arch-clean`), so the edge belongs only to a build with no separate `:app`-side
+composition root.
 
 1. **Never feature → feature.** The moment `:feature:cart` names `:feature:checkout`, both rebuild
    together, neither can ship alone, and the next arrow closes a cycle. Route through an
@@ -107,7 +112,7 @@ outside its row is either the wrong archetype or the graph is wrong.
    and the routes are registered (`di-composition-root`).
 3. **`core` depends on no module of this build.** External libraries yes; a sibling module never. The
    first `implementation(project(...))` in a core module is the moment it stopped being one.
-4. **`core` is a name, not a bucket.** `:core:designsystem`, `:core:common`, `:core:datetime` — narrow
+4. **`core` is a name, not a bucket.** `:core:designsystem`, `:core:model`, `:core:datetime` — narrow
    and named for what they hold. `arch-clean` refuses a `:core` in its three-module layout for exactly
    this reason: a module everything depends on has no dependency rule left to enforce.
 5. **The archetypes name a shape; they do not rename the modules a pattern already gave you.**
@@ -149,9 +154,10 @@ ktor = "3.0.3"
 [libraries]
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
 [bundles]
-ktor-client = ["ktor-client-core", "ktor-client-content-negotiation"]
+ktor-client = ["ktor-client-core", "ktor-client-content-negotiation", "ktor-serialization-json"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -192,12 +198,14 @@ dependencies {
 }
 ```
 
-1. **`build-logic` as an included build, never `buildSrc`.** `buildSrc` sits on the classpath of every
-   build script in the build, so any change to it recompiles all of them and invalidates the
-   configuration cache wholesale. An included build is an ordinary Gradle build: its output is
-   cacheable, and a change invalidates only what actually depended on it.
-2. **Name the plugins `kotlin-platform.<target>.<archetype>`** — `kotlin-platform.android.library`,
-   `kotlin-platform.jvm.library`, `kotlin-platform.android.feature`. The dotted id reads as a
+1. **`build-logic` as an included build, never `buildSrc`.** Since Gradle 8.0 `buildSrc` builds like
+   an included build — cacheable and parallel — so the old cost story is out of date. What survives is
+   the one that matters: its jar is on the classpath of *every* build script in the build, so any
+   change to it recompiles all of them. An included build reaches only the modules that apply one of
+   its plugin ids.
+2. **Name the plugins `kotlin-platform.<target>.<archetype>`** — `kotlin-platform.android.application`,
+   `kotlin-platform.android.library`, `kotlin-platform.jvm.library`,
+   `kotlin-platform.android.feature`. The dotted id reads as a
    coordinate, sorts sensibly, and cannot collide with a published plugin id.
 3. **Precompiled script plugins and binary plugins are both fine.** A file named
    `kotlin-platform.jvm.library.gradle.kts` *is* the plugin id and needs no registration — shortest
@@ -282,8 +290,8 @@ includeBuild("../shared-lib") {
    artifact, or the version everyone else resolves is never exercised.
 4. **The cost is one Gradle build per included build**, each with its own configuration phase. Two is
    comfortable; a composite of six is slower than publishing.
-5. **The wiring is scriptable**, and the `/kotlin-init` command automates it for a new workspace — this
-   section is the shape it produces, so a hand-written one matches.
+5. **The wiring is scriptable**, and a later command automates it for a new workspace — this section
+   is the shape it produces, so a hand-written one matches.
 
 ## Common Mistakes
 
@@ -296,9 +304,10 @@ includeBuild("../shared-lib") {
 3. **A `:common` or `:core` module everything lands in.** It depends on nothing and everything depends
    on it, so every change rebuilds the world and no rule constrains what may go in. Split it by what
    it actually holds, and name each piece.
-4. **`buildSrc` for the conventions.** A one-line edit there recompiles every build script in the
-   repo and drops the configuration cache. `build-logic` as an included build costs one extra settings
-   file and removes the whole class of problem.
+4. **`buildSrc` for the conventions.** Its jar sits on every build script's classpath, so a one-line
+   edit there recompiles every build script in the repo; `build-logic` is paid for only by the modules
+   that apply one of its ids. (`buildSrc` has built like an included build since Gradle 8.0 — that
+   half of the old argument is gone; this half is not.)
 5. **A version string in a module's `build.gradle.kts`.** It is the one the upgrade misses, the one
    that resolves to a different version than the catalog's, and the reason two modules link two copies
    of the same library.

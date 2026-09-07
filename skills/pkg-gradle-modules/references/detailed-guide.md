@@ -1,12 +1,12 @@
 # pkg-gradle-modules — detailed guide
 
-One build wired end to end: the settings file, the `build-logic` included build with three convention
+One build wired end to end: the settings file, the `build-logic` included build and its convention
 plugins, the catalog every version comes from, one build file per archetype, the task that fails when
 a graph rule is broken, the performance properties, and the two shapes that appear only in a larger
 project — a composite build and published test fixtures. Load the section you need, not the file.
 
 The build it wires is an orders app with six modules, one per archetype: `:app` (entry point and
-composition root), `:feature:orders`, `:core:designsystem`, `:core:common`, `:data:orders`, and
+composition root), `:feature:orders`, `:core:designsystem`, `:core:model`, `:data:orders`, and
 `:api:orders` — the contract a second feature would reach orders through.
 
 ## Settings and the Included Build
@@ -41,7 +41,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "orders"
 
-include(":app", ":feature:orders", ":core:designsystem", ":core:common", ":data:orders", ":api:orders")
+include(":app", ":feature:orders", ":core:designsystem", ":core:model", ":data:orders", ":api:orders")
 ```
 
 ```kotlin
@@ -83,14 +83,16 @@ dependencies {
 }
 
 gradlePlugin {
+    // Binary plugins only. `kotlin-platform.jvm.library` is a precompiled script two sections down,
+    // and a script plugin registers itself by its file name.
     plugins {
+        register("androidApplication") {
+            id = "kotlin-platform.android.application"
+            implementationClass = "AndroidApplicationConventionPlugin"
+        }
         register("androidLibrary") {
             id = "kotlin-platform.android.library"
             implementationClass = "AndroidLibraryConventionPlugin"
-        }
-        register("jvmLibrary") {
-            id = "kotlin-platform.jvm.library"
-            implementationClass = "JvmLibraryConventionPlugin"
         }
         register("androidFeature") {
             id = "kotlin-platform.android.feature"
@@ -109,14 +111,39 @@ artifact form until the duplicate coordinate actually causes a mismatch.
 
 ## Convention Plugins
 
-Three classes under `build-logic/src/main/kotlin/`, one per archetype. The first carries the
-version-catalog lookup, the only part of the setup that is not obvious.
+Three classes and the helper they share, under `build-logic/src/main/kotlin/`.
+`kotlin-platform.jvm.library` is not among them — it is the precompiled script in the next section.
+The library plugin carries the version-catalog lookup, the only part of the setup that is not
+obvious.
+
+```kotlin
+// build-logic/src/main/kotlin/AndroidConventions.kt
+// imports: ApplicationExtension, CommonExtension, LibraryExtension, VersionCatalogsExtension,
+// JvmTarget, KotlinAndroidProjectExtension, and the org.gradle.kotlin.dsl helpers.
+// The half both Android conventions share. CommonExtension is what ApplicationExtension and
+// LibraryExtension have in common, which is why the SDK and JVM settings can live in one place.
+internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, *, *, *>) {
+    commonExtension.apply {
+        compileSdk = 35
+        defaultConfig { minSdk = 24 }
+        compileOptions {
+            sourceCompatibility = JavaVersion.VERSION_17
+            // Set both: KGP validates the Kotlin jvmTarget against the Java target, and a mismatch
+            // fails the build rather than warning.
+            targetCompatibility = JavaVersion.VERSION_17
+        }
+    }
+    extensions.configure<KotlinAndroidProjectExtension> {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+            allWarningsAsErrors.set(true)
+        }
+    }
+}
+```
 
 ```kotlin
 // build-logic/src/main/kotlin/AndroidLibraryConventionPlugin.kt
-// imports: LibraryExtension, VersionCatalogsExtension, JvmTarget, KotlinAndroidProjectExtension,
-// and the org.gradle.kotlin.dsl helpers (configure, dependencies, getByType)
-
 class AndroidLibraryConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
         pluginManager.apply("com.android.library")
@@ -125,17 +152,7 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
         // lookup is the way in, and why the catalog is declared in build-logic's settings file.
         val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
-        extensions.configure<LibraryExtension> {
-            compileSdk = 35
-            defaultConfig { minSdk = 24 }
-            compileOptions { sourceCompatibility = JavaVersion.VERSION_17 }
-        }
-        extensions.configure<KotlinAndroidProjectExtension> {
-            compilerOptions {
-                jvmTarget.set(JvmTarget.JVM_17)
-                allWarningsAsErrors.set(true)
-            }
-        }
+        configureAndroid(extensions.getByType<LibraryExtension>())
         dependencies {
             add("testImplementation", libs.findLibrary("junit").get())
             add("testImplementation", libs.findLibrary("kotlinx-coroutines-test").get())
@@ -146,20 +163,21 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
 ```
 
 ```kotlin
-// build-logic/src/main/kotlin/JvmLibraryConventionPlugin.kt
-class JvmLibraryConventionPlugin : Plugin<Project> {
+// build-logic/src/main/kotlin/AndroidApplicationConventionPlugin.kt
+// :app needs its own convention: com.android.application and com.android.library cannot both be
+// applied to one project, and the feature convention configures a LibraryExtension.
+class AndroidApplicationConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
-        pluginManager.apply("org.jetbrains.kotlin.jvm")
-        val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+        pluginManager.apply("com.android.application")
+        pluginManager.apply("org.jetbrains.kotlin.android")
+        pluginManager.apply("org.jetbrains.kotlin.plugin.compose")
 
-        extensions.configure<JavaPluginExtension> {
-            toolchain { languageVersion.set(JavaLanguageVersion.of(17)) }
+        val application = extensions.getByType<ApplicationExtension>()
+        configureAndroid(application)
+        application.apply {
+            defaultConfig { targetSdk = 35 }
+            buildFeatures { compose = true }
         }
-        extensions.configure<KotlinJvmProjectExtension> {
-            compilerOptions { allWarningsAsErrors.set(true) }
-        }
-        tasks.withType<Test>().configureEach { useJUnitPlatform() }
-        dependencies { add("testImplementation", libs.findLibrary("junit").get()) }
         registerGraphRuleCheck()
     }
 }
@@ -214,7 +232,14 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 dependencies {
     "testImplementation"(libs.findLibrary("junit").get())
 }
+
+tasks.withType<Test>().configureEach { useJUnitPlatform() }
+registerGraphRuleCheck()   // a top-level Project extension in build-logic resolves here too
 ```
+
+This is the only form `kotlin-platform.jvm.library` takes: it has no entry in `gradlePlugin { }`,
+because a script plugin is registered by its file name. Writing both a class and a script for one id
+is the one way to get two plugins that disagree.
 
 Which form to take:
 
@@ -234,6 +259,8 @@ kotlin = "2.2.0"
 compose-bom = "2024.12.01"
 coroutines = "1.9.0"
 ktor = "3.0.3"
+serialization = "1.7.3"
+datetime = "0.6.2"
 room = "2.7.1"
 junit = "5.11.4"
 turbine = "1.2.0"
@@ -249,16 +276,21 @@ androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version = "2.8.7" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 junit = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 [bundles]
-# Artifacts that are always added together and always upgraded together.
-ktor-client = ["ktor-client-core", "ktor-client-content-negotiation"]
+# Artifacts that are always added together and always upgraded together: the client, an engine,
+# and the serializer it negotiates content with. One of them alone does not make a working client.
+ktor-client = ["ktor-client-core", "ktor-client-okhttp", "ktor-client-content-negotiation", "ktor-serialization-json"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -282,11 +314,7 @@ Five files, one per archetype. What each one is *missing* is the design.
 
 ```kotlin
 // :app/build.gradle.kts — the only module that names every other module
-plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
-    id("kotlin-platform.android.feature")
-}
+plugins { id("kotlin-platform.android.application") }
 
 android {
     namespace = "com.example.orders"
@@ -297,29 +325,32 @@ dependencies {
     implementation(project(":feature:orders"))
     implementation(project(":data:orders"))       // bound to the domain interfaces here, nowhere else
     implementation(project(":core:designsystem"))
-    implementation(project(":core:common"))
+    implementation(project(":core:model"))
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.material3)
 }
 ```
 
 ```kotlin
-// :feature:orders/build.gradle.kts — the absent line is project(":feature:cart")
+// :feature:orders/build.gradle.kts — the absent lines are project(":feature:cart") and
+// project(":data:orders"): the repository interface lives in :core:model and :app binds it.
 plugins { id("kotlin-platform.android.feature") }
 
 android { namespace = "com.example.feature.orders" }
 
 dependencies {
     implementation(project(":core:designsystem"))
-    implementation(project(":core:common"))
+    implementation(project(":core:model"))
     implementation(project(":api:orders"))
 }
 ```
 
 ```kotlin
-// :core:common/build.gradle.kts — no project(...) line exists, and that is the archetype
+// :core:model/build.gradle.kts — no project(...) line exists, and that is the archetype
 plugins { id("kotlin-platform.jvm.library") }
 
 dependencies {
-    api(libs.kotlinx.coroutines.core)   // CoroutineDispatcher appears in this module's own signatures
+    api(libs.kotlinx.datetime)   // Instant appears in this module's own signatures
 }
 ```
 
@@ -335,7 +366,7 @@ android { namespace = "com.example.data.orders" }
 
 dependencies {
     api(project(":api:orders"))         // this module hands back the contract's types
-    implementation(project(":core:common"))
+    implementation(project(":core:model"))
     implementation(libs.bundles.ktor.client)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
@@ -348,15 +379,26 @@ plugins {
     id("kotlin-platform.jvm.library")
     alias(libs.plugins.kotlin.serialization)
 }
+
+dependencies {
+    // The plugin generates serializers; this is the runtime they call. @Serializable is on the
+    // DTOs here, so the annotation and the format are part of the contract.
+    implementation(libs.kotlinx.serialization.json)
+}
 ```
 
-1. `:app` applies the feature convention on top of the application plugin because it draws the host
-   screen too; a pure shell app applies only the application plugin and the Kotlin one.
+1. `:app` gets its own convention rather than the feature one: `com.android.application` and
+   `com.android.library` cannot both be applied to a project, and the feature convention configures a
+   `LibraryExtension`, which an application project does not have. The two Android conventions share
+   `configureAndroid`; what differs is the extension type and the two application-only settings.
 2. `:data:orders` holds the build's one `api(project(...))`, for the stated reason: its repository
    returns `:api:orders` types. Everything else is `implementation` — the check is deleting the
    keyword and seeing what breaks.
-3. `:api:orders` declares no dependencies at all. The first one it needs is the question of whether
-   an implementation has moved in.
+3. `:api:orders` names no other module of this build. External artifacts it does have — a
+   serialization runtime is part of the contract — but the first `project(...)` line it wants is the
+   question of whether an implementation has moved in.
+4. `:feature:orders` has no `:data:orders` line even though the archetype table allows one. On a
+   Clean layout it never does: the interface is in `:core:model` and `:app` binds the implementation.
 
 ## Enforcing the Graph
 
@@ -369,7 +411,7 @@ private val CHECKED = setOf("api", "implementation", "compileOnly")
 
 private val ALLOWED = mapOf(   // keyed by first path segment: :feature:orders -> "feature"
     "app" to setOf("feature", "core", "data", "api"),
-    "feature" to setOf("core", "data", "api"),
+    "feature" to setOf("core", "data", "api"),   // "data" allowed, unused on a Clean layout
     "data" to setOf("core", "api"),
     "core" to emptySet(),
     "api" to emptySet(),
@@ -462,8 +504,9 @@ includeBuild("../shared-lib") {
    already declares `group = "com.example"` and its root project is named `shared`, `includeBuild`
    alone substitutes it.
 2. Module files do not change: they keep `implementation(libs.shared)` and resolve to the checkout.
-   Verify with `./gradlew :data:orders:dependencyInsight --dependency com.example:shared`, which
-   prints the substitution and the project it resolved to.
+   Verify with
+   `./gradlew :data:orders:dependencyInsight --configuration debugRuntimeClasspath --dependency com.example:shared`
+   — an Android module has one classpath per variant, so the task needs to be told which one.
 3. CI builds against the published artifact, always: a composite that is the only way the code
    compiles is a merge nobody else can reproduce. Each included build is a full Gradle build with its
    own configuration phase, so past two or three, publishing to a local repository is faster.
@@ -471,30 +514,32 @@ includeBuild("../shared-lib") {
 ## Test Fixtures
 
 ```kotlin
-// :core:common/build.gradle.kts
+// :core:model/build.gradle.kts
 plugins {
     id("kotlin-platform.jvm.library")
     `java-test-fixtures`
 }
 
 dependencies {
-    api(libs.kotlinx.coroutines.core)
-    testFixturesImplementation(libs.kotlinx.coroutines.test)
+    api(libs.kotlinx.datetime)
 }
 ```
 
 ```kotlin
-// :core:common src/testFixtures/kotlin/com/example/common/TestDispatchers.kt
+// :core:model src/testFixtures/kotlin/com/example/model/OrderFixtures.kt
 // Compiled into its own variant: on a consumer's test classpath, never in the production artifact.
-class TestDispatchers(scheduler: TestCoroutineScheduler) : AppDispatchers {
-    override val io = StandardTestDispatcher(scheduler)
-    override val default = StandardTestDispatcher(scheduler)
-}
+fun order(
+    id: OrderId = OrderId("o-1"),
+    placedAt: Instant = Instant.parse("2026-01-01T00:00:00Z"),
+    lines: List<OrderLine> = listOf(orderLine()),
+) = Order(id, placedAt, lines)
 ```
 
-1. The consumer side is one line: `testImplementation(testFixtures(project(":core:common")))`. An
+1. The consumer side is one line: `testImplementation(testFixtures(project(":core:model")))`. An
    Android library enables the same source set with `android { testFixtures { enable = true } }`
    instead of the `java-test-fixtures` plugin; that consumer line is identical.
-2. Fixtures belong to the module that owns the types they fake; a `:core:testing` module is right only
+2. The fixtures source set already sees the module's own `api` dependencies; anything it needs on top
+   goes in `testFixturesImplementation`, which reaches no production classpath.
+3. Fixtures belong to the module that owns the types they fake; a `:core:testing` module is right only
    for helpers no single module owns. The alternative is three copies in three `src/test/` trees, and
    the one you fixed is never the one the failing test used.

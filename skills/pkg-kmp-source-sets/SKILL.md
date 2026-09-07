@@ -45,7 +45,7 @@ declared — you get the intermediate source sets for free and write none of the
 commonMain
 ├── jvmMain
 ├── androidMain
-├── jsMain / wasmJsMain          (grouped under webMain)
+├── jsMain / wasmJsMain          (under webMain since Kotlin 2.2.20)
 └── nativeMain
     └── appleMain
         └── iosMain
@@ -56,7 +56,9 @@ commonMain
 
 1. **Only the sets your targets need exist.** Declare `jvm()` and two iOS targets and you get
    `commonMain`, `jvmMain`, `nativeMain`, `appleMain`, `iosMain` and the two leaves — no `jsMain`, no
-   `macosMain`. Every `*Main` has a `*Test` twin with the same shape.
+   `macosMain`. Every `*Main` has a `*Test` twin with the same shape. The `webMain` group over the two
+   web targets is new in Kotlin 2.2.20; before that `jsMain` and `wasmJsMain` share nothing by
+   default.
 2. **`applyDefaultHierarchyTemplate()` is called for you.** Writing it by hand changes nothing; it is
    only worth writing when you are extending it (next section).
 3. **A file goes in the highest source set that can hold it.** A rule shared by every target is
@@ -76,6 +78,7 @@ An intermediate source set is code shared by *some* targets. The template alread
 useful native ones; the group worth adding by hand is JVM plus Android:
 
 ```kotlin
+@OptIn(ExperimentalKotlinGradlePluginApi::class)   // the hierarchy DSL is still experimental
 kotlin {
     jvm()
     androidTarget()
