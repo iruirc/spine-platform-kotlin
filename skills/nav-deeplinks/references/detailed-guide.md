@@ -2,8 +2,8 @@
 
 One app — `com.example.app`, hosting `https://example.com`, opening an order detail and a search
 screen — wired end to end. Every section is self-contained; load the one you need, not the file. The
-`Route` hierarchy is `nav-multiplatform`'s and `nav-compose` registers it; it is repeated in `The
-Parser` only because the parser's return type is the point.
+`Route` hierarchy and the `PendingRoute` holder are printed once, in this skill's `SKILL.md`, and
+referred to from here rather than copied — two copies of a type is two places to change it.
 
 ## App Links Setup
 
@@ -76,6 +76,9 @@ The file, served at `https://example.com/.well-known/assetlinks.json`:
 
 ## Verification On Device
 
+Every `pm` subcommand below is API 31+: the per-domain verification state does not exist before
+Android 12, and on an older device tapping the link is the only check there is.
+
 ```bash
 adb shell pm get-app-links com.example.app
 ```
@@ -116,16 +119,10 @@ well-formed, because this is where an ill-formed one became `null`.
 
 ```kotlin
 // commonMain/kotlin/com/example/app/deeplink/DeepLinkParser.kt
+// Route is the sealed hierarchy in SKILL.md's Core Shape
 package com.example.app.deeplink
 
 import io.ktor.http.Url
-
-@Serializable
-sealed interface Route {
-    @Serializable data object Home : Route
-    @Serializable data class OrderDetail(val id: String) : Route
-    @Serializable data class Search(val query: String? = null) : Route
-}
 
 object DeepLinkParser {
 
@@ -162,15 +159,18 @@ object DeepLinkParser {
 2. **`http` is not `https`**, and the `when` rejects it because the intent filter never declared it.
 3. **Every id is shape-checked and every free-text field is bounded.** `orderId` is what stops a
    traversal segment and a 4 MB id from reaching a repository; `take(MAX_QUERY)` does the same for
-   input that has no shape at all. `Route.Home` for the bare host keeps `https://example.com/` from
-   falling through to `null` and looking broken.
+   input that has no shape at all. `Route.Home` for the bare host is reachable only through the
+   custom scheme or `am start` — the filter's `pathPrefix` list never delivers the apex — but the
+   branch costs one line and keeps a hand-built URL from looking broken.
 
 **Without Ktor on the classpath**, on a JVM-only target, `java.net.URI` does the same job with more
-hand-work: `url.path.orEmpty().split('/')` for the segments, and a hand-written
-`split('&')` / `split('=')` / `URLDecoder.decode(…, UTF_8)` loop for the query, because `URI` hands
-back one raw string. That loop is the argument for the Ktor form wherever the project already has it
-(`net-http-clients`) — percent-encoding and repeated keys are where hand-written parsing goes wrong,
-and it goes wrong on the untrusted input path.
+hand-work and one trap of its own: split `url.rawPath`, not `url.path`, and run
+`URLDecoder.decode(…, UTF_8)` over each segment **after** the split — `path` is already decoded, so
+an encoded `%2F` inside a segment has become a separator by the time you see it, which is the trap
+`The Parser Test` keeps a row against. The query is the same story from `rawQuery`: split on `&`,
+then on `=`, then decode each half. That hand-work is the argument for the Ktor form wherever the
+project already has it (`net-http-clients`) — percent-encoding and repeated keys are where
+hand-written parsing goes wrong, and it goes wrong on the untrusted input path.
 
 The Android edge is the only Android-typed line in the feature:
 `fun Intent.deepLinkUrl(): String? = takeIf { it.action == Intent.ACTION_VIEW }?.data?.toString()`.
@@ -340,10 +340,10 @@ fun orderReadyNotification(context: Context, orderId: String): Notification =
         .build()
 ```
 
-1. **`FLAG_IMMUTABLE` or `FLAG_MUTABLE` is mandatory from Android 12.** Neither one and the
-   constructor throws — at the notification site, which is nowhere near the link handling, so the
-   stack trace blames the wrong feature. Immutable unless something genuinely fills the intent in
-   later (a direct-reply action).
+1. **`FLAG_IMMUTABLE` or `FLAG_MUTABLE` is required of an app targeting API 31 or later.** Neither
+   one and the constructor throws — at the notification site, which is nowhere near the link
+   handling, so the stack trace blames the wrong feature. Immutable unless something genuinely fills
+   the intent in later (a direct-reply action).
 2. **`setPackage(packageName)` targets your own app** regardless of verification state, so an
    in-app notification never opens a chooser and never depends on the hosted file.
 3. **Give each target its own request code.** Two `PendingIntent`s are the same object when their
@@ -370,8 +370,9 @@ A static shortcut in `res/xml/shortcuts.xml`, referenced from the launcher Activ
 ```
 
 A dynamic one is the same `Intent` handed to `ShortcutInfoCompat.Builder(context, "order-$id")
-.setIntent(linkIntent(context, url))` and pushed with `ShortcutManagerCompat.pushDynamicShortcut`;
-the builder throws if the `Intent` carries no action, and the action is `VIEW` for the same reason as
+.setShortLabel(title).setIntent(linkIntent(context, url))` and pushed with
+`ShortcutManagerCompat.pushDynamicShortcut`; the builder throws if the `Intent` carries no action
+and again if `setShortLabel` was never called, and the action is `VIEW` for the same reason as
 everywhere else. A widget wraps the identical `PendingIntent` once more —
 `RemoteViews(context.packageName, R.layout.widget_orders).setOnClickPendingIntent(R.id.widget_root, …)`
 — and with Glance it goes to `actionStartActivity(...)` instead. Nothing about the URL, the flags or
@@ -382,16 +383,12 @@ the parser changes on any of the three.
 Links do not wait for the app: one may land before the graph exists, before the app knows who is
 signed in, or halfway through onboarding. One holder, one gate, one replay.
 
+`PendingRoute` is the holder printed in `SKILL.md`, plus a `drop()` that clears the slot without
+replaying it. It lives in `commonMain` because `lifecycle-viewmodel-savedstate` went multiplatform
+in Lifecycle **2.9.0** — not 2.8, which shipped the multiplatform `lifecycle-viewmodel` and
+`lifecycle-runtime-compose` and left saved state on Android. The gate beside it:
+
 ```kotlin
-// commonMain — SavedStateHandle is multiplatform since Lifecycle 2.8
-class PendingRoute(private val handle: SavedStateHandle) {
-    fun hold(route: Route) { handle[KEY] = Json.encodeToString(route) }
-    fun consume(): Route? = handle.remove<String>(KEY)?.let { Json.decodeFromString<Route>(it) }
-    fun drop() { handle.remove<String>(KEY) }
-
-    private companion object { const val KEY = "pending_route" }
-}
-
 fun interface DeepLinkGate { fun allows(route: Route): Boolean }
 
 class SessionGate(
@@ -447,7 +444,7 @@ the whole subject is packaging — `release-ops` owns the distribution this ride
 | Option | What it actually does |
 |---|---|
 | `--file-associations <file>` | registers *file types* — a different registry from URL schemes on all three systems, and no help here |
-| `--resource-dir <dir>` | overrides the templates jpackage generates: `Info.plist` on macOS, the WiX `main.wxs` on Windows, the `.desktop` file on Linux. **This is the hook the scheme goes through** |
+| `--resource-dir <dir>` | overrides jpackage's own templates — `Info.plist`, the WiX `main.wxs`, the `.desktop` file. **The Compose Gradle plugin sets this option itself and exposes no DSL key for it**, so a Compose Desktop build cannot take that route at all |
 | `--mac-package-identifier`, `--mac-sign`, `--win-menu`, `--win-per-user-install`, `--linux-shortcut`, `--linux-menu-group`, … | identity, signing, menu entries, install scope. `--linux-shortcut` does emit a `.desktop` file — without a `MimeType` line |
 
 **macOS — `CFBundleURLTypes` in `Info.plist`.** The Compose Desktop Gradle plugin writes it without
@@ -473,33 +470,41 @@ installed, not run out of a build directory.
 
 **Windows — a registry key.** `HKEY_CLASSES_ROOT\myapp` (or `HKCU\Software\Classes\myapp` per user)
 with an empty-valued `URL Protocol` entry and
-`shell\open\command` = `"C:\Program Files\ExampleApp\ExampleApp.exe" "%1"`. The Gradle DSL has no key
-for it: a WiX fragment through an overridden `main.wxs`, a write on first run, or a packager that
-declares schemes directly.
+`shell\open\command` = `"C:\Program Files\ExampleApp\ExampleApp.exe" "%1"`. Nothing reachable from
+the Gradle DSL writes it, so there are two workable routes: the app writes the key under `HKCU` on
+first run (per user, no elevation), or the build uses a packager other than jpackage that declares
+schemes itself. `release-ops` picks between them.
 
-**Linux — a `.desktop` file** with `MimeType=x-scheme-handler/myapp;` and `Exec=exampleapp %u`,
-installed under `/usr/share/applications` by the package, then `update-desktop-database`. The
-`MimeType` line comes from the overridden template.
+**Linux — a `.desktop` file** with `MimeType=x-scheme-handler/myapp;` and `Exec=exampleapp %u`. Same
+constraint and the same two routes: write it to `~/.local/share/applications/` on first run and call
+`update-desktop-database` on that directory, or let another packager emit it. The file
+`--linux-shortcut` produces carries no `MimeType` line and there is no reachable template to add one
+to.
 
-Receiving the URL is not symmetric either:
+Receiving the URL is not symmetric either, and the registration has to happen before the UI does:
 
 ```kotlin
-fun main(args: Array<String>) = application {
-    val router = remember { DeepLinkRouter(/* … */) }
-    LaunchedEffect(Unit) {
-        args.firstOrNull()?.let(router::handle)             // Windows, Linux: cold start argument
-        val desktop = Desktop.getDesktop()                  // macOS: a second open passes no args
-        if (desktop.isSupported(Desktop.Action.APP_OPEN_URI)) {
-            desktop.setOpenURIHandler { router.handle(it.uri.toString()) }
-        }
+fun main(args: Array<String>) {
+    val router = DeepLinkRouter(/* … */)
+    // macOS: register before application { }. A handler installed from a composition effect is
+    // too late — the launch-time OpenURIEvent has already been delivered and dropped.
+    val desktop = Desktop.getDesktop()
+    if (desktop.isSupported(Desktop.Action.APP_OPEN_URI)) {
+        desktop.setOpenURIHandler { router.handle(it.uri.toString()) }
     }
-    Window(onCloseRequest = ::exitApplication) { App() }
+    args.firstOrNull()?.let(router::handle)   // Windows and Linux only: macOS passes no arguments
+    application { Window(onCloseRequest = ::exitApplication) { App() } }
 }
 ```
 
-On Windows and Linux a link opens a **new process**: without a single-instance guard — a lock file
-in the user data directory plus a local socket forwarding the URL to the running instance — the user
-gets a second window instead of a navigation. macOS does this for you, through the handler above.
+Even registered this early, **launch-time delivery on macOS is unreliable** — the JDK bug for it,
+JDK-8198549, is still open — so the app has to tolerate losing the very first link and opening at
+its start destination instead. A link arriving at an already-running app comes through the handler
+dependably; `args` is no fallback, because macOS passes none.
+
+On Windows and Linux the link instead opens a **new process** with the URL in `args`: without a
+single-instance guard — a lock file in the user data directory plus a local socket forwarding the
+URL to the running instance — the user gets a second window instead of a navigation.
 
 ## Testing With adb
 

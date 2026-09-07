@@ -301,7 +301,7 @@ A destination declares the URL it answers to; `nav-deeplinks` owns everything up
 
 ```kotlin
 composable<OrderDetail>(
-    deepLinks = listOf(navDeepLink<OrderDetail>(basePath = "https://example.com/order")),
+    deepLinks = listOf(navDeepLink<OrderDetail>(basePath = "https://example.com/orders")),
 ) { /* … */ }
 ```
 

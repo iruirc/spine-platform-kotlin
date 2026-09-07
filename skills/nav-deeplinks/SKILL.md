@@ -73,10 +73,10 @@ Navigator.navigate(route)  /  NavController inside the Route composable
 nav-multiplatform · nav-compose
 ```
 
-The `Route` is the one from the graph, not a second vocabulary:
+The `Route` is the one from the graph — `nav-multiplatform`'s hierarchy in `commonMain`, and the
+same types `nav-compose` registers:
 
 ```kotlin
-// commonMain — nav-multiplatform's hierarchy; nav-compose registers these same types
 @Serializable
 sealed interface Route {
     @Serializable data object Home : Route
@@ -86,10 +86,16 @@ sealed interface Route {
 
 object DeepLinkParser {
     fun parse(url: String): Route? {
-        val u = runCatching { Url(url) }.getOrNull() ?: return null   // io.ktor.http.Url
-        if (u.protocol.name == "https" && u.host != "example.com") return null
+        val u = runCatching { Url(url) }.getOrNull() ?: return null  // io.ktor.http.Url
+        val ours = when (u.protocol.name) {          // scheme and host together, never one alone
+            "https" -> u.host in setOf("example.com", "www.example.com")
+            "myapp" -> u.host == "app"
+            else -> false
+        }
+        if (!ours) return null
         val path = u.segments.filter(String::isNotEmpty)
         return when {
+            path.isEmpty() -> Route.Home
             path.size == 2 && path[0] == "orders" && path[1].isOrderId() -> Route.OrderDetail(path[1])
             path.size == 1 && path[0] == "search" -> Route.Search(u.parameters["q"])
             else -> null
@@ -161,7 +167,7 @@ Every row ends at the same `DeepLinkParser.parse` call.
 | Cold start from a link | `Activity.intent.data` read in `onCreate` | the same intent is re-delivered to the recreated Activity, so consume it once |
 | Warm start, app already running | `onNewIntent(intent)` | fires only under `launchMode="singleTop"` or `singleTask`; call `setIntent(intent)` so later reads are not the stale one |
 | Navigation Compose's own matching | `navDeepLink<T>(basePath = …)` on the destination (`nav-compose`) | it matches the URL and synthesises the back stack for you |
-| Notification tap | `PendingIntent` wrapping a `VIEW` intent | `FLAG_IMMUTABLE` is mandatory since Android 12 |
+| Notification tap | `PendingIntent` wrapping a `VIEW` intent | `FLAG_IMMUTABLE` **or** `FLAG_MUTABLE` is required of an app targeting API 31+ |
 | App Shortcut | `res/xml/shortcuts.xml`, or `ShortcutManagerCompat` for a dynamic one | each `<intent>` is a `VIEW` action over the app's own URL |
 | App widget | `RemoteViews.setOnClickPendingIntent` | same `PendingIntent` shape, same flags |
 
@@ -223,9 +229,9 @@ adb shell pm get-app-links com.example.app
 3. **`adb ... -d <url> <package>` proves parsing; the same command without the package proves
    verification.** Naming the package bypasses the chooser, so a filter that was never verified
    passes the first command and fails the second — which is the failure users report.
-4. **`pm get-app-links` is the only honest verification check.** It prints a state per host, and
-   anything other than `verified` means the link opens a browser on a clean device. Re-run it after
-   `adb shell pm verify-app-links --re-verify com.example.app`.
+4. **`pm get-app-links` is the only honest verification check** (API 31+). It prints a state per
+   host, and anything other than `verified` means the link opens a browser on a clean device.
+   Re-run it after `adb shell pm verify-app-links --re-verify com.example.app`.
 5. **The graph half is `nav-compose`'s** — `TestNavHostController`, `hasRoute<T>()`. Test that the
    parsed `Route` reaches the destination there, once per feature, not once per URL.
 6. **A `PendingIntent` is opaque to a test.** Build the `Intent` in a named function, assert on that
@@ -252,9 +258,9 @@ adb shell pm get-app-links com.example.app
    fresh Activity instance on top of the old one, and back goes through a museum of them. The mirror
    image is an `onNewIntent` that reads `getIntent()` instead of its parameter and routes to the
    link before last.
-5. **A `PendingIntent` without `FLAG_IMMUTABLE`.** It throws on Android 12 and above, and it throws
-   where the notification is built rather than where the link is handled, so the stack trace points
-   at the wrong skill.
+5. **A `PendingIntent` with neither `FLAG_IMMUTABLE` nor `FLAG_MUTABLE`.** An app targeting API 31
+   or later throws, and it throws where the notification is built rather than where the link is
+   handled, so the stack trace blames the wrong feature.
 6. **Re-navigating on every configuration change.** The launch intent is re-delivered to the
    recreated Activity, so a rotation on a deep-linked screen pushes a second copy of it. The intent
    has to be consumed once and marked as consumed in saved state.
