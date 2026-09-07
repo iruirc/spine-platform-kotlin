@@ -25,3 +25,5 @@ setup() {
 @test "persistence-migrations: shape" { assert_skill_shape "$ROOT/skills/persistence-migrations"; }
 @test "di-composition-root: shape" { assert_skill_shape "$ROOT/skills/di-composition-root"; }
 @test "di-hilt: shape" { assert_skill_shape "$ROOT/skills/di-hilt"; }
+@test "di-koin: shape" { assert_skill_shape "$ROOT/skills/di-koin"; }
+@test "di-spring: shape" { assert_skill_shape "$ROOT/skills/di-spring"; }
