@@ -157,6 +157,7 @@ The shared code names destinations and asks to move. It never learns which libra
 sealed interface Route {
     @Serializable data object Home : Route
     @Serializable data class OrderDetail(val id: String) : Route
+    @Serializable data class Search(val query: String? = null) : Route
 }
 
 interface Navigator {

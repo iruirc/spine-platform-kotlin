@@ -65,16 +65,20 @@ Compose, naming the Navigation 3 counterpart wherever the shapes differ.
 A destination is a `@Serializable` type. No route in this file is a string.
 
 ```kotlin
-@Serializable data object OrderList
-@Serializable data class OrderDetail(val id: String)
-@Serializable data class Search(val query: String? = null)
+// in the module every feature depends on: a sealed family is extended only where it is declared
+@Serializable
+sealed interface Route {
+    @Serializable data object Home : Route
+    @Serializable data class OrderDetail(val id: String) : Route
+    @Serializable data class Search(val query: String? = null) : Route
+}
 
-NavHost(navController, startDestination = OrderList) {
-    composable<OrderList> {
-        OrderListRoute(onOpenOrder = { id -> navController.navigate(OrderDetail(id)) })
+NavHost(navController, startDestination = Route.Home) {
+    composable<Route.Home> {
+        HomeRoute(onOpenOrder = { id -> navController.navigate(Route.OrderDetail(id)) })
     }
-    composable<OrderDetail> { backStackEntry ->
-        val args = backStackEntry.toRoute<OrderDetail>()
+    composable<Route.OrderDetail> { backStackEntry ->
+        val args = backStackEntry.toRoute<Route.OrderDetail>()
         OrderDetailRoute(id = args.id, onBack = { navController.popBackStack() })
     }
 }
@@ -92,22 +96,20 @@ NavHost(navController, startDestination = OrderList) {
    Nullability alone does not do it: `Search(val query: String? = null)` is optional for the `=`.
 5. **A custom type in a route needs its own `NavType`**, passed per destination through
    `composable<T>(typeMap = ...)` — and wanting one is usually rule 3 being violated.
-6. **The ViewModel reads its own arguments** with `savedStateHandle.toRoute<OrderDetail>()` — not a
+6. **The ViewModel reads its own arguments** with `savedStateHandle.toRoute<Route.OrderDetail>()` — not a
    string key, and not a `NavController` it should not have.
 
 The same two screens under Navigation 3, where keys are `NavKey` and the stack is yours:
 
 ```kotlin
-@Serializable data object OrderList : NavKey
-@Serializable data class OrderDetail(val id: String) : NavKey
-
-val backStack = rememberNavBackStack(OrderList)
+// the same family, with `NavKey` on the interface: `sealed interface Route : NavKey`
+val backStack = rememberNavBackStack(Route.Home)
 NavDisplay(
     backStack = backStack,
     onBack = { backStack.removeLastOrNull() },
     entryProvider = entryProvider {
-        entry<OrderList> { OrderListRoute(onOpenOrder = { backStack.add(OrderDetail(it)) }) }
-        entry<OrderDetail> { key -> OrderDetailRoute(id = key.id, onBack = { backStack.removeLastOrNull() }) }
+        entry<Route.Home> { HomeRoute(onOpenOrder = { backStack.add(Route.OrderDetail(it)) }) }
+        entry<Route.OrderDetail> { key -> OrderDetailRoute(id = key.id, onBack = { backStack.removeLastOrNull() }) }
     },
 )
 ```
@@ -122,15 +124,15 @@ NavDisplay(
 
 // in the orders feature module
 fun NavGraphBuilder.ordersGraph(navController: NavHostController, onOpenInvoice: (String) -> Unit) {
-    navigation<OrdersGraph>(startDestination = OrderList) {
-        composable<OrderList> { OrderListRoute(onOpenOrder = { navController.navigate(OrderDetail(it)) }) }
-        composable<OrderDetail> { OrderDetailRoute(onOpenInvoice = onOpenInvoice) }
+    navigation<OrdersGraph>(startDestination = Route.Home) {
+        composable<Route.Home> { HomeRoute(onOpenOrder = { navController.navigate(Route.OrderDetail(it)) }) }
+        composable<Route.OrderDetail> { OrderDetailRoute(onOpenInvoice = onOpenInvoice) }
     }
 }
 
 // in the app module
 NavHost(navController, startDestination = OrdersGraph) {
-    ordersGraph(navController, onOpenInvoice = { navController.navigate(Invoice(it)) })
+    ordersGraph(navController, onOpenInvoice = { navController.navigate(Route.Invoice(it)) })
 }
 ```
 
@@ -160,7 +162,7 @@ private const val PickedCurrency = "picked_currency"
 navController.previousBackStackEntry?.savedStateHandle?.set(PickedCurrency, code)
 navController.popBackStack()
 
-// in the Route of the screen that asked — `composable<Checkout> { entry -> CheckoutRoute(entry, …) }`
+// in the Route of the screen that asked — `composable<Route.Checkout> { entry -> CheckoutRoute(entry, …) }`
 @Composable
 fun CheckoutRoute(
     entry: NavBackStackEntry,
@@ -180,7 +182,7 @@ fun CheckoutRoute(
 share one ViewModel whose store owner is the graph entry, so it dies when the flow is popped:
 
 ```kotlin
-composable<OrderDetail> { entry ->
+composable<Route.OrderDetail> { entry ->
     val parentEntry = remember(entry) { navController.getBackStackEntry<OrdersGraph>() }
     val draft: OrderDraftViewModel = hiltViewModel(parentEntry)
     // with Koin: koinViewModel<OrderDraftViewModel>(viewModelStoreOwner = parentEntry)
@@ -266,10 +268,10 @@ BackHandler(enabled = state.hasUnsavedChanges) { // Android; Desktop draws its o
 Three composables per destination, and each one knows strictly less than the one above it:
 
 ```kotlin
-composable<OrderDetail> {
+composable<Route.OrderDetail> {
     OrderDetailRoute(
         onBack = { navController.popBackStack() },
-        onOpenInvoice = { id -> navController.navigate(Invoice(id)) },
+        onOpenInvoice = { id -> navController.navigate(Route.Invoice(id)) },
     )
 }
 
@@ -300,8 +302,8 @@ fun OrderDetailRoute(
 A destination declares the URL it answers to; `nav-deeplinks` owns everything upstream of that.
 
 ```kotlin
-composable<OrderDetail>(
-    deepLinks = listOf(navDeepLink<OrderDetail>(basePath = "https://example.com/orders")),
+composable<Route.OrderDetail>(
+    deepLinks = listOf(navDeepLink<Route.OrderDetail>(basePath = "https://example.com/orders")),
 ) { /* … */ }
 ```
 
@@ -318,7 +320,7 @@ fun openingAnOrderNavigatesToDetail() {
     }
     composeRule.onNodeWithText("Order 42").performClick()
 
-    assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<OrderDetail>() == true)
+    assertTrue(navController.currentBackStackEntry?.destination?.hasRoute<Route.OrderDetail>() == true)
 }
 ```
 
@@ -353,4 +355,4 @@ fun openingAnOrderNavigatesToDetail() {
    user on a spinner. A splash is a state of the first screen, or the system splash screen API.
 7. **An argument read by string key** — `savedStateHandle["id"]` beside a type-safe route. Nothing
    checks the key, so a rename makes it `null` and the screen renders an empty state instead of
-   failing. `savedStateHandle.toRoute<OrderDetail>()` is the same line, typed.
+   failing. `savedStateHandle.toRoute<Route.OrderDetail>()` is the same line, typed.
