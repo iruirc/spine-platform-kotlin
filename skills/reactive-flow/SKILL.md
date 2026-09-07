@@ -12,9 +12,9 @@ at what is being collected and how it is shared.
 
 > **Related skills:**
 > - `concurrency-coroutines` — the scope that owns a collection, `repeatOnLifecycle`, cancellation discipline
-> - `arch-mvvm` — the ViewModel's `stateIn(viewModelScope, WhileSubscribed(5_000), initial)`, and the one-shot-effects decision
+> - `arch-mvvm` — the ViewModel's `stateIn(viewModelScope, WhileSubscribed(5_000), initial)`, `collectAsStateWithLifecycle()`, and the one-shot-effects decision
 > - `arch-mvi` — the single `State` a reducer folds into, and the effect stream beside it
-> - `compose-state` — `collectAsStateWithLifecycle()` on the collector side, `snapshotFlow { }` on the way back
+> - `compose-state` — `snapshotFlow { }` and `produceState`, the two crossings between Compose state and a `Flow`
 > - `persistence-architecture` — the database `Flow` this skill shares, and the one-per-query rule over it
 > - `net-architecture` — a polled or streamed endpoint exposed as a `Flow`, and where it is shared
 > - `error-architecture` — what a `catch { }` on a flow hands the layer above it
@@ -55,17 +55,25 @@ Not for which scope collects, what cancels it, or which dispatcher a layer runs 
 4. **Choose by what the *collector* needs on arrival.** The latest value immediately → `StateFlow`.
    Everything that happens while it is present, and nothing from before → `SharedFlow(replay = 0)`.
    Its own run of the upstream → a cold `Flow`.
-5. **The mutable one never leaves the class.** `private val _state = MutableStateFlow(...)` plus
+5. **"Every collector sees every emission" assumes the default `onBufferOverflow = SUSPEND`.** A
+   `MutableSharedFlow(replay = 0)` has no buffer at all: `emit` suspends until every current
+   collector has taken the value, and `tryEmit` returns `false` rather than buffer it. That is why
+   `extraBufferCapacity = 1` appears wherever a non-suspending caller uses `tryEmit`, and why
+   `onBufferOverflow = DROP_OLDEST` is the opt-out for a producer allowed to outrun a slow collector.
+6. **The mutable one never leaves the class.** `private val _state = MutableStateFlow(...)` plus
    `val state = _state.asStateFlow()`; the same for `asSharedFlow()`. An exposed `MutableStateFlow`
    is a public setter with extra steps.
-6. **A one-shot effect stream is not a third answer to this question.** `Channel` versus
+7. **A one-shot effect stream is not a third answer to this question.** `Channel` versus
    `SharedFlow(replay = 0, extraBufferCapacity = 1)` is decided by `arch-mvvm`'s effects table, on
    delivery guarantees rather than on hot-versus-cold, and that decision is not redone here.
 
 ## stateIn and shareIn
 
 ```kotlin
-class OrdersViewModel(repository: OrderRepository) : ViewModel() {
+class OrdersViewModel(
+    repository: OrderRepository,
+    customerId: CustomerId,
+) : ViewModel() {
     val state: StateFlow<OrdersUiState> = repository.observe(customerId)
         .map(::toUiState)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), OrdersUiState())
@@ -92,9 +100,10 @@ expires, and the upstream stops with it. `Eagerly` and `Lazily` both keep it run
    establish, a prefetch — and only on a scope that actually ends.
 3. **`Lazily` when the first collection should also be the last start**: expensive once, cheap
    forever, and the scope is narrower than the process.
-4. **`stateIn` needs an initial value.** The overload without one is a `suspend fun` that waits for
-   the upstream's first emission, so calling it from `init` leaves the screen with nothing to render
-   until then. Give the state a `Loading` case instead (`arch-mvvm`).
+4. **`stateIn` needs an initial value.** The overload without one is a `suspend fun`, so it cannot
+   be called from `init` at all — only from a `viewModelScope.launch` in `init`, where it waits for
+   the upstream's first emission and the screen has nothing to render until then. Give the state a
+   `Loading` case instead (`arch-mvvm`).
 5. **`replayExpirationMillis = 0` when a stale value must not come back.** `WhileSubscribed` keeps
    its cached value forever by default; passing `0` drops it when the upstream stops, so the next
    collector sees the initial value rather than yesterday's balance.
@@ -140,8 +149,10 @@ events actually wants.
 4. **`combine` for independent sources, `zip` for paired ones.** Two flows that update on their own
    schedules are `combine`; needing `zip` on a UI stream usually means the two values came from one
    source and should never have been split.
-5. **`conflate` and `buffer` decide what is dropped, not how fast anything runs.** Neither adds
-   parallelism; they only say what happens to values a busy collector has not reached yet.
+5. **`conflate` drops, `buffer` decouples.** `conflate` keeps only the latest value while the
+   collector is busy; `buffer(n)` keeps up to `n` of them and runs the emitter in its own coroutine,
+   so a slow producer and a slow collector overlap instead of taking turns. That concurrency is
+   between the two ends of the chain and nowhere else — neither operator makes a slow `map` faster.
 
 ## RxJava to Flow
 
@@ -232,12 +243,14 @@ fun handle(request: Request): Mono<Response> = mono { service.handle(request) }
 3. **Pick the `await` by cardinality, not by habit.** `awaitSingle()` throws
    `NoSuchElementException` on an empty `Mono`; `awaitSingleOrNull()` returns `null`, which is what
    a "find by id" wants; `awaitFirstOrNull()` takes the head of a multi-element stream.
-4. **Context propagation is not automatic everywhere.** `mono { }` and `flux { }` read the
-   subscriber's Reactor `Context` into the coroutine context as a `ReactorContext` element, and
-   `asFlux()` carries a `ReactorContext` from the coroutine context back out. Anything riding in
-   that context — reactive security, tracing, an MDC bridge — survives those three conversions and
-   nothing else, so a `Flux` consumed by a plain `awaitSingle()` inside a coroutine started
-   elsewhere loses it.
+4. **Reactor's `Context` travels inward, into the coroutine.** `mono { }`, `flux { }` and
+   `asFlux()` all read the Reactor `Context` of the subscriber that subscribed to them and install
+   it as a `ReactorContext` element in the coroutine context — `asFlux()` by a `flowOn` — so a
+   suspending body can read reactive security, tracing or an MDC bridge out of
+   `currentCoroutineContext()[ReactorContext]`. Outward, `kotlinx-coroutines-reactor` registers a
+   context injector: with it on the classpath, `awaitSingle()` and its neighbours write the
+   coroutine's `ReactorContext` into the `Mono` or `Flux` they await, so a `Mono` called from a
+   `mono { }` block keeps the context that block was given.
 5. **Stay on Reactor where the pipeline genuinely is Reactor's** — `Retry.backoff`, `windowUntil`,
    `groupBy` over a live stream, an existing WebFlux chain nobody is rewriting today. Convert at the
    boundary the moment the code below it is domain logic: it is testable with `runTest` and Turbine,
@@ -306,10 +319,11 @@ fun `emits loading then content`() = runTest {
 7. **`catch` placed above the operator it should guard.** It only sees upstream exceptions, so a
    `catch` before the `map` that throws never runs, and the crash reaches the collector unchanged.
    It also never catches the collector's own body.
-8. **`buffer` where `conflate` was meant.** `buffer` keeps every value and lets a slow collector fall
-   behind by a growing queue; `conflate` keeps only the newest and drops the rest. A UI wants
-   `conflate`; work nobody may lose wants `buffer` — and reaching for either to make something faster
-   is the third mistake, since neither adds parallelism.
+8. **`buffer` where `conflate` was meant.** `buffer(n)` keeps up to `n` values and runs the emitter
+   in its own coroutine, so a collector that cannot keep up falls behind by a queue that suspends the
+   producer once it fills; `conflate` keeps only the newest and drops the rest. A UI wants
+   `conflate`, work nobody may lose wants `buffer`, and neither one makes the operator bodies
+   themselves any faster — which is the other reason both get reached for.
 9. **`first()` on a `SharedFlow` with no replay.** It suspends until the *next* emission, and if the
    producer emitted before this collector arrived, there may not be one. `first()` is for a cold flow
    or a `StateFlow`.
