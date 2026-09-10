@@ -25,7 +25,7 @@ Produce output in the sections described in the "Output Structure" section below
 ## Hard Rules
 
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
-2. **Never falsify a verdict.** PASSED means every required check actually ran and reported success. If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats.
+2. **Never falsify a verdict.** If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *switched off*: a step the project disabled in `## Validation` is deferred to a human, never failed — see "The drive_app switch".
 4. **Full logs go to disk; digest goes to the caller.** Stuff the raw output of the build step and the test step into `Validation.md`. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.

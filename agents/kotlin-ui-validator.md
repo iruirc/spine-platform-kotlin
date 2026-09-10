@@ -25,7 +25,7 @@ Produce output in the sections described in the "Output Structure" section below
 ## Hard Rules
 
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
-2. **Never falsify a verdict.** PASSED means every required check actually ran and reported success. If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats.
+2. **Never falsify a verdict.** If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step no resolved driver can perform, are both deferred to a human, never failed — see "The drive_app switch" and "The driver".
 4. **Full logs go to disk; digest goes to the caller.** Stuff the raw output of the build step and the test step into `Validation.md`. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
@@ -110,6 +110,11 @@ this surface; the surface is declared by the driver and absent from this machine
 user's next action differs in each. The desktop lane meets the third case honestly: a driver that
 declares `macos` and not `windows` is unreachable for a Windows run, and saying so is the answer.
 
+A driver named in the chain whose plugin is not installed at all — `<driver>:manifest` does not resolve —
+is `unavailable` as well, and the message says the plugin was not found rather than naming prefixes that
+were tried. Core has already warned about this before the stage started; reporting the state is yours,
+failing the run over it is not.
+
 `incompatible` does **not** stop the stage. Driving with a mismatched driver is invented evidence,
 which is worse than a deferred check — but the build and the tests still produce theirs, and stopping
 would take those away over a line in a config.
@@ -169,13 +174,13 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 - **The build step** — mandatory.
 - **The test step** — mandatory (regression: no existing tests may break; new regression test for the bug, if present, must pass).
-- **Driving the app** — **mandatory regardless of layer**, unless `drive_app` resolves to `off` or the driver is in one of its three non-working states; either turns the replay into a manual check. Replay the reproduction scenario from `Reproduce.md` step by step and compare observed behavior to the "expected after fix" section. **BUG is atomic**, unlike every other profile: a replay is a sequence, not a set of independent checks, so one step whose capability is missing ends the whole replay — all of it goes to `ManualChecks.md` and `reproduction_status` is `deferred-manual`. Half a replay gives you the right to claim nothing. When it does run, output an explicit statement: "the bug no longer reproduces" / "the bug still reproduces" / "reproduction inconclusive — <reason>".
+- **Driving the app** — **mandatory regardless of layer**, unless `drive_app` resolves to `off`, the driver is in one of its three non-working states, or the lane produces no surface; each turns the replay into a manual check. Replay the reproduction scenario from `Reproduce.md` step by step and compare observed behavior to the "expected after fix" section. **BUG is atomic**, unlike every other profile: a replay is a sequence, not a set of independent checks, so one step whose capability is missing ends the whole replay — all of it goes to `ManualChecks.md` and `reproduction_status` is `deferred-manual`. Half a replay gives you the right to claim nothing. When it does run, output an explicit statement: "the bug no longer reproduces" / "the bug still reproduces" / "reproduction inconclusive — <reason>".
 
 ### REFACTOR
 
 - **The test step** — mandatory. Every pre-existing test must pass **without modification**. If any test was edited as part of the refactor, that is itself a finding (refactor should preserve behavior; touching tests means behavior changed).
 - **The build step** — optional (covered by the test step running successfully, since tests can't run without a build). Run only if the test step fails for a non-test reason (e.g. compile error in a module not covered by tests).
-- **Driving the app** — **only when UI-layer code was touched**. Smoke-check the affected screen(s) for visual regressions: layout intact, no missing labels/buttons, key interactions still work. `ui_tree` answers the structural half; a pixel comparison needs `visual_baseline`, and where the block does not name it, say the smoke-check was structural rather than implying more.
+- **Driving the app** — **only when UI-layer code was touched**. Smoke-check the affected screen(s) for visual regressions: layout intact, no missing labels/buttons, key interactions still work. `ui_tree` answers the structural half; a pixel comparison needs `visual_baseline`, and where the block does not name it the visual half defers like any other uncovered check — a case in `ManualChecks.md` naming the missing capability, and its title in `manual_checks:`. Say in `## Scope` that the smoke-check was structural, rather than implying more.
 
 ### TEST
 
@@ -339,7 +344,7 @@ flaky_tests:
 manual_checks_path: <relative path to ManualChecks.md, omitted when none was written>
 manual_checks:
   - <one line per case in ManualChecks.md: its title>
-driver: <the driver plugin that resolved, or — >
+driver: <the driver plugin that resolved, or — >          # context for the reader; not a field of core's schema
 driver_status: ok | none | unavailable | incompatible
 next_recommended_action: continue | ask_user | stop
 notes: <optional one-line context>

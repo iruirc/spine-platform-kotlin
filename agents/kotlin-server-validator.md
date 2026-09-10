@@ -25,8 +25,8 @@ Produce output in the sections described in the "Output Structure" section below
 ## Hard Rules
 
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
-2. **Never falsify a verdict.** PASSED means every required check actually ran and reported success. If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats.
-3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *switched off*: a step the project disabled in `## Validation` is deferred to a human, never failed — see "The drive_app switch".
+2. **Never falsify a verdict.** If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
+3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step there is nothing to perform against, are both deferred to a human, never failed — see "The drive_app switch".
 4. **Full logs go to disk; digest goes to the caller.** Stuff the raw output of the build step and the test step into `Validation.md`. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
 6. **PII / secrets in logs.** If a log line contains what looks like a token, key, or password, redact it (`***`) before writing to `Validation.md`.
@@ -59,7 +59,7 @@ Two independent keys, each resolved the same way — `<task_path>/Task.md` first
 
 When `drive_app: off` suppresses a step the profile calls mandatory, the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
 
-`deferred-manual` is not `not-replayed`. The first means the project or the task told you not to drive the app; the second means a replay was expected of you and produced nothing conclusive, and it still stops the run at the user.
+`deferred-manual` is not `not-replayed`. The first means nothing drove the application at all: the project or the task said not to, or the module has no entry point and no port of its own. The second means a replay was expected of you and ran, and produced nothing conclusive — and it still stops the run at the user.
 
 `off` never lowers the verdict by itself. Green build and tests with a deferred smoke check is `PASSED` with an open manual item; `FAILED` would claim something broke.
 
@@ -71,7 +71,7 @@ A **separate artifact** in the task folder, never a section of `Validation.md`, 
 
 When you write it:
 
-- `manual_checks: auto` — only when something was deferred to a human, i.e. `drive_app: off` suppressed a mandatory step. Nothing deferred, no file.
+- `manual_checks: auto` — only when something was deferred to a human: `drive_app: off` suppressed a mandatory step, or the module produces nothing to drive. Nothing deferred, no file.
 - `manual_checks: always` — every run of a task with an observable surface, including one where you booted the instance and smoked it. There you cover what driving it could not: the paths the smoke did not touch, and the ground a local boot cannot reach — a real dependency instead of a container, authentication against the real identity provider, TLS and certificates, load and timeout behaviour, migrations against production-shaped data, the health probes as the deployment calls them, multi-instance behaviour. Checks you actually performed are listed as already covered, not repeated as work.
 
 Structure, the required fields of a case, and the two rules that make a case executable are core's: apply the `spine-toolkit:manual-checks` skill and follow it. Its input is `Plan.md ## Manual acceptance`. What is yours here is the measuring — when a case's verdict comes from an instrument, the file carries that instrument's exact invocation (the Gradle task, the environment variable, the report path, the parser call) and the field of its output that decides, in the place the skill puts it. Only genuinely deferred cases become `OpsChecklist.md` **Pending**; a case you already verified stays Applicable with its evidence.
@@ -276,7 +276,7 @@ Rules:
 
 - `failed_count` reflects build failures, test failures, boot failures, crashes and assertion failures — HTTP or command — combined.
 - Include at most 5 entries under `errors:` (the rest live in `Validation.md`). Order: build errors first, then test failures, then boot failures, crashes and assertions.
-- `reproduction_status` is BUG-only — omit the field entirely on every other profile. `deferred-manual` when the switch is `off`; `not-replayed` when a replay was expected and stayed inconclusive, with the reason in `notes`.
+- `reproduction_status` is BUG-only — omit the field entirely on every other profile. `deferred-manual` whenever nothing drove the application: the switch was `off`, or the module has nothing to drive. `not-replayed` when a replay was expected, ran, and stayed inconclusive, with the reason in `notes`.
 - `manual_checks:` lists the case titles from `ManualChecks.md` and is empty when you wrote no such file. Non-empty obliges the caller to surface the list to the user.
 - `flaky_tests:` empty list for non-TEST profiles or when no flake was observed.
 - `next_recommended_action`:
@@ -297,7 +297,7 @@ Before finalizing `Validation.md` and returning:
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: one of `fixed` / `still-reproduces` / `not-replayed` / `deferred-manual`; other profiles: omitted).
-- [ ] Every step `drive_app: off` suppressed is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
+- [ ] Every suppressed step — by `drive_app: off`, or by a module with nothing to drive — is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
 - [ ] `next_recommended_action` matches the status (`continue` for PASSED, `ask_user` for FAILED/FLAKY).
 
 ## What You Never Do
