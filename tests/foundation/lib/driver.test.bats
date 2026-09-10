@@ -98,7 +98,7 @@ setup() {
   scanned="$(grep -rl --exclude-dir=.git --exclude-dir=tests --exclude-dir=.superpowers \
                -e . "$ROOT" | wc -l | tr -d ' ')"
   [ "$scanned" -ge 60 ] || { echo "scan went vacuous: $scanned file(s)"; return 1; }
-  offenders="$(grep -riE 'mcp__mobile|mobile[ -]mcp' "$ROOT" \
+  offenders="$(grep -rliE 'mcp__mobile|mobile[ -]mcp' "$ROOT" \
                  --exclude-dir=.git --exclude-dir=tests --exclude-dir=.superpowers || true)"
   [ -z "$offenders" ] || { echo "$offenders"; return 1; }
 }
