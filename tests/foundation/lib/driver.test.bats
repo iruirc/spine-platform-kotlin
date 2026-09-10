@@ -49,3 +49,42 @@ setup() {
   [ "$status" -eq 1 ] || { echo "expected exit 1, got $status: $output"; return 1; }
   grep -q "surface outside core's vocabulary: pixel" <<<"$output" || { echo "$output"; return 1; }
 }
+
+@test "the UI validator glosses all four driver states" {
+  V="$ROOT/agents/kotlin-ui-validator.md"
+  bad=""
+  for s in ok none unavailable incompatible; do
+    grep -qF "\`$s\`" "$V" || bad="$bad $s"
+  done
+  [ -z "$bad" ] || { echo "states not glossed:$bad"; return 1; }
+}
+
+@test "the return contract carries driver_status with core's four values" {
+  # core's profile scripts declare driver_status with exactly this enum under
+  # additionalProperties:false, so a fifth value is a field the orchestrator drops.
+  grep -qF 'driver_status: ok | none | unavailable | incompatible' \
+    "$ROOT/agents/kotlin-ui-validator.md"
+}
+
+@test "no retired call name survives in the UI validator" {
+  # The prefixed forms are caught by Task 7's tree-wide guard; `enable_module` is
+  # the one bare name the old file used, and it would sail straight past it.
+  V="$ROOT/agents/kotlin-ui-validator.md"
+  grep -qF 'driver_status' "$V" || { echo "not the validator, or it lost driver_status"; return 1; }
+  bad=""
+  for c in enable_module app_launch input_tap screen_capture; do
+    grep -qF "$c" "$V" && bad="$bad $c"
+  done
+  [ -z "$bad" ] || { echo "retired call names present:$bad"; return 1; }
+}
+
+@test "the UI validator names each lane's surface from core's vocabulary" {
+  # The lane is what fixes the surface, and the surface is what the driver matches
+  # on. A lane whose surface is unnamed cannot be matched against anything.
+  V="$ROOT/agents/kotlin-ui-validator.md"
+  bad=""
+  for s in android-emulator android-device macos windows linux; do
+    grep -qF "\`$s\`" "$V" || bad="$bad $s"
+  done
+  [ -z "$bad" ] || { echo "surfaces not named:$bad"; return 1; }
+}
