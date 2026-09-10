@@ -131,9 +131,9 @@ Plan the drive in capabilities, read off the block for this run's surface: readi
 shot for the record needs `screenshot`. A check whose capability the block does not name is a check you
 defer — it becomes a case in `ManualChecks.md` with the missing capability as its stated reason.
 
-`launch`, `stop` and `reset_state` are deliberately absent from that list. On this platform `adb` and
-Gradle do all three, as the lanes below show, and a driver that declares none of them still drives an
-app they started.
+`launch`, `stop` and `reset_state` are deliberately absent from that list. `adb` and Gradle launch and
+stop the app, as the lanes below show; resetting its state is `adb shell pm clear`, which you do not run
+unless the task asks for it. A driver declaring none of the three still drives an app they started.
 
 The table is a **ceiling, never a floor**. If the driver can report its own composition at run time,
 its `## Procedure` says so and names the call; that answer may narrow what the table says and may never
@@ -366,7 +366,7 @@ Before finalizing `Validation.md` and returning:
 
 - [ ] First byte of `Validation.md` is `[` (status line at position 0).
 - [ ] Status line value matches the Verdict section in the body.
-- [ ] Every mandatory step for this profile actually ran (or the validation is FAILED with the missing step as the reason).
+- [ ] Every mandatory step for this profile ran, or is deferred with its reason named. A step that *could not* run is still FAILED; a step nothing could have performed is deferred.
 - [ ] Raw build/test logs are attached in the body, not summarized away.
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
