@@ -55,11 +55,16 @@ Two independent keys, each resolved the same way — `<task_path>/Task.md` first
 | manual checks | `[MANUAL_CHECKS]` | `manual_checks` | `auto` | whether **a human** gets a script |
 
 - `auto` — the per-profile rules below apply unchanged.
-- `off` — you never launch mobile MCP, on any profile. The build step and the test step still run in full; build and test evidence is what carries the verdict.
+- `off` — nothing changes for you: you never drive the app in any case. The build step and the test step still run in full; build and test evidence is what carries the verdict.
+
+This lane produces no drivable surface: a JVM library, or a target that did not resolve, has no app on
+a screen for anything to drive. So no driver applies here and `driver_status` is not reported — which
+is not the same as a driver failing to resolve. There is nothing here for one to do. The UI checks a
+profile calls mandatory become manual cases for exactly the reason they always did.
 
 When `drive_app: off` suppresses a step the profile calls mandatory, the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
 
-`deferred-manual` is not `not-replayed`. The first means the project or the task told you not to drive the app; the second means a replay was expected of you and produced nothing conclusive, and it still stops the run at the user.
+`deferred-manual` is not `not-replayed`. The first means nothing drove the app at all: on this lane there is no surface for anything to drive, and elsewhere the project or the task said not to. The second means a replay was expected of you and ran, and produced nothing conclusive — and it still stops the run at the user.
 
 `off` never lowers the verdict by itself. Green build and tests with a deferred UI check is `PASSED` with an open manual item; `FAILED` would claim something broke.
 
@@ -80,7 +85,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 - **The build step** — mandatory. Project must compile cleanly. Warnings allowed but reported.
 - **The test step** — mandatory. All tests must pass (unit + integration, whatever test tasks the modules declare).
-- **mobile MCP** — mandatory **if the feature has a UI layer** (Compose screens, Android views, navigation), and you cannot run it. The three things it would establish become cases in `ManualChecks.md`:
+- **Driving the app** — mandatory **if the feature has a UI layer** (Compose screens, Android views, navigation), and out of reach on this lane, which resolves no surface. The three things driving would establish become cases in `ManualChecks.md`:
   - the app launches without crash,
   - the new screen/feature is reachable via the documented entry point,
   - the key happy-path action succeeds.
@@ -91,20 +96,20 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 - **The build step** — mandatory.
 - **The test step** — mandatory (regression: no existing tests may break; new regression test for the bug, if present, must pass).
-- **mobile MCP** — **mandatory regardless of layer**, and unavailable to you, which turns the replay into a manual check. The scenario from `Reproduce.md` goes into `ManualChecks.md` step by step, with its "expected after fix" section as the verdict field. The explicit statement you MUST output is that the reproduction was deferred, not replayed — never "the bug no longer reproduces", which you did not observe.
+- **Driving the app** — **mandatory regardless of layer**, and out of reach on this lane, which turns the replay into a manual check. The scenario from `Reproduce.md` goes into `ManualChecks.md` step by step, with its "expected after fix" section as the verdict field. The explicit statement you MUST output is that the reproduction was deferred, not replayed — never "the bug no longer reproduces", which you did not observe.
 
 ### REFACTOR
 
 - **The test step** — mandatory. Every pre-existing test must pass **without modification**. If any test was edited as part of the refactor, that is itself a finding (refactor should preserve behavior; touching tests means behavior changed).
 - **The build step** — optional (covered by the test step running successfully, since tests can't run without a build). Run only if the test step fails for a non-test reason (e.g. compile error in a module not covered by tests).
-- **mobile MCP** — **only when UI-layer code was touched**, and unavailable to you. The smoke-check of the affected screen(s) — layout intact, no missing labels/buttons, key interactions still work — becomes a case in `ManualChecks.md`.
+- **Driving the app** — **only when UI-layer code was touched**, and out of reach on this lane. The smoke-check of the affected screen(s) — layout intact, no missing labels/buttons, key interactions still work — becomes a case in `ManualChecks.md`.
 
 ### TEST
 
 - **The test step** — mandatory. Every test the Write stage added (named per phase in `Plan.md`, landed in that phase's commit) must pass on the first run.
 - **Flaky detection** — if any added test fails on the first run but the scope says it should pass, re-run the failing test **up to 3 times**. Record fail rate (e.g. `2/3 runs`). A test that flaps is FLAKY, not FAILED.
 - **The build step** — implicit (the test step builds first).
-- **mobile MCP** — optional in the profile rule, unavailable to you. A test that needs a driven app to run at all is not run by you: report it under `## Scope` and defer its verification.
+- **Driving the app** — optional in the profile rule, out of reach on this lane. A test that needs a driven app to run at all is not run by you: report it under `## Scope` and defer its verification.
 
 ## Tooling Procedure
 

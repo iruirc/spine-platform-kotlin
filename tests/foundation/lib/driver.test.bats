@@ -88,3 +88,17 @@ setup() {
   done
   [ -z "$bad" ] || { echo "surfaces not named:$bad"; return 1; }
 }
+
+@test "no file in this plugin decides which MCP server drives the app" {
+  # Which server drives is the project's choice from core 1.7.1 on. A name written
+  # here is that choice made for them, wrong for every project that made another.
+  # No --include: a YAML agent definition decides this as much as a Markdown one,
+  # and enumerating types is how the first version of this guard missed files.
+  # tests/ is excluded because this guard carries the very strings it forbids.
+  scanned="$(grep -rl --exclude-dir=.git --exclude-dir=tests --exclude-dir=.superpowers \
+               -e . "$ROOT" | wc -l | tr -d ' ')"
+  [ "$scanned" -ge 60 ] || { echo "scan went vacuous: $scanned file(s)"; return 1; }
+  offenders="$(grep -riE 'mcp__mobile|mobile[ -]mcp' "$ROOT" \
+                 --exclude-dir=.git --exclude-dir=tests --exclude-dir=.superpowers || true)"
+  [ -z "$offenders" ] || { echo "$offenders"; return 1; }
+}

@@ -44,7 +44,7 @@ Read the files involved. Look for:
 
 Execute as needed without asking:
 - The target's build and test step (`./gradlew build`, `:module:test --tests …`) — confirm the reproducer builds and which test fails
-- Android: `adb logcat -d -v threadtime` after reproducing; `adb shell dumpsys activity` for lifecycle state; `adb bugreport` only when asked (it is large); `mcp__mobile__ui` `action: 'tree'` for the UI state at the failure
+- Android: `adb logcat -d -v threadtime` after reproducing; `adb shell dumpsys activity` for lifecycle state; `adb bugreport` only when asked (it is large); the project's driver for the UI state at the failure, where the capability to look for is `ui_tree`. You resolve it yourself, by the chain `kotlin-platform:kotlin-ui-validator` documents and in that order: you are called at Reproduce, at Diagnose or on the RESEARCH profile, never from Validation, so unlike the testers there is no validator result for you to take one from
 - Server: the application log at DEBUG for the failing request; `jcmd <pid> Thread.print` for a hang; `jcmd <pid> GC.heap_info` and a heap dump (`jcmd <pid> GC.heap_dump`) for a leak; `curl -v` for the failing endpoint
 - Desktop: the JVM's stderr; `jstack <pid>` on a frozen window (the EDT stack is the one to read)
 - Coroutines: `-Dkotlinx.coroutines.debug` (or `DebugProbes.install()` from `kotlinx-coroutines-debug`) to name coroutines in a dump
@@ -72,7 +72,7 @@ Produce the Output Structure below. Wait for explicit user confirmation (`ok`, `
 
 ## Validation Tooling
 
-Bash for Gradle/Maven, adb, jcmd/jstack, curl; `mcp__mobile__*` for UI state on Android and desktop.
+Bash for Gradle/Maven, adb, jcmd/jstack, curl; the project's driver for UI state on Android and desktop, where the capabilities worth reaching for are `ui_tree`, `screenshot` and `logs`. What those are called belongs to the server's own tool schemas, already in your context; which driver resolves is decided by the chain `kotlin-platform:kotlin-ui-validator` documents.
 
 ## Skills Reference (kotlin-platform)
 

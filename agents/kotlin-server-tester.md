@@ -275,7 +275,7 @@ A test at a higher slice than its assertion needs is a slow test that hides whic
 
 - **Build tool via Bash** — `- Build:` in `## Stack` says which: `./gradlew <task>` (Gradle KTS / Groovy), `mvn <phase>` (Maven), `./amper test` (Amper). Run the narrowest task that covers the tests you wrote (`:module:test --tests 'com.example.FooTest'`), then the module's full test task before reporting.
 - **JUnit XML** — read failures from the build tool's report directory, never from the console alone: Gradle `build/test-results/**/*.xml` (Gradle truncates console output and hides it behind `--info`), Maven `target/surefire-reports/TEST-*.xml` and `target/failsafe-reports/TEST-*.xml`, Amper `build/tasks/**/test-results/**/*.xml`. Failures are `<failure>` / `<error>` elements, with `message` and the stack trace in the element body.
-- **mobile MCP** — only where the profile requires driving the app; the validator agent owns that, you use it for a UI test that needs visual confirmation.
+- **The project's driver** — only where the profile requires driving the app. Resolving it and driving with it belong to the validator agent; what you need back is the result. A UI test that needs visual confirmation says so and lets validation supply it.
 
 When `NEED_TEST = false` in the task, do not generate tests — run the existing suite and report.
 
