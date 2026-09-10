@@ -34,9 +34,9 @@ setup() {
 }
 
 @test "no file in spine-platform-kotlin names the core tree by a filesystem path" {
-  pat='(\.\./(core|spine-toolkit|swift-platform|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
+  pat='(\.\./(core|spine-toolkit|spine-platform-swift|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
   pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
-  pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|swift-platform|spine-platform-kotlin)/)'
+  pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|spine-platform-swift|spine-platform-kotlin)/)'
   # Three files are excluded by name: the two suites that look for a sibling checkout
   # of core (they skip rather than dangle when it is absent) and this one, which
   # spells the patterns out. The cost is a blind spot inside those three files.
