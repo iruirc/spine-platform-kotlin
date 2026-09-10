@@ -126,11 +126,14 @@ your context along with the server's own instructions. Never write a call name i
 if it were contract: a table of call names is exactly what this contract replaced, after all six names
 in it had stopped existing at a server release and nothing noticed for months.
 
-Plan the drive in capabilities, read off the block for this run's surface: launching needs `launch`,
-reading the screen needs `ui_tree` or `find`, driving a path needs `tap`, `type` or `swipe`, an
-assertion needs `assert`, a shot for the record needs `screenshot`, a clean first run needs
-`reset_state`, and finishing needs `stop`. A check whose capability the block does not name is a check
-you defer — it becomes a case in `ManualChecks.md` with the missing capability as its stated reason.
+Plan the drive in capabilities, read off the block for this run's surface: reading the screen needs
+`ui_tree` or `find`, driving a path needs `tap`, `type` or `swipe`, an assertion needs `assert`, and a
+shot for the record needs `screenshot`. A check whose capability the block does not name is a check you
+defer — it becomes a case in `ManualChecks.md` with the missing capability as its stated reason.
+
+`launch`, `stop` and `reset_state` are deliberately absent from that list. On this platform `adb` and
+Gradle do all three, as the lanes below show, and a driver that declares none of them still drives an
+app they started.
 
 The table is a **ceiling, never a floor**. If the driver can report its own composition at run time,
 its `## Procedure` says so and names the call; that answer may narrow what the table says and may never
@@ -157,7 +160,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 - **The build step** — mandatory. Project must compile cleanly. Warnings allowed but reported.
 - **The test step** — mandatory. All tests must pass (unit + integration, whatever test tasks the modules declare).
-- **Driving the app** — mandatory **if the feature has a UI layer** (Compose screens, Android views, navigation). Skipped only for purely domain/infrastructure features. Needs `launch` and one of `ui_tree` / `find`, plus whatever input the happy path uses. Per check, not all-or-nothing: a step whose capability is missing becomes a manual case while the rest still runs. Read the tree before reaching for a screenshot — it is text, and roughly ten times cheaper. Establish that:
+- **Driving the app** — mandatory **if the feature has a UI layer** (Compose screens, Android views, navigation). Skipped only for purely domain/infrastructure features. Needs one of `ui_tree` / `find`, plus whatever input the happy path uses. Per check, not all-or-nothing: a step whose capability is missing becomes a manual case while the rest still runs. Read the tree before reaching for a screenshot — it is text, and roughly ten times cheaper. Establish that:
   - the app launches without crash,
   - the new screen/feature is reachable via the documented entry point,
   - the key happy-path action succeeds.
@@ -281,7 +284,7 @@ This is a hard contract with the `workflow-*` profiles and the orchestrator. Sam
 
 Semantics:
 
-- **PASSED** — every mandatory step ran, build is clean (warnings tolerated), all tests passed, and for BUG profile the reproduction scenario no longer reproduces.
+- **PASSED** — every mandatory step either ran or was deferred with its reason named, build is clean (warnings tolerated), all tests passed, and for BUG profile the reproduction scenario no longer reproduces or was deferred. A deferred check never lowers the verdict; a check that errored out is not deferred, it is FAILED.
 - **FAILED** — at least one mandatory step did not run, or build/tests/reproduction failed.
 - **FLAKY** — TEST-profile only; one or more new tests showed non-deterministic results across re-runs.
 
@@ -293,8 +296,8 @@ Semantics:
 emulator/device or as a desktop process, top-level outcome.
 
 ## Scope
-What the validation covered (modules, build tool, test tasks, emulator/device or desktop
-process, mobile-MCP scenario if any).
+What the validation covered: modules, build tool, test tasks, the lane and the surface this run was on,
+the driver and the state it resolved to, and the scenario driven if any.
 
 ## Build Log
 Full stdout of the build step (or a clear "skipped: covered by the test step" line for REFACTOR).
@@ -306,7 +309,7 @@ Full output of the test step. Summary table of test tasks + individual failures 
 Step-by-step replay of `Reproduce.md`, observed vs. expected, explicit statement.
 
 ## UI Smoke (FEATURE with UI / BUG / UI-touching REFACTOR)
-What was driven, what was asserted, screenshot path.
+The driver and the surface, what was driven, what was asserted, screenshot path. When nothing was driven, the state and what the user has to do about it.
 
 ## Failures
 Structured list of every failure. Each entry:
