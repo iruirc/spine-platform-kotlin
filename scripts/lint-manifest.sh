@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/lint-manifest.sh sha256:6740aec3de096e21ef4340b49b13b73efa251a77815ad65b414488cd7846f327
+# Adapted from spine-toolkit scripts/lint-manifest.sh sha256:52efa80045a70b782fc214a334e0793781be7748125a41815b43cb916cac9c31
 # Adapted from spine-toolkit's lint. Plugins share no code; update both or neither.
 # Checks a platform plugin's manifest skill against the spine-toolkit contract.
 # Validates the five tables' presence, Roles content (vocabulary, named agents
@@ -20,11 +20,69 @@ ROLES="architect developer tester reviewer refactorer validator security diagnos
 ENTRYPOINTS="setup"
 violations=0
 
+# The eight drivable surfaces — third copy of a list core owns; the other two live
+# in core: its driver convention and its driver-manifest lint. A test there binds
+# all three.
+SURFACES="
+ios-simulator ios-device
+android-emulator android-device
+macos windows linux
+browser
+"
+
 [ -f "$manifest" ] || { echo "no manifest skill at $manifest"; exit 1; }
 
 for section in Roles Axes Heuristics Topics Entrypoints; do
   grep -q "^## $section\$" "$manifest" || { echo "missing table: $section"; violations=$((violations+1)); }
 done
+
+# `## Driver` is optional — a platform that declares no driver has five tables, and
+# that must stay a passing manifest. Checked only when present, and then strictly:
+# an unknown key here is a row core will never read, indistinguishable from a typo
+# in the one key it does.
+if grep -q '^## Driver$' "$manifest"; then
+  driver_block=$(sed -n '/^## Driver/,/^## /p' "$manifest")
+  while IFS= read -r line; do
+    # Deliberately wider than the key core accepts: a `default_plugin` or `Default` typo
+    # has to be *reported*, and a class narrow enough to exclude it lets the row through
+    # unread, which is the failure this check exists to name.
+    [[ "$line" =~ ^([A-Za-z][A-Za-z0-9_-]*)[[:space:]]*=[[:space:]]*(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"
+    rhs="${BASH_REMATCH[2]}"
+    rhs="${rhs%"${rhs##*[![:space:]]}"}"
+    case "$key" in
+      default)
+        [[ "$rhs" =~ ^[a-z][a-z0-9-]*$ ]] \
+          || { echo "malformed '## Driver' default '$rhs' (expected a plugin name)"; violations=$((violations+1)); }
+        ;;
+      surfaces)
+        [ -n "$(tr -d '[:space:]' <<<"$rhs")" ] \
+          || { echo "'## Driver' surfaces row is empty"; violations=$((violations+1)); }
+        IFS=',' read -ra surfs <<<"$rhs"
+        # An empty row leaves the array empty, and "${surfs[@]}" would abort here under
+        # `set -u`, before a single check past this block gets to run.
+        for s in ${surfs[@]+"${surfs[@]}"}; do
+          # Ends only: stripping every space turns `mac os` into a name in the
+          # vocabulary and the malformed spelling lints clean.
+          s="${s#"${s%%[![:space:]]*}"}"
+          s="${s%"${s##*[![:space:]]}"}"
+          [ -n "$s" ] || { echo "empty element in the '## Driver' surfaces list"; violations=$((violations+1)); continue; }
+          # Exact membership, not `grep -w`: a hyphen is not a word character, so
+          # `grep -qw ios` matches the list entry `ios-simulator` and a truncated
+          # typo would pass unreported — which is the failure this check exists for.
+          case " $(tr -s '[:space:]' ' ' <<<"$SURFACES") " in
+            *" $s "*) ;;
+            *) echo "surface outside core's vocabulary: $s"; violations=$((violations+1)) ;;
+          esac
+        done
+        ;;
+      *)
+        echo "unknown key in '## Driver' (core reads 'default' and 'surfaces'): $key"
+        violations=$((violations+1))
+        ;;
+    esac
+  done <<<"$driver_block"
+fi
 
 roles_block=$(sed -n '/^## Roles/,/^## /p' "$manifest")
 

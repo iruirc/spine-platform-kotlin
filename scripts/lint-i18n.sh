@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/lint-i18n.sh sha256:6d6684c9beef8a053143482291eb5ae868505381b4e6dfd7455ee468f08159fd
+# Adapted from spine-toolkit scripts/lint-i18n.sh sha256:a106f9fef930d43f8f2a3a4516e8f6fdc5b55759234959f08622b79239758719
 # Adapted from spine-toolkit's lint. Plugins share no code; update both or neither.
 set -euo pipefail
 
@@ -72,7 +72,7 @@ PY
       ;;
   esac
 done < <(find . -type f \( -name '*.md' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' \
-  -o -name '*.js' -o -name '*.sh' -o -name '*.bats' -o -name '*.zsh' \) -print0)
+  -o -name '*.js' -o -name '*.sh' -o -name '*.bats' -o -name '*.zsh' \) ! -path './.superpowers/*' -print0)
 
 if [ "$violations" -gt 0 ]; then
   echo

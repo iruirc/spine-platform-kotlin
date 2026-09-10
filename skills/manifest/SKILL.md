@@ -162,3 +162,13 @@ Skills spine-toolkit invokes by name, or `—` for one this platform does not pr
 platform half of installation: core writes the config, this skill fills `## Stack` and `## Modules`.
 
 setup = `kotlin-setup`
+
+## Driver
+
+The driver plugin this platform recommends, and the surfaces its projects run on. Both are read by
+whoever validates: the driver named here is what a project gets when it never chose one, so an
+installed project keeps driving its app exactly as it did. The surfaces are half of the compatibility
+test — a driver fits when its own targets intersect this list.
+
+default  = mobile-driver
+surfaces = android-emulator, android-device, macos, windows, linux

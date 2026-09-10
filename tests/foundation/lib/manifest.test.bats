@@ -8,10 +8,13 @@ setup() {
   M="$ROOT/skills/manifest/SKILL.md"
 }
 
-@test "manifest declares all five tables" {
+@test "manifest declares all five tables, and the optional sixth" {
   for s in Roles Axes Heuristics Topics Entrypoints; do
     grep -q "^## $s\$" "$M"
   done
+  # Optional in the contract, mandatory here: this platform drives an app on two
+  # of its five targets, and without the block every project resolves to no driver.
+  grep -q '^## Driver$' "$M"
 }
 
 @test "the manifest passes spine-toolkit's conformance lint" {
