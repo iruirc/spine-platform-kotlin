@@ -1,7 +1,7 @@
-# kotlin-platform
+# spine-platform-kotlin
 
-[![release](https://img.shields.io/github/v/tag/iruirc/kotlin-platform?sort=semver&label=release&color=0969da)](https://github.com/iruirc/kotlin-platform)
-[![license](https://img.shields.io/github/license/iruirc/kotlin-platform?color=555)](LICENSE)
+[![release](https://img.shields.io/github/v/tag/iruirc/spine-platform-kotlin?sort=semver&label=release&color=0969da)](https://github.com/iruirc/spine-platform-kotlin)
+[![license](https://img.shields.io/github/license/iruirc/spine-platform-kotlin?color=555)](LICENSE)
 [![requires spine-toolkit](https://img.shields.io/badge/requires-spine--toolkit-0969da)](https://github.com/iruirc/spine-toolkit)
 
 The Kotlin platform plugin for **spine-toolkit**. One plugin for three surfaces — Android,
@@ -17,7 +17,7 @@ they know.
 
 ```
 /plugin marketplace add iruirc/claude-marketplace
-/plugin install kotlin-platform
+/plugin install spine-platform-kotlin
 ```
 
 `spine-toolkit` is declared as a dependency and installs with it. Then, in an existing project:
@@ -84,7 +84,7 @@ the ten topics here.
 
 | Table | Declares |
 |---|---|
-| `## Roles` | role → `kotlin-platform:<agent>`, nine roles, three fanned out on `target`, none absent |
+| `## Roles` | role → `spine-platform-kotlin:<agent>`, nine roles, three fanned out on `target`, none absent |
 | `## Axes` | `ecosystem = kotlin` plus `target`, `ui`, `async`, `di`, `framework`, `architecture`, `build`, `baseline`, `tests` and their allowed values |
 | `## Heuristics` | which repo signals (build plugins, imports, paths) pin which axis value — written so nested signals (a KMP build with an Android target) match exactly one row |
 | `## Topics` | topic → the skills that cover it, for the orchestrator's methodology skills |

@@ -1,7 +1,7 @@
 # kotlin-setup — en
 
 ## error_not_kotlin_project
-Not a Kotlin project (no `settings.gradle(.kts)`, `build.gradle(.kts)`, `pom.xml` or `module.yaml` found), so I left `## Stack` unset. To create a new project use `@kotlin-platform:kotlin-init`.
+Not a Kotlin project (no `settings.gradle(.kts)`, `build.gradle(.kts)`, `pom.xml` or `module.yaml` found), so I left `## Stack` unset. To create a new project use `@spine-platform-kotlin:kotlin-init`.
 
 ## auq_axis_target_label
 Target surface

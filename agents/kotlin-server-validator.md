@@ -161,7 +161,7 @@ A Gradle test task that already ran reports `UP-TO-DATE` and executes nothing, s
 
 Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timing-dependent assertion, shared mutable state, missing isolation, `Instant.now()` / `UUID.randomUUID()` in the production path).
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 For **classification of observed failures only** — never to propose fixes.
 
@@ -182,13 +182,13 @@ For **classification of observed failures only** — never to propose fixes.
 - `spine-toolkit:feature-landscape` — for the REFACTOR profile, the `## Landscape (current)` vs `## Landscape (target)` sections in Research.md tell you what behavior MUST stay identical and what is allowed to change structurally. A regression against the current landscape is a finding — note it in `Failures`.
 - `spine-toolkit:feature-requirements` — for the BUG profile, the Secondary table in Reproduce.md / Research.md scopes which `spine-toolkit:ops-checklist` categories you re-verify. BUG validation does not require full-checklist coverage — only the categories the bug touched.
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI
-- `kotlin-platform:kotlin-refactorer` — the Refactor stage for REFACTOR
-- `kotlin-platform:kotlin-server-tester` — the Write stage for TEST on Server and CLI
+- `spine-platform-kotlin:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI
+- `spine-platform-kotlin:kotlin-refactorer` — the Refactor stage for REFACTOR
+- `spine-platform-kotlin:kotlin-server-tester` — the Write stage for TEST on Server and CLI
 
 ## Output Structure
 

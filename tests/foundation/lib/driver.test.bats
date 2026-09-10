@@ -10,7 +10,7 @@ setup() {
 
 @test "the manifest declares a Driver block with both rows" {
   block="$(sed -n '/^## Driver$/,/^## /p' "$M")"
-  grep -qE '^default[[:space:]]*=[[:space:]]*mobile-driver$' <<<"$block"
+  grep -qE '^default[[:space:]]*=[[:space:]]*spine-driver-mobile$' <<<"$block"
   grep -qE '^surfaces[[:space:]]*=' <<<"$block"
 }
 

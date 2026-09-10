@@ -18,11 +18,11 @@ assert_agent_shape() {
   grep -q '^\*\*First\*\*: Read CLAUDE-spine-toolkit.md' "$f" \
     || { echo "$f: does not read the project config first"; return 1; }
   local h
-  for h in 'Invocation Context' 'Skills Reference (kotlin-platform)' 'Skills Reference (core)' \
-           'Related Agents (kotlin-platform)' 'Output Structure' 'What You Never Do' 'Output Language'; do
+  for h in 'Invocation Context' 'Skills Reference (spine-platform-kotlin)' 'Skills Reference (core)' \
+           'Related Agents (spine-platform-kotlin)' 'Output Structure' 'What You Never Do' 'Output Language'; do
     grep -q "^## $h" "$f" || { echo "$f: missing ## $h"; return 1; }
   done
-  grep -q 'subagent_type=kotlin-platform:<name>' "$f" \
+  grep -q 'subagent_type=spine-platform-kotlin:<name>' "$f" \
     || { echo "$f: Related Agents does not state the namespaced dispatch form"; return 1; }
   ! _body_after_frontmatter "$f" | _has_cyrillic \
     || { echo "$f: cyrillic outside the frontmatter"; return 1; }

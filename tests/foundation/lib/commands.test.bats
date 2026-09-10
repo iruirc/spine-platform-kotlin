@@ -8,6 +8,6 @@ setup() { ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)";
   f="$ROOT/commands/kotlin-init.md"
   [ -f "$f" ]
   grep -qE '^description: ".* / .*"$' "$f"
-  grep -q 'subagent_type=kotlin-platform:kotlin-init' "$f"
+  grep -q 'subagent_type=spine-platform-kotlin:kotlin-init' "$f"
   [ -f "$ROOT/agents/kotlin-init.md" ]
 }

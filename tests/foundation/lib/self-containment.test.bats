@@ -8,7 +8,7 @@ setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
 }
 
-@test "every bare relative path kotlin-platform names resolves under its own root" {
+@test "every bare relative path spine-platform-kotlin names resolves under its own root" {
   missing=""
   for p in $(grep -rhoE '`[A-Za-z_][A-Za-z0-9_.-]*/[^` ]*`' "$ROOT" \
                --include='*.md' --include='*.sh' --include='*.bats' --include='*.yml' \
@@ -21,7 +21,7 @@ setup() {
     q="$(printf '%s' "$p" | sed 's/<[^>]*>/*/g')"
     compgen -G "$ROOT/${q%/}" >/dev/null || missing="$missing $p"
   done
-  [ -z "$missing" ] || { echo "path(s) that do not resolve under kotlin-platform:$missing"; return 1; }
+  [ -z "$missing" ] || { echo "path(s) that do not resolve under spine-platform-kotlin:$missing"; return 1; }
 }
 
 @test "no file names the retired plugin's namespace" {
@@ -33,10 +33,10 @@ setup() {
   [ -z "$offenders" ] || { echo "$offenders"; return 1; }
 }
 
-@test "no file in kotlin-platform names the core tree by a filesystem path" {
-  pat='(\.\./(core|spine-toolkit|swift-platform|kotlin-platform)([^A-Za-z0-9_-]|$)'
+@test "no file in spine-platform-kotlin names the core tree by a filesystem path" {
+  pat='(\.\./(core|spine-toolkit|swift-platform|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
   pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
-  pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|swift-platform|kotlin-platform)/)'
+  pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|swift-platform|spine-platform-kotlin)/)'
   # Three files are excluded by name: the two suites that look for a sibling checkout
   # of core (they skip rather than dangle when it is absent) and this one, which
   # spells the patterns out. The cost is a blind spot inside those three files.
@@ -46,5 +46,5 @@ setup() {
   hits="$(grep -rnE --exclude-dir=.git --exclude-dir=.superpowers \
             --exclude=self-containment.test.bats --exclude=core-refs.test.bats --exclude=forks.test.bats \
             "$pat" "$ROOT" | grep -vE '/\.claude/plugins/(cache|marketplaces)/' || true)"
-  [ -z "$hits" ] || { echo "kotlin-platform reference(s) to the core tree:"; echo "$hits"; return 1; }
+  [ -z "$hits" ] || { echo "spine-platform-kotlin reference(s) to the core tree:"; echo "$hits"; return 1; }
 }

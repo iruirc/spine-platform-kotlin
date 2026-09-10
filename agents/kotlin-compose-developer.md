@@ -170,7 +170,7 @@ fun UserCard(
   - `// Cancel-order race fix: cancel + null-assignment MUST happen BEFORE resetSession — otherwise the dangling Job observes a torn state.`
   - `// detekt workaround: SwallowedException false-positive on the rethrow below.`
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 - `compose-state` — where state lives in a Compose UI: hoisting, `remember` vs `rememberSaveable` vs ViewModel, stability, recomposition
 - `arch-mvvm` — MVVM: ViewModel with `StateFlow`, `UiState` modelling, events, one-shot effects, testing with Turbine and test dispatchers
@@ -196,14 +196,14 @@ fun UserCard(
 - `spine-toolkit:task-walkthrough` — write `Walkthrough.md` at the end of the implementing stage
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-ui-tester` — tests for a screen you wrote: ViewModel unit tests and Compose UI tests
-- `kotlin-platform:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
-- `kotlin-platform:kotlin-security` — audits credential handling, storage and transport in what you wrote
-- `kotlin-platform:kotlin-kmp-developer` — when the screen lives in a shared module
+- `spine-platform-kotlin:kotlin-ui-tester` — tests for a screen you wrote: ViewModel unit tests and Compose UI tests
+- `spine-platform-kotlin:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
+- `spine-platform-kotlin:kotlin-security` — audits credential handling, storage and transport in what you wrote
+- `spine-platform-kotlin:kotlin-kmp-developer` — when the screen lives in a shared module
 
 ## Output Structure
 
@@ -215,7 +215,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - `## Code` — per-file full code blocks (no fragments)
 - `## DI & Wiring` — what was registered, in which module, and with which scope
 - `## Localization & Resources` — user-facing strings and assets added, in `res/values` on Android or Compose resources on Desktop (or `(none)`)
-- `## Tests Written` — names of new tests (or `(delegated to kotlin-platform:kotlin-ui-tester)` / `(none)` if NEED_TEST=false)
+- `## Tests Written` — names of new tests (or `(delegated to spine-platform-kotlin:kotlin-ui-tester)` / `(none)` if NEED_TEST=false)
 - `## Open Issues` — anything the orchestrator/reviewer should know
 
 ## Self-Check Before Completing
@@ -241,7 +241,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - Use `GlobalScope`.
 - Block the main thread.
 - Hardcode a string the user sees.
-- Write tests when NEED_TEST=false — `kotlin-platform:kotlin-ui-tester` does.
+- Write tests when NEED_TEST=false — `spine-platform-kotlin:kotlin-ui-tester` does.
 - Commit — the orchestrator's phase commit does.
 
 ## Output Language

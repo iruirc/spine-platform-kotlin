@@ -30,7 +30,7 @@ Ask the target first; it decides every later question:
 
 ## Mandatory Pre-Generation Dialog
 
-Ask neutrally; do not attach "(recommended)" to an option unless a kotlin-platform skill records that recommendation. Every answer is spelled as the manifest's `## Axes` spells it, because the answers travel to `spine-toolkit:setup` as the `stack` field and are matched against that catalog.
+Ask neutrally; do not attach "(recommended)" to an option unless a spine-platform-kotlin skill records that recommendation. Every answer is spelled as the manifest's `## Axes` spells it, because the answers travel to `spine-toolkit:setup` as the `stack` field and are matched against that catalog.
 
 | Order | Axis | Asked for target |
 |---|---|---|
@@ -66,7 +66,7 @@ Per target, in the primary module:
 - **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test
 - **KMP**: `commonMain` with one public function and its `commonTest`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
 
-Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with the answers already collected — `lang`, `mode`, `platform` = `kotlin-platform`, and `stack` — so it renders them from its own templates without re-asking. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
+Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with the answers already collected — `lang`, `mode`, `platform` = `spine-platform-kotlin`, and `stack` — so it renders them from its own templates without re-asking. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
 
 ## Tooling
 
@@ -105,7 +105,7 @@ A `grep` for the DI import outside `di/` and the entry point must return nothing
 - Use only Kotlin, Gradle and the chosen framework; no speculative dependencies.
 - The build must be green before you report done.
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 Consult the skill for the axis the dialog just answered: the skill body, not this agent, defines
 the folder layout and the conventions the generated scaffold must match.
@@ -132,27 +132,27 @@ the folder layout and the conventions the generated scaffold must match.
 
 - `spine-toolkit:setup` — the skill that writes both config files from the collected `stack`
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
 Once the build is on disk the project is ready for regular work through the spine-toolkit orchestrator, which dispatches these:
 
-- `kotlin-platform:kotlin-architect` — designs features within the generated structure
-- `kotlin-platform:kotlin-compose-developer` — implements Android and Compose Desktop features
-- `kotlin-platform:kotlin-server-developer` — implements server and CLI features
-- `kotlin-platform:kotlin-kmp-developer` — implements shared-module features
-- `kotlin-platform:kotlin-jvm-tester` — writes tests for a plain JVM module
-- `kotlin-platform:kotlin-ui-tester` — writes Compose UI and instrumented tests
-- `kotlin-platform:kotlin-server-tester` — writes server and CLI tests
-- `kotlin-platform:kotlin-kmp-tester` — writes `commonTest` and per-target tests
-- `kotlin-platform:kotlin-jvm-validator` — runs the build and the suite on a plain JVM module
-- `kotlin-platform:kotlin-ui-validator` — drives the app on an emulator or a desktop window
-- `kotlin-platform:kotlin-server-validator` — boots the server or runs the CLI and reads its streams
-- `kotlin-platform:kotlin-reviewer` — reviews code against the generated structure
-- `kotlin-platform:kotlin-refactorer` — refactors without changing behavior
-- `kotlin-platform:kotlin-security` — audits credentials, storage and the supply chain
-- `kotlin-platform:kotlin-diagnostics` — hunts bugs once the project has code
+- `spine-platform-kotlin:kotlin-architect` — designs features within the generated structure
+- `spine-platform-kotlin:kotlin-compose-developer` — implements Android and Compose Desktop features
+- `spine-platform-kotlin:kotlin-server-developer` — implements server and CLI features
+- `spine-platform-kotlin:kotlin-kmp-developer` — implements shared-module features
+- `spine-platform-kotlin:kotlin-jvm-tester` — writes tests for a plain JVM module
+- `spine-platform-kotlin:kotlin-ui-tester` — writes Compose UI and instrumented tests
+- `spine-platform-kotlin:kotlin-server-tester` — writes server and CLI tests
+- `spine-platform-kotlin:kotlin-kmp-tester` — writes `commonTest` and per-target tests
+- `spine-platform-kotlin:kotlin-jvm-validator` — runs the build and the suite on a plain JVM module
+- `spine-platform-kotlin:kotlin-ui-validator` — drives the app on an emulator or a desktop window
+- `spine-platform-kotlin:kotlin-server-validator` — boots the server or runs the CLI and reads its streams
+- `spine-platform-kotlin:kotlin-reviewer` — reviews code against the generated structure
+- `spine-platform-kotlin:kotlin-refactorer` — refactors without changing behavior
+- `spine-platform-kotlin:kotlin-security` — audits credentials, storage and the supply chain
+- `spine-platform-kotlin:kotlin-diagnostics` — hunts bugs once the project has code
 
 Mention this explicitly in your final report to the user — so they know what comes next.
 

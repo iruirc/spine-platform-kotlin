@@ -193,7 +193,7 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
   - `// Cancel-order race fix: cancel + null-assignment MUST happen BEFORE resetSession — otherwise the dangling Job observes a torn state.`
   - `// detekt workaround: SwallowedException false-positive on the rethrow below.`
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 - `arch-layered` — controller / route → service → repository → domain: layer responsibilities, transaction boundaries, DTO vs entity vs domain, the per-framework mapping
 - `arch-hexagonal` — ports and adapters: an application core with no framework import, inbound and outbound ports, where transactions and DI live, testing through ports
@@ -217,13 +217,13 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
 - `spine-toolkit:task-walkthrough` — write `Walkthrough.md` at the end of the implementing stage
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-server-tester` — tests for what you wrote: service unit tests and integration tests that stand the framework up
-- `kotlin-platform:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
-- `kotlin-platform:kotlin-security` — audits credential handling, storage and transport in what you wrote
+- `spine-platform-kotlin:kotlin-server-tester` — tests for what you wrote: service unit tests and integration tests that stand the framework up
+- `spine-platform-kotlin:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
+- `spine-platform-kotlin:kotlin-security` — audits credential handling, storage and transport in what you wrote
 
 ## Output Structure
 
@@ -235,7 +235,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - `## Code` — per-file full code blocks (no fragments)
 - `## DI & Wiring` — what was registered, in which module or configuration class, and with which scope
 - `## Configuration & Migrations` — configuration keys added and where they are bound, migration files added with their rollback, or `(none)`
-- `## Tests Written` — names of new tests (or `(delegated to kotlin-platform:kotlin-server-tester)` / `(none)` if NEED_TEST=false)
+- `## Tests Written` — names of new tests (or `(delegated to spine-platform-kotlin:kotlin-server-tester)` / `(none)` if NEED_TEST=false)
 - `## Open Issues` — anything the orchestrator/reviewer should know
 
 ## Self-Check Before Completing
@@ -259,7 +259,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - Use `@Autowired` on a field — dependencies arrive through the primary constructor.
 - Add a second web framework to a project that already has one.
 - Ship a destructive migration without a documented rollback.
-- Write tests when NEED_TEST=false — `kotlin-platform:kotlin-server-tester` does.
+- Write tests when NEED_TEST=false — `spine-platform-kotlin:kotlin-server-tester` does.
 - Commit — the orchestrator's phase commit does.
 
 ## Output Language

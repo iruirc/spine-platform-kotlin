@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# kotlin-platform's manifest is the five-table contract spine-toolkit documents;
+# spine-platform-kotlin's manifest is the five-table contract spine-toolkit documents;
 # these tests check the real manifest against that contract from this side, since
 # core's suite must reach no tree but core's.
 
@@ -43,9 +43,9 @@ setup() {
 }
 
 @test "every role that names an agent names a file that exists" {
-  refs="$(grep -oE 'kotlin-platform:kotlin-[a-z0-9-]+' "$M" | sort -u)"
+  refs="$(grep -oE 'spine-platform-kotlin:kotlin-[a-z0-9-]+' "$M" | sort -u)"
   for ref in $refs; do
-    [ -f "$ROOT/agents/${ref#kotlin-platform:}.md" ] || { echo "no agent file for $ref"; return 1; }
+    [ -f "$ROOT/agents/${ref#spine-platform-kotlin:}.md" ] || { echo "no agent file for $ref"; return 1; }
   done
 }
 
@@ -70,30 +70,30 @@ setup() {
   rows="$(sed -n '/^## Roles/,/^## Axes/p' "$M" \
            | grep -E '^[a-z][a-z-]*(\[[^]]+\])?[[:space:]]*=' | tr -s ' ' | sort)"
   expected="$(sort <<'EOF'
-architect = kotlin-platform:kotlin-architect
-reviewer = kotlin-platform:kotlin-reviewer
-refactorer = kotlin-platform:kotlin-refactorer
-security = kotlin-platform:kotlin-security
-diagnostics = kotlin-platform:kotlin-diagnostics
-init = kotlin-platform:kotlin-init
-developer[target=Android] = kotlin-platform:kotlin-compose-developer
-developer[target=Desktop] = kotlin-platform:kotlin-compose-developer
-developer[target=Server] = kotlin-platform:kotlin-server-developer
-developer[target=CLI] = kotlin-platform:kotlin-server-developer
-developer[target=KMP] = kotlin-platform:kotlin-kmp-developer
-developer = kotlin-platform:kotlin-kmp-developer
-tester[target=Android] = kotlin-platform:kotlin-ui-tester
-tester[target=Desktop] = kotlin-platform:kotlin-ui-tester
-tester[target=Server] = kotlin-platform:kotlin-server-tester
-tester[target=CLI] = kotlin-platform:kotlin-server-tester
-tester[target=KMP] = kotlin-platform:kotlin-kmp-tester
-tester = kotlin-platform:kotlin-jvm-tester
-validator[target=Android] = kotlin-platform:kotlin-ui-validator
-validator[target=Desktop] = kotlin-platform:kotlin-ui-validator
-validator[target=Server] = kotlin-platform:kotlin-server-validator
-validator[target=CLI] = kotlin-platform:kotlin-server-validator
-validator[target=KMP] = kotlin-platform:kotlin-ui-validator
-validator = kotlin-platform:kotlin-jvm-validator
+architect = spine-platform-kotlin:kotlin-architect
+reviewer = spine-platform-kotlin:kotlin-reviewer
+refactorer = spine-platform-kotlin:kotlin-refactorer
+security = spine-platform-kotlin:kotlin-security
+diagnostics = spine-platform-kotlin:kotlin-diagnostics
+init = spine-platform-kotlin:kotlin-init
+developer[target=Android] = spine-platform-kotlin:kotlin-compose-developer
+developer[target=Desktop] = spine-platform-kotlin:kotlin-compose-developer
+developer[target=Server] = spine-platform-kotlin:kotlin-server-developer
+developer[target=CLI] = spine-platform-kotlin:kotlin-server-developer
+developer[target=KMP] = spine-platform-kotlin:kotlin-kmp-developer
+developer = spine-platform-kotlin:kotlin-kmp-developer
+tester[target=Android] = spine-platform-kotlin:kotlin-ui-tester
+tester[target=Desktop] = spine-platform-kotlin:kotlin-ui-tester
+tester[target=Server] = spine-platform-kotlin:kotlin-server-tester
+tester[target=CLI] = spine-platform-kotlin:kotlin-server-tester
+tester[target=KMP] = spine-platform-kotlin:kotlin-kmp-tester
+tester = spine-platform-kotlin:kotlin-jvm-tester
+validator[target=Android] = spine-platform-kotlin:kotlin-ui-validator
+validator[target=Desktop] = spine-platform-kotlin:kotlin-ui-validator
+validator[target=Server] = spine-platform-kotlin:kotlin-server-validator
+validator[target=CLI] = spine-platform-kotlin:kotlin-server-validator
+validator[target=KMP] = spine-platform-kotlin:kotlin-ui-validator
+validator = spine-platform-kotlin:kotlin-jvm-validator
 EOF
 )"
   [ "$rows" = "$expected" ] || { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$rows"); return 1; }
@@ -104,7 +104,7 @@ EOF
   [ "$n" -eq 16 ] || { echo "expected 16 agents, found $n"; return 1; }
   for f in "$ROOT"/agents/*.md; do
     a="$(basename "$f" .md)"
-    grep -qE "kotlin-platform:${a}([[:space:]]|$)" "$M" || { echo "agent no Roles row names: $a"; return 1; }
+    grep -qE "spine-platform-kotlin:${a}([[:space:]]|$)" "$M" || { echo "agent no Roles row names: $a"; return 1; }
   done
 }
 

@@ -448,7 +448,7 @@ This step is not optional and not satisfied by "I followed the project style" in
   - `// Cancel-order race fix: cancel + null-assignment MUST happen BEFORE resetSession — otherwise the dangling Job observes a torn state.`
   - `// detekt workaround: SwallowedException false-positive on the rethrow below.`
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 Consult these when the refactoring touches the concern they own — the skill body is the source of truth for the shape you are refactoring toward:
 
@@ -478,16 +478,16 @@ Consult these when the refactoring touches the concern they own — the skill bo
 - `spine-toolkit:task-new` — file the debt you found and deliberately left out of scope as its own task
 - `spine-toolkit:task-move` — task lifecycle when a follow-up you raised changes status
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-jvm-tester` — write the missing tests before a refactor; the fallback when `- Target:` never resolved
-- `kotlin-platform:kotlin-ui-tester` — the same, for the Android or Compose Desktop code you are about to move
-- `kotlin-platform:kotlin-server-tester` — the same, for a JVM server or CLI
-- `kotlin-platform:kotlin-kmp-tester` — the same, for `commonMain` and the platform source sets
-- `kotlin-platform:kotlin-diagnostics` — when a refactor exposes a bug rather than causing one, hand it over instead of fixing it inline
-- `kotlin-platform:kotlin-security` — when the code being moved handles credentials, storage or transport
+- `spine-platform-kotlin:kotlin-jvm-tester` — write the missing tests before a refactor; the fallback when `- Target:` never resolved
+- `spine-platform-kotlin:kotlin-ui-tester` — the same, for the Android or Compose Desktop code you are about to move
+- `spine-platform-kotlin:kotlin-server-tester` — the same, for a JVM server or CLI
+- `spine-platform-kotlin:kotlin-kmp-tester` — the same, for `commonMain` and the platform source sets
+- `spine-platform-kotlin:kotlin-diagnostics` — when a refactor exposes a bug rather than causing one, hand it over instead of fixing it inline
+- `spine-platform-kotlin:kotlin-security` — when the code being moved handles credentials, storage or transport
 
 ## Output Structure
 

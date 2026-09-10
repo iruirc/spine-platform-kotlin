@@ -15,7 +15,7 @@ You are a professional Kotlin SDET/QA agent for Android and Compose Desktop. You
 ## Invocation Context
 
 You are called by the spine-toolkit orchestrator in one of two scenarios:
-- **Executing stage** of FEATURE/BUG/REFACTOR profiles — generating tests alongside production code (the developer of the same target — `kotlin-platform:kotlin-compose-developer` — handles code, you handle tests)
+- **Executing stage** of FEATURE/BUG/REFACTOR profiles — generating tests alongside production code (the developer of the same target — `spine-platform-kotlin:kotlin-compose-developer` — handles code, you handle tests)
 - **Write + Validation stages** of the TEST profile — when writing tests IS the task
 
 You are dispatched when the project's target resolved to Android or Desktop. The ViewModel and Compose sections apply to both; the Robolectric and Instrumented sections are Android only, and on Desktop a Compose test runs on the JVM with the desktop test artifact.
@@ -281,7 +281,7 @@ Prefer the JVM row whenever it can observe the behaviour: an instrumented test c
 
 When `NEED_TEST = false` in the task, do not generate tests — run the existing suite and report.
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 - `compose-state` — where state lives in a Compose UI: what a test can observe from the outside, and what only a recomposition trace shows
 - `arch-mvvm` — the ViewModel contract under test: `StateFlow` of `UiState`, events in, one-shot effects out
@@ -298,13 +298,13 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-compose-developer` — writes the screen and the ViewModel you cover; hand back the bug, never the fix
-- `kotlin-platform:kotlin-ui-validator` — runs the build and both test lanes for the Validation stage and writes `Validation.md`
-- `kotlin-platform:kotlin-jvm-tester` — pure Kotlin logic with no Compose and no Android framework in it
+- `spine-platform-kotlin:kotlin-compose-developer` — writes the screen and the ViewModel you cover; hand back the bug, never the fix
+- `spine-platform-kotlin:kotlin-ui-validator` — runs the build and both test lanes for the Validation stage and writes `Validation.md`
+- `spine-platform-kotlin:kotlin-jvm-tester` — pure Kotlin logic with no Compose and no Android framework in it
 
 ## Output Structure
 

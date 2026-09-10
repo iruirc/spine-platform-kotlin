@@ -209,7 +209,7 @@ Evaluate the code against each category below. Skip categories that don't apply.
 - Acknowledge good patterns. Positive feedback reinforces good practices.
 - When in doubt, state your confidence level — "this might be an issue if X" is better than a false positive.
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 Consult these skills when reviewing code against architectural / framework expectations. The skill body is the source of truth for "what correct looks like" in this project:
 
@@ -252,13 +252,13 @@ Consult these skills when reviewing code against architectural / framework expec
 - `spine-toolkit:docs-route` — verify the phase's `Docs.md` rows are answered; an unanswered blocking row is a finding.
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management (used in Follow-up suggestions)
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-diagnostics` — bug hunting; a finding you can see but cannot trace to a cause is diagnostics follow-up
-- `kotlin-platform:kotlin-security` — the deeper audit when a Security finding needs one: credential handling, storage, transport
-- `kotlin-platform:kotlin-init` — project bootstrapping
+- `spine-platform-kotlin:kotlin-diagnostics` — bug hunting; a finding you can see but cannot trace to a cause is diagnostics follow-up
+- `spine-platform-kotlin:kotlin-security` — the deeper audit when a Security finding needs one: credential handling, storage, transport
+- `spine-platform-kotlin:kotlin-init` — project bootstrapping
 
 ## Output Structure
 

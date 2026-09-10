@@ -1,7 +1,7 @@
 # kotlin-setup — ru
 
 ## error_not_kotlin_project
-Не Kotlin-проект (не найден `settings.gradle(.kts)`, `build.gradle(.kts)`, `pom.xml` или `module.yaml`), поэтому `## Stack` остался незаполненным. Для генерации нового используй `@kotlin-platform:kotlin-init`.
+Не Kotlin-проект (не найден `settings.gradle(.kts)`, `build.gradle(.kts)`, `pom.xml` или `module.yaml`), поэтому `## Stack` остался незаполненным. Для генерации нового используй `@spine-platform-kotlin:kotlin-init`.
 
 ## auq_axis_target_label
 Целевая поверхность

@@ -1,7 +1,7 @@
 ---
 name: kotlin-setup
 description: |
-  Platform half of project setup for Kotlin projects. Asks the stack questions of kotlin-platform's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing CLAUDE-spine-toolkit.md. Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
+  Platform half of project setup for Kotlin projects. Asks the stack questions of spine-platform-kotlin's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing CLAUDE-spine-toolkit.md. Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
   Use when (en): spine-toolkit:setup hands the platform its own config blocks
   Use when (ru): spine-toolkit:setup передаёт платформе её блоки конфига
 ---
@@ -14,11 +14,11 @@ The platform half of `/setup`. `spine-toolkit:setup` owns the config file — it
 **`## Stack` and `## Modules`**. This skill touches nothing else in the file and creates no file
 of its own.
 
-It is reached through the `setup` row of kotlin-platform's manifest `## Entrypoints`. That row is
+It is reached through the `setup` row of spine-platform-kotlin's manifest `## Entrypoints`. That row is
 the whole binding; core never hardcodes this skill's name.
 
 The skill does NOT create a Gradle build, does NOT modify Kotlin code, and does NOT start any
-workflow. To generate a project from scratch, use the `@kotlin-platform:kotlin-init` agent (via the
+workflow. To generate a project from scratch, use the `@spine-platform-kotlin:kotlin-init` agent (via the
 `/kotlin-init` slash command).
 
 ## Language Resolution
@@ -147,7 +147,7 @@ back against `## Axes`, so a localized option label resolves nothing.
 
 - Does NOT create or rename `CLAUDE-spine-toolkit.md`, `CLAUDE.md`, `Tasks/` or `Docs/` — that is `spine-toolkit:setup`.
 - Does NOT write `## Language`, `## Mode`, `## Progress`, `## Platform` or `## Agents`.
-- Does NOT create a Gradle build, sources, `libs.versions.toml`, lint configs, or `README.md` — that is `@kotlin-platform:kotlin-init`.
+- Does NOT create a Gradle build, sources, `libs.versions.toml`, lint configs, or `README.md` — that is `@spine-platform-kotlin:kotlin-init`.
 - Does NOT modify Kotlin code or build scripts.
 - Does NOT start workflows or call `spine-toolkit:orchestrator`.
 - Does NOT init git, make commits, or run Gradle.

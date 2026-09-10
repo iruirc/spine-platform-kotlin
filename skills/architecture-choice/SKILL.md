@@ -33,7 +33,7 @@ skill of the pattern it chose.
 
 ## When to Use
 
-- New project (`kotlin-platform:kotlin-init`, or `spine-toolkit:setup` on an existing repo) and the
+- New project (`spine-platform-kotlin:kotlin-init`, or `spine-toolkit:setup` on an existing repo) and the
   active project guidance file's `## Stack` carries no `- Architecture:` line
 - Major refactor with a concrete trigger: the signals in `arch-layered` that layering has run out of
   steam; the team grows past 3 devs; the domain grows explicit use cases; build time or merge
@@ -176,8 +176,8 @@ Cross-cutting (always, regardless of pattern):
 6. **If the user disagrees with the recommendation** — record their choice as-is, then add
    `Objection: <reason from the matrix or Fast Path>` either directly under `## Stack`, or in
    `Done.md → ## Objections` of the active task. Risks must stay visible.
-7. **Hand control** to `kotlin-platform:kotlin-init` (new project) or
-   `kotlin-platform:kotlin-architect` (existing project) with the skill list from Stack Cookbook.
+7. **Hand control** to `spine-platform-kotlin:kotlin-init` (new project) or
+   `spine-platform-kotlin:kotlin-architect` (existing project) with the skill list from Stack Cookbook.
 
 The output of this skill is one `## Stack` block in the active project guidance file and a list of
 skills to follow next — nothing more. Don't generate code here.

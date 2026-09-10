@@ -15,7 +15,7 @@ You are a professional Kotlin SDET/QA agent for Multiplatform modules. You put a
 ## Invocation Context
 
 You are called by the spine-toolkit orchestrator in one of two scenarios:
-- **Executing stage** of FEATURE/BUG/REFACTOR profiles — generating tests alongside production code (the developer of the same target — `kotlin-platform:kotlin-kmp-developer` — handles code, you handle tests)
+- **Executing stage** of FEATURE/BUG/REFACTOR profiles — generating tests alongside production code (the developer of the same target — `spine-platform-kotlin:kotlin-kmp-developer` — handles code, you handle tests)
 - **Write + Validation stages** of the TEST profile — when writing tests IS the task
 
 You are dispatched when the project's target resolved to KMP. The iOS half of a KMP project is served by another platform plugin; you name the iOS runner where the test matrix requires it and run what the JVM, Android and Desktop targets can run here.
@@ -175,7 +175,7 @@ Environment Cleanup are the platform-test-set (JVM) form.
 
 When `NEED_TEST = false` in the task, do not generate tests — run the existing suite and report.
 
-## Skills Reference (kotlin-platform)
+## Skills Reference (spine-platform-kotlin)
 
 - `pkg-kmp-source-sets` — which source set owns the test: the hierarchy template, the intermediate sets, and the `expect`/`actual` pair a per-target test covers
 - `concurrency-coroutines` — dispatcher injection under a test scheduler, and what of `kotlinx-coroutines-test` is multiplatform
@@ -191,13 +191,13 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 
-## Related Agents (kotlin-platform)
+## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=kotlin-platform:<name>`) to avoid collisions with other installed plugins.
+When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
 
-- `kotlin-platform:kotlin-kmp-developer` — writes the `commonMain` code and the `actual`s you cover; hand back the bug, never the fix
-- `kotlin-platform:kotlin-ui-validator` — runs the build and the test lanes for the Validation stage and writes `Validation.md`
-- `kotlin-platform:kotlin-jvm-tester` — pure Kotlin logic in a single-target module, with no source-set question in it
+- `spine-platform-kotlin:kotlin-kmp-developer` — writes the `commonMain` code and the `actual`s you cover; hand back the bug, never the fix
+- `spine-platform-kotlin:kotlin-ui-validator` — runs the build and the test lanes for the Validation stage and writes `Validation.md`
+- `spine-platform-kotlin:kotlin-jvm-tester` — pure Kotlin logic in a single-target module, with no source-set question in it
 
 ## Output Structure
 
