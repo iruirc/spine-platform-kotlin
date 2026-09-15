@@ -25,8 +25,9 @@ setup() {
 
 @test "the declared core floor reads everything this plugin relies on" {
   # `surfaces` is read by core from 1.7.1. A floor below it loads and is then
-  # misread: core looks for a row this manifest means and never finds it. The agents pin
-  # no model, and the `## Models` a user sets to keep them on opus exists from 1.11.0.
+  # misread: core looks for a row this manifest means and never finds it. The agents no
+  # longer pin opus, and the `## Models` a user sets to keep them on it exists from
+  # 1.11.0.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
   [ "$output" = ">=1.11.0 <2" ] || { echo "floor: $output"; return 1; }
