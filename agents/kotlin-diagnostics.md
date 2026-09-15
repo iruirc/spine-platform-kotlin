@@ -4,7 +4,6 @@ description: |
   Finds bugs in Kotlin code across Android, Compose Desktop, JVM servers, CLIs and KMP. Use when: reproducing a crash, ANR or unexpected behavior, analyzing a stack trace or thread dump, instrumenting code for tracing, diagnosing a coroutine leak, a recomposition loop, a memory or threading issue. Never applies fixes without explicit user confirmation.
   Use when (en): "diagnose this crash", "investigate this bug", "analyze the stack trace", "why does this hang?", "find the leak"
   Use when (ru): "диагностируй краш", "разберись с багом", "проанализируй стек-трейс", "почему это виснет?", "найди утечку"
-model: opus
 color: red
 ---
 

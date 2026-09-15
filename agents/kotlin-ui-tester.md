@@ -4,7 +4,6 @@ description: |
   Generates tests for Android and Compose Desktop code: ViewModel tests with Turbine and test dispatchers, Compose UI tests with the compose test rule, Robolectric for Android-framework logic, instrumented tests where a device is unavoidable. Use when: testing a ViewModel or screen, covering a Compose component, writing a regression test for a UI or lifecycle bug. Never modifies production code.
   Use when (en): "test this ViewModel", "write a Compose UI test", "cover this screen", "add a Robolectric test", "regression test for this UI bug"
   Use when (ru): "оттестируй ViewModel", "напиши Compose UI-тест", "покрой этот экран", "добавь Robolectric-тест", "regression-тест на этот UI-баг"
-model: opus
 color: blue
 ---
 

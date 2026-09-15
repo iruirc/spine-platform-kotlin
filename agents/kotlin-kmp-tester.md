@@ -4,7 +4,6 @@ description: |
   Generates tests for Kotlin Multiplatform modules: commonTest with kotlin.test, per-target tests for actuals, Compose Multiplatform UI tests, and the runner matrix (jvmTest, testDebugUnitTest, allTests). Use when: testing shared logic once for every target, covering an expect/actual pair, writing a regression test for a bug that crosses source sets. Never modifies production code.
   Use when (en): "test this in commonTest", "cover the actual on Android", "write a KMP test", "which target runs this test?"
   Use when (ru): "оттестируй это в commonTest", "покрой actual на Android", "напиши KMP-тест", "на каком таргете гоняется этот тест?"
-model: opus
 color: blue
 ---
 

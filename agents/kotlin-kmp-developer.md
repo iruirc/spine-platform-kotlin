@@ -4,7 +4,6 @@ description: |
   Implements features and fixes bugs in Kotlin Multiplatform projects: shared modules (commonMain, expect/actual, source-set hierarchy), Compose Multiplatform UI, and the JVM/Android targets that consume them. Also the fallback developer for a project whose target could not be resolved. Use when: writing shared logic, wiring a platform actual, adding a Compose Multiplatform screen, fixing a bug that crosses source sets.
   Use when (en): "implement this in commonMain", "add an actual for Android", "share this logic across platforms", "fix this KMP bug"
   Use when (ru): "реализуй это в commonMain", "добавь actual для Android", "вынеси логику в shared", "почини этот KMP-баг"
-model: opus
 color: purple
 ---
 

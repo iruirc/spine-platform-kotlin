@@ -4,7 +4,6 @@ description: |
   Bootstraps a new Kotlin project as one Gradle build: an Android app, a Compose Desktop app, a JVM server (Spring Boot, Ktor, Micronaut, Quarkus, http4k), a CLI tool (Clikt, kotlinx-cli) or a KMP shared module. Asks the target first, confirms the stack, generates the build with a version catalog and lint config, then hands the answers to spine-toolkit:setup for the toolkit config. To attach the toolkit to an existing project use `/setup`.
   Use when (en): "create a new Kotlin project", "scaffold an Android app", "init a Ktor server", "new Compose Desktop app", "generate a KMP module", "/kotlin-init"
   Use when (ru): "создай Kotlin-проект", "новый Android-проект", "инициализируй Ktor-сервер", "новое Compose Desktop приложение", "сгенерируй KMP-модуль", "/kotlin-init"
-model: opus
 color: blue
 ---
 

@@ -4,7 +4,6 @@ description: |
   Designs and reviews Kotlin application architecture across Android, Compose Desktop, JVM servers, CLI tools and KMP shared modules. Use when: planning new feature modules, evaluating architectural patterns (MVVM, MVI, Clean, Layered, Hexagonal), designing API and DB schemas, configuring dependency injection, deciding Gradle module boundaries, or reviewing architecture.
   Use when (en): "design architecture", "plan new feature module", "evaluate architectural pattern", "review project architecture", "should I split this into a Gradle module?"
   Use when (ru): "спроектируй архитектуру", "запланируй модуль", "оцени архитектурный паттерн", "проведи ревью архитектуры", "нужен ли отдельный Gradle-модуль?"
-model: opus
 color: purple
 ---
 

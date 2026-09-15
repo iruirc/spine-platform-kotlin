@@ -14,7 +14,10 @@ assert_agent_shape() {
   grep -qE "^name: ${name}\$" "$f" || { echo "$f: frontmatter name is not $name"; return 1; }
   grep -q 'Use when (en):' "$f" || { echo "$f: no English triggers"; return 1; }
   grep -q 'Use when (ru):' "$f" || { echo "$f: no Russian triggers"; return 1; }
-  grep -qE '^model: (opus|sonnet)$' "$f" || { echo "$f: no model"; return 1; }
+  local front; front="$(awk '/^---$/{c++; next} c==1{print}' "$f")"
+  ! grep -q '^model:' <<<"$front" || grep -qxE 'model: (sonnet|haiku)' <<<"$front" \
+    || { echo "$f: pins a model heavier than the session may choose"; return 1; }
+  ! grep -q '^effort:' <<<"$front" || { echo "$f: pins an effort"; return 1; }
   grep -q '^\*\*First\*\*: Read CLAUDE-spine-toolkit.md' "$f" \
     || { echo "$f: does not read the project config first"; return 1; }
   local h

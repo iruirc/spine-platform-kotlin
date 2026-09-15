@@ -4,7 +4,6 @@ description: |
   Implements JVM server and CLI functionality in Kotlin — new features, changes, bug fixes — with Spring Boot, Ktor, Micronaut, Quarkus, http4k, Clikt or kotlinx-cli. Use when: writing an endpoint or route, a service, a repository, a migration, a command; integrating an external system; fixing a server or CLI defect.
   Use when (en): "implement this endpoint", "add this service", "write the repository", "add a CLI command", "fix this server bug"
   Use when (ru): "реализуй этот эндпоинт", "добавь этот сервис", "напиши репозиторий", "добавь CLI-команду", "почини этот серверный баг"
-model: opus
 color: purple
 ---
 

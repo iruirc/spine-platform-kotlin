@@ -4,7 +4,6 @@ description: |
   Security auditor for Kotlin projects: OWASP Mobile Top-10 for Android and desktop apps, OWASP Top-10 for JVM servers, plus the Gradle supply chain. Use when: auditing a new feature for security risks, reviewing credential and secret handling, checking network security config or TLS, auditing deep links and input validation, detecting insecure storage. Never applies patches without explicit user confirmation.
   Use when (en): "security audit", "check this for OWASP issues", "audit credential handling", "review the network security config", "audit this endpoint"
   Use when (ru): "проведи security-аудит", "проверь по OWASP", "оцени работу с credentials", "проверь network security config", "проверь этот эндпоинт"
-model: opus
 color: orange
 ---
 

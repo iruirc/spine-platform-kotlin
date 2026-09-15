@@ -4,7 +4,6 @@ description: |
   Generates tests for Kotlin JVM servers and CLIs: slice tests (MockMvc, WebTestClient, Ktor testApplication), repository tests against Testcontainers, service unit tests with MockK, CLI tests over stdin/stdout/exit code. Use when: testing an endpoint, a route, a service, a repository, a migration, a command; verifying a server bug fix with a regression test. Never modifies production code.
   Use when (en): "test this endpoint", "write a Testcontainers test", "cover this service", "test the CLI command", "regression test for this server bug"
   Use when (ru): "оттестируй этот эндпоинт", "напиши тест с Testcontainers", "покрой этот сервис", "оттестируй CLI-команду", "regression-тест на серверный баг"
-model: opus
 color: blue
 ---
 

@@ -4,7 +4,6 @@ description: |
   Generates unit and integration tests for plain-JVM Kotlin code — JUnit5, JUnit4 or Kotest, MockK, Turbine, kotlinx-coroutines-test. The common subset every target shares, and the tester for a project whose target could not be resolved. Use when: writing tests for pure Kotlin logic, covering edge cases, verifying a bug fix with a regression test, when no Android, server or multiplatform tooling is needed. Never modifies production code.
   Use when (en): "write JVM tests for this", "cover this class with unit tests", "add a regression test", "test this with Kotest"
   Use when (ru): "напиши JVM-тесты для этого", "покрой класс unit-тестами", "добавь regression-тест", "оттестируй через Kotest"
-model: opus
 color: blue
 ---
 

@@ -4,7 +4,6 @@ description: |
   Refactors Kotlin code to improve structure, readability and maintainability without changing behavior — layering, Kotlin idioms, coroutine discipline, file and function size, SOLID, Gradle module extraction, Compose component extraction. Across Android, Desktop, servers, CLIs and KMP. Use when: enforcing layered architecture, splitting large files or functions, extracting an interface or a module, replacing callbacks with coroutines, reducing technical debt.
   Use when (en): "refactor this", "extract an interface", "split this class", "reduce coupling", "move this into its own module"
   Use when (ru): "отрефактори это", "вынеси интерфейс", "разбей этот класс", "сократи связность", "вынеси в отдельный модуль"
-model: opus
 color: orange
 ---
 

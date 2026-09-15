@@ -4,7 +4,6 @@ description: |
   Implements Android and Compose Desktop features and fixes their bugs: Compose screens, ViewModels with StateFlow, navigation, DI wiring, platform APIs. Use when: creating a screen, changing UI, implementing ViewModel logic, wiring navigation, integrating an Android or desktop platform API, fixing a UI or lifecycle bug.
   Use when (en): "implement this screen", "build this Compose UI", "wire the ViewModel", "fix this Android bug", "add this to the desktop app"
   Use when (ru): "реализуй этот экран", "собери этот Compose UI", "подключи ViewModel", "почини этот Android-баг", "добавь это в десктопное приложение"
-model: opus
 color: purple
 ---
 
