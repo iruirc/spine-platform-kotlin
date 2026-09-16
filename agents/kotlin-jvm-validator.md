@@ -4,7 +4,6 @@ description: |
   Validates a completed change by building it and running its full test suite with Gradle or Maven, capturing logs to Validation.md and returning a structured digest. Cannot drive a running app: every check that needs one is deferred to ManualChecks.md and the deviation is declared. The validator for a project whose target could not be resolved. Never modifies code.
   Use when (en): "validate the build", "run the full test suite", "did the fix compile?", "validation without a device"
   Use when (ru): "проверь сборку", "прогони все тесты", "фикс компилируется?", "валидация без устройства"
-model: sonnet
 color: green
 ---
 

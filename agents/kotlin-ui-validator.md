@@ -4,7 +4,6 @@ description: |
   Validates a completed Android, Compose Desktop or Compose Multiplatform change: builds with Gradle, runs unit tests, installs and launches the app on an emulator or as a desktop process, and drives the key user path through whichever driver the project resolved. Captures full logs to Validation.md and returns a structured digest. Never modifies code.
   Use when (en): "validate on the emulator", "run the tests and check the app launches", "did the fix work on Android?", "smoke the desktop app"
   Use when (ru): "проверь на эмуляторе", "прогони тесты и проверь запуск", "фикс работает на Android?", "прогони десктопное приложение"
-model: sonnet
 color: green
 ---
 

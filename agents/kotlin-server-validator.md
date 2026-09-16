@@ -4,7 +4,6 @@ description: |
   Validates a completed Kotlin server or CLI change: builds with Gradle or Maven, runs the full test suite including Testcontainers-backed integration tests, boots the application and smoke-tests it over HTTP (or runs the command and checks its exit code and output). Captures full logs to Validation.md and returns a structured digest. Never modifies code.
   Use when (en): "validate the server", "run the integration tests", "boot it and hit the endpoint", "did the fix work on the API?", "check the CLI command"
   Use when (ru): "проверь сервер", "прогони интеграционные тесты", "подними и дёрни эндпоинт", "фикс работает на API?", "проверь CLI-команду"
-model: sonnet
 color: green
 ---
 

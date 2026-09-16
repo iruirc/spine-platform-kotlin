@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/lint-manifest.sh sha256:899419a74d367e607e75c4a431515b06d1c31a301247763beeb8cbe1aac05525
+# Adapted from spine-toolkit scripts/lint-manifest.sh sha256:b228904d1d1105d81cf02092d6e2536303b3358a745d7773a3eea44fd77fad79
 # Adapted from spine-toolkit's lint. Plugins share no code; update both or neither.
 # Checks a platform plugin's manifest skill against the spine-toolkit contract.
 # Validates the five tables' presence, Roles content (vocabulary, named agents
@@ -136,8 +136,8 @@ while read -r ref; do
     || { echo "manifest names an agent outside this plugin's namespace (expected $own_name:): $ref"; violations=$((violations+1)); }
   [ -f "$plugin/agents/${ref#*:}.md" ] \
     || { echo "manifest names an agent with no file: $ref"; violations=$((violations+1)); }
-  # A frontmatter model decides for every project that leaves the role at `platform`,
-  # whatever the session runs, so only a lighter model is allowed.
+  # A frontmatter model decides for every project that leaves the role at `session`,
+  # whatever the session runs, so a platform agent declares none.
   front="$(awk '{ sub(/\r$/, "") } NR == 1 && $0 == "---" { f = 1; next } f && $0 == "---" { exit } f' "$plugin/agents/${ref#*:}.md" 2>/dev/null || true)"
   # Parsed like YAML in awk, not `sed | head -1`: `head` closing early can SIGPIPE
   # sed and abort the script under `pipefail`, and awk also strips quotes/comments.
@@ -155,8 +155,8 @@ while read -r ref; do
     }
   ' <<<"$front")"
   case "$pinned" in
-    ''|sonnet|haiku) ;;
-    *) echo "agent pins model '$pinned', which decides for every project that leaves the role at platform — only sonnet or haiku, or none: $ref"; violations=$((violations+1)) ;;
+    '') ;;
+    *) echo "agent pins model '$pinned', which belongs to the project's ## Models: $ref"; violations=$((violations+1)) ;;
   esac
   if grep -qE '^effort:' <<<"$front"; then
     echo "agent pins an effort, which belongs to the session and the project: $ref"; violations=$((violations+1))
