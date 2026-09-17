@@ -1,14 +1,17 @@
 # arch-mvvm — detailed guide
 
-One screen — a list of orders that loads, fails, retries, refreshes and opens a detail — written
-twice: once with a sealed `UiState`, once with a data-class one, plus the hybrid the third table row
-recommends. Every section is self-contained; load the one you need, not the file.
+## Contents
 
-Android imports are shown. `collectAsStateWithLifecycle()` and
-`androidx.lifecycle.compose.LocalLifecycleOwner` are multiplatform since Lifecycle 2.8, so a Compose
-Multiplatform screen in `commonMain` keeps this code as written — it is the Android screen. Only
-Compose Desktop, which has no lifecycle to observe, swaps in `collectAsState()` and collects effects
-in a plain `LaunchedEffect`. Read `Test Setup` for the test differences.
+- Shared Pieces
+- Sealed UiState — ViewModel
+- Sealed UiState — Screen
+- Sealed UiState — Test
+- Data-class UiState — ViewModel
+- Data-class UiState — Screen
+- Data-class UiState — Test
+- Hybrid UiState
+- One-shot Effects
+- Test Setup
 
 ## Shared Pieces
 

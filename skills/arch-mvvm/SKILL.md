@@ -33,11 +33,9 @@ holders — is `compose-state`; the route graph the screen is registered in is `
 Not for a screen with no asynchronous work and no state beyond one field — hoist it into the caller
 and stop (`compose-state`). Not for a JVM server or CLI — that is `arch-layered`.
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries one screen written twice — full ViewModel, Screen and test in
-both UiState shapes. Load one section, not the file:
-`rg -n "^## " skills/arch-mvvm/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
