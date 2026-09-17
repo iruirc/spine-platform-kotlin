@@ -1,17 +1,17 @@
 # arch-mvi — detailed guide
 
-One screen — a search box with filters, a submit, a late result, a retry and an open-detail effect —
-written twice: hand-rolled, then on Orbit MVI. Every section is self-contained; load the one you
-need, not the file.
+## Contents
 
-The screen is deliberately the kind MVI is chosen for: the query, the filters and an in-flight
-response all move independently, so what is on screen depends on the *order* the three arrive in.
-`Shared Pieces` is the domain both halves import; everything else stands alone.
-
-Android imports are shown. `collectAsStateWithLifecycle()` is multiplatform since Lifecycle 2.8, so a
-Compose Multiplatform screen in `commonMain` keeps this code as written; Compose Desktop, which has
-no lifecycle to observe, swaps in `collectAsState()`. Read `Test Setup` for the dependency
-coordinates and the differences per target.
+- Shared Pieces
+- Hand-rolled — State and Intent
+- Hand-rolled — Reducer
+- Hand-rolled — Store
+- Hand-rolled — Screen
+- Hand-rolled — Reducer Test
+- Orbit — Container
+- Orbit — Screen
+- Orbit — Test
+- Test Setup
 
 ## Shared Pieces
 

@@ -36,11 +36,9 @@ Not for a screen with one load and one retry — that is `arch-mvvm`, and the re
 a two-state machine. Not for a whole app: MVI is chosen per screen, and a codebase where three
 screens have reducers and thirty do not is normal.
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries one search screen — query, filters, submit, a late result,
-retry and an open-detail effect — written twice, hand-rolled and on Orbit. Load one section, not the
-file: `rg -n "^## " skills/arch-mvi/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
