@@ -1,8 +1,22 @@
 # nav-deeplinks — detailed guide
 
-One app — `com.example.app`, hosting `https://example.com`, opening an order detail and a search
-screen — wired end to end. Every section is self-contained; load the one you need, not the file. The
-`Route` hierarchy and the `PendingRoute` holder are printed once, in this skill's `SKILL.md`, and
+## Contents
+
+- Shared Types
+- App Links Setup
+- Verification On Device
+- The Parser
+- The Parser Test
+- Entry Points — Activity
+- Entry Points — NavDeepLink
+- Entry Points — Notifications, Shortcuts, Widgets
+- Pending Route Gate
+- Desktop Scheme Registration
+- Testing With adb
+
+## Shared Types
+
+The `Route` hierarchy and the `PendingRoute` holder are printed once, in this skill's `SKILL.md`, and
 referred to from here rather than copied — two copies of a type is two places to change it.
 
 ## App Links Setup

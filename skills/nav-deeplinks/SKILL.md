@@ -36,12 +36,11 @@ and not for push delivery — what a notification carries in its payload and how
 
 ## When To Load The Reference
 
-`references/detailed-guide.md` carries the full setup: manifest and hosted file, the parser and its
-table test, every entry point wired, the gate, and the desktop half. Load a section, not the file:
-`rg -n "^## " skills/nav-deeplinks/references/detailed-guide.md`.
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
 | Need | Reference sections |
 |---|---|
+| Where `Route` and `PendingRoute` are declared, and why they are not repeated here | `Shared Types` |
 | Intent filter and the hosted `assetlinks.json` | `App Links Setup` |
 | Prove the link verified on a real device | `Verification On Device` |
 | Write the URL → Route parser | `The Parser` |
