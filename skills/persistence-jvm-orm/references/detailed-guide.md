@@ -1,8 +1,22 @@
 # persistence-jvm-orm — detailed guide
 
-One aggregate — an `Order` with its `OrderLine`s, read by customer, written whole, tested against
-real Postgres — built four times: Spring Data JPA, Exposed on Ktor, jOOQ, Spring Data JDBC; then an
-N+1 nobody measured and a pool nobody sized. The domain side belongs to no engine:
+## Contents
+
+- The Domain Side
+- JPA — Entity and Gradle Plugins
+- JPA — Repository and the Read Path
+- JPA — @DataJpaTest with Testcontainers
+- Exposed — Tables and DSL
+- Exposed — Repository on Ktor
+- Exposed — Testcontainers Test
+- jOOQ — Codegen and a Typed Query
+- Spring Data JDBC — Aggregate Root
+- Finding an N+1 with Hibernate Statistics
+- HikariCP Sizing
+
+## The Domain Side
+
+The domain side belongs to no engine:
 
 ```kotlin
 // :domain — nothing below this block appears in it.

@@ -37,17 +37,13 @@ layer is *for* (`persistence-architecture`), not for schema change (`persistence
 not for where the transaction goes relative to the layers — that is `arch-layered`, and this skill
 adds only what JPA's proxy makes different.
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` builds one aggregate — an `Order` with its lines — four times: as
-a JPA entity pair with a Spring Data repository and a Testcontainers test, as Exposed tables with
-a Ktor-side repository, as a jOOQ query over the migrated schema, and as a Spring Data JDBC
-aggregate root. Then an N+1 caught with Hibernate statistics, and pool sizing. Every section is
-self-contained; load a section, not the file:
-`rg -n "^## " skills/persistence-jvm-orm/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| The shared `Order`/`OrderRepository` types every engine section assumes | `The Domain Side` |
 | Write a JPA entity in Kotlin without tripping over `final` or `equals` | `JPA — Entity and Gradle Plugins` |
 | Load an aggregate in one query and return it as domain | `JPA — Repository and the Read Path` |
 | Test a repository against the real database | `JPA — @DataJpaTest with Testcontainers` |
