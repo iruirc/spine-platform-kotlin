@@ -39,13 +39,11 @@ Not for which HTTP client suspends how — `net-http-clients`.
 
 ## When To Load The Reference
 
-`references/detailed-guide.md` carries the worked versions: one full call chain, five cancellation
-samples, both fan-out shapes, the two long-lived owners, shared state, the server, and the test
-setup. Load a section, not the file:
-`rg -n "^## " skills/concurrency-coroutines/references/detailed-guide.md`.
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
 | Need | Reference sections |
 |---|---|
+| The shared `Order` type every section uses, and the client/server sample convention | `Shared Type` |
 | A ViewModel → use case → repository → data source chain with the one `withContext` in it | `The Chain — Where withContext Sits` |
 | Proof that `runCatching` eats cancellation, and the helper that does not | `Cancellation — runCatching Swallows It`, `Cancellation — A Safe runCatching` |
 | A CPU loop that stays cancellable, and cleanup that still runs after cancel | `Cancellation — ensureActive in a Loop`, `Cancellation — Cleanup Under NonCancellable` |

@@ -1,9 +1,32 @@
 # concurrency-coroutines — detailed guide
 
-One domain — an order list loaded for a screen and served from an HTTP API — carried through every
-decision in `SKILL.md`: the dispatcher chain, the five cancellation shapes, both fan-outs, the two
-long-lived owners, shared state, the server frameworks, and the test setup. Every section is
-self-contained; load the one you need. The shared type is `data class Order(val id: String, val total: Long)`.
+## Contents
+
+- Shared Type
+- The Chain — Where withContext Sits
+- Cancellation — runCatching Swallows It
+- Cancellation — A Safe runCatching
+- Cancellation — ensureActive in a Loop
+- Cancellation — Cleanup Under NonCancellable
+- Cancellation — withTimeout and withTimeoutOrNull
+- Fan-out — coroutineScope and async
+- Fan-out — supervisorScope and Per-Child Failure
+- App Scope — A Service That Outlives the Screen
+- Android — WorkManager CoroutineWorker
+- Shared State — Mutex
+- Shared State — limitedParallelism for Blocking JDBC
+- Server — Ktor Handlers
+- Server — Spring WebFlux and Reactor Interop
+- Server — Spring MVC and Virtual Threads
+- Testing — runTest and Virtual Time
+- Testing — Injected Dispatchers and setMain
+- Testing — backgroundScope for Endless Collectors
+
+## Shared Type
+
+```kotlin
+data class Order(val id: String, val total: Long)
+```
 
 Client samples are Android's and compile unchanged on Compose Multiplatform and Compose Desktop
 except where noted; server samples name their framework.
