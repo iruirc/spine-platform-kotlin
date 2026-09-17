@@ -35,14 +35,13 @@ row of the table below.
 Not for the layer above the client — the API interface, retry, refresh, paging, caching are all
 `net-architecture`. Not for generating a client from a spec (`net-openapi`).
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries one fully configured client per row of the decision table,
-each with its matching test double, plus one serializer setup per row of the serializer table. Load a
-section, not the file: `rg -n "^## " skills/net-http-clients/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| The shared payload, middleware order and `TokenStore` every client below assumes | `Shared Setup` |
 | Retrofit over a configured OkHttp, with the interceptor stack | `Retrofit + OkHttp` |
 | A Ktor client with timeouts, negotiation, redacting logs, retry and bearer refresh | `Ktor Client` |
 | OkHttp used directly, with no typed layer over it | `OkHttp Alone` |

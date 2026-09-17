@@ -1,9 +1,26 @@
 # net-http-clients — detailed guide
 
-One API — `GET /orders?cursor=…` returning a page, `POST /orders` creating one — configured on each
-client of `SKILL.md`'s decision table, then doubled in a test, plus one setup per serializer. Every
-section is self-contained; load the one you need, not the file. The payload they share, behind the
-`OrdersApi` boundary `net-architecture` declares:
+## Contents
+
+- Shared Setup
+- Retrofit + OkHttp
+- Retrofit + OkHttp — Test Double
+- Ktor Client
+- Ktor Client — Test Double
+- OkHttp Alone
+- OkHttp Alone — Test Double
+- Spring RestClient
+- Spring RestClient — Test Double
+- Spring WebClient
+- Spring WebClient — Test Double
+- JDK HttpClient
+- Serializer — kotlinx.serialization
+- Serializer — Moshi
+- Serializer — Jackson
+
+## Shared Setup
+
+The payload every client shares, behind the `OrdersApi` boundary `net-architecture` declares:
 
 ```kotlin
 @Serializable
