@@ -34,14 +34,13 @@ Not for choosing the `UiState` type or deciding where a snackbar goes — that i
 the flow operators feeding the screen — `reactive-flow`. Not for what a route argument may hold —
 `nav-compose`.
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries the worked versions: one refactor, one holder, one stability
-walkthrough, one sample per effect handler, and one diagnosis session. Load a section, not the file:
-`rg -n "^## " skills/compose-state/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| The row type every section shares, and where Multiplatform differs | `Shared Type` |
 | A composable that owns too much, and the same one hoisted | `Hoisting — Before`, `Hoisting — After` |
 | A plain state holder class and its `remember` factory | `State Holder` |
 | Keeping a non-`Bundle`-able type across process death | `Saver for rememberSaveable` |

@@ -1,10 +1,23 @@
 # compose-state — detailed guide
 
-One screen — a searchable, filterable order list with a scroll-to-top button — carried through every
-decision in `SKILL.md`: hoisted, given a state holder, made skippable, wired to each effect handler,
-and finally profiled. Every section is self-contained; load the one you need, not the file.
+## Contents
 
-The row type all sections share:
+- Shared Type
+- Hoisting — Before
+- Hoisting — After
+- State Holder
+- Saver for rememberSaveable
+- Stability — The Unstable Class
+- Stability — The Compiler Report
+- Stability — The Fix
+- Strong Skipping
+- Side Effect Handlers
+- derivedStateOf — Pays
+- derivedStateOf — Does Not Pay
+- Diagnosing — Compiler Metrics
+- Diagnosing — recomposeHighlighter
+
+## Shared Type
 
 ```kotlin
 data class OrderRow(val id: String, val title: String, val isOpen: Boolean)
