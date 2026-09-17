@@ -1,9 +1,22 @@
 # arch-clean — detailed guide
 
-One feature — a customer's orders — walked through all three layers as the files a real project
-would have, then tested one layer at a time, then wired in Gradle so the build enforces what the
-prose claims. The two Domain sections define the types every later section maps to and are worth
-reading first; from there each section stands alone.
+## Contents
+
+- Reading These Files
+- Domain — Entity and Repository Port
+- Domain — Use Cases
+- Data — DTO and the Remote Source
+- Data — Room Entity and the Local Source
+- Data — Mappers
+- Data — Repository Implementation
+- Presentation — ViewModel
+- Testing
+- Gradle Wiring
+
+## Reading These Files
+
+The two Domain sections define the types every later section maps to and are worth reading first;
+from there each section stands alone.
 
 The header comment on each block is the module and path the file belongs to. That is not decoration:
 in this architecture the path *is* the constraint, because the module a file sits in decides what it

@@ -42,16 +42,13 @@ Not for the shape of one screen's state — that is `arch-mvvm`, or `arch-mvi` w
 state machine. Not for a CRUD service that maps HTTP to SQL and has no rules to protect: that is
 `arch-layered`, and Clean over it is 40 files of indirection.
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` walks one feature — Orders — through all three layers as real files,
-then tests each layer, then shows the Gradle blocks that enforce the arrows. The two Domain sections
-define the types everything else maps to; each section after them stands alone. Load what you need,
-not the file:
-`rg -n "^## " skills/arch-clean/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| What the header comment means, and the time-type opt-in every sample assumes | `Reading These Files` |
 | The entity, the port, and the domain error type | `Domain — Entity and Repository Port` |
 | A use case with an actual rule in it, and the `Result` shape | `Domain — Use Cases` |
 | The wire model and the API service that returns it | `Data — DTO and the Remote Source` |
