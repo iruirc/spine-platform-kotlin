@@ -39,13 +39,11 @@ rules stand on — `concurrency-coroutines`.
 
 ## When To Load The Reference
 
-`references/detailed-guide.md` carries both chains end to end — one client chain from an
-`IOException` to a rendered message, one server chain from a domain error to a problem-details body
-on four frameworks — plus the logging setup and the mapper tests. Load a section, not the file:
-`rg -n "^## " skills/error-architecture/references/detailed-guide.md`.
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
 | Need | Reference sections |
 |---|---|
+| The shared `Order` type, package, and cross-references every mapper below assumes | `Shared Setup` |
 | The failure-side `map` that `kotlin.Result` does not ship | `The catching Helper` |
 | The data-layer family, and the mapper that produces it | `Client — The Data Error Family`, `Client — Platform Exception to DataError` |
 | Where the data family dies and the domain family starts | `Client — DataError to Domain` |

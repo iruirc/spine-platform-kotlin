@@ -1,12 +1,31 @@
 # error-architecture — detailed guide
 
+## Contents
+
+- Shared Setup
+- The catching Helper
+- Client — The Data Error Family
+- Client — Platform Exception to DataError
+- Client — DataError to Domain
+- Client — Domain to UiState
+- Client — The Mapper Golden Table
+- Server — The Domain Error Family
+- Server — Problem Details
+- Server — Spring @ControllerAdvice
+- Server — Ktor StatusPages
+- Server — Micronaut and Quarkus
+- Server — Testing the Error Path
+- Logging — SLF4J and MDC
+- Logging — Timber and Redaction
+
+## Shared Setup
+
 Two chains over one domain: the client chain from an `IOException` to a message on a screen, the
-server chain from a domain error to an `application/problem+json` body on four frameworks. Load the
-section you need, not the file — the four server handler sections all read `toProblem()` from
-`Server — Problem Details` and the `ProblemDetails` type declared in `Server — Ktor StatusPages`,
-and the client chain's `isRetryable` is `SKILL.md`'s. The shared type is
-`data class Order(val id: String, val total: Long)`, packages are `com.acme`, and the shared
-discipline is that no mapper below ever sees a `CancellationException`.
+server chain from a domain error to an `application/problem+json` body on four frameworks. The four
+server handler sections all read `toProblem()` from `Server — Problem Details` and the
+`ProblemDetails` type declared in `Server — Ktor StatusPages`, and the client chain's `isRetryable`
+is `SKILL.md`'s. The shared type is `data class Order(val id: String, val total: Long)`, packages are
+`com.acme`, and the shared discipline is that no mapper below ever sees a `CancellationException`.
 
 ## The catching Helper
 
