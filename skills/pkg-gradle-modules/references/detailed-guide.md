@@ -1,9 +1,20 @@
 # pkg-gradle-modules — detailed guide
 
-One build wired end to end: the settings file, the `build-logic` included build and its convention
-plugins, the catalog every version comes from, one build file per archetype, the task that fails when
-a graph rule is broken, the performance properties, and the two shapes that appear only in a larger
-project — a composite build and published test fixtures. Load the section you need, not the file.
+## Contents
+
+- The Build It Wires
+- Settings and the Included Build
+- The build-logic Build File
+- Convention Plugins
+- Precompiled Script Plugins
+- The Version Catalog
+- Module Build Files
+- Enforcing the Graph
+- gradle.properties
+- Composite Build
+- Test Fixtures
+
+## The Build It Wires
 
 The build it wires is an orders app with six modules, one per archetype: `:app` (entry point and
 composition root), `:feature:orders`, `:core:designsystem`, `:core:model`, `:data:orders`, and

@@ -37,15 +37,13 @@ Not for the layer boundaries themselves — which module a use case belongs in i
 `arch-hexagonal`, and this skill starts once the answer is "its own module". Not for the source sets
 inside a multiplatform module (`pkg-kmp-source-sets`).
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries one complete build: the settings file, the `build-logic`
-included build with its convention plugins, the catalog, one module file per archetype, the
-graph-rule test and the performance properties. Each section stands alone; load the section, not the
-file: `rg -n "^## " skills/pkg-gradle-modules/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference section |
 |---|---|
+| The six modules every later section builds against | `The Build It Wires` |
 | `settings.gradle.kts`, the included build, where the catalog is declared | `Settings and the Included Build` |
 | The `build-logic` build file, `kotlin-dsl`, and registering plugin ids | `The build-logic Build File` |
 | The Android conventions as `Plugin<Project>` classes, and the helper they share | `Convention Plugins` |
