@@ -269,8 +269,8 @@ compose.desktop {
    Conveyor's own channel, has none.
 6. **URL-scheme registration happens at packaging time, and `jpackage` has no option for it.** The
    scheme is an `Info.plist` key on macOS, a registry key on Windows, a `.desktop` file with a
-   `MimeType` line on Linux — see `Desktop Scheme Registration` in
-   `skills/nav-deeplinks/references/detailed-guide.md` before promising a desktop deep link, because
+   `MimeType` line on Linux — see `Desktop Scheme Registration` in the `nav-deeplinks` reference
+   guide before promising a desktop deep link, because
    the answer constrains which packager the build can use.
 7. **Unsigned means a warning the user has to click past** — Gatekeeper quarantine on macOS,
    SmartScreen on Windows. Acceptable for an internal tool; decide it rather than learn it from the
