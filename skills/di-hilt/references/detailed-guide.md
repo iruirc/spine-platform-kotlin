@@ -1,9 +1,19 @@
 # di-hilt — detailed guide
 
-One Android app wired end to end with Hilt: the build files, the root, one module of each kind, two
-ViewModels, a multibinding, an entry point for a class Hilt cannot touch, and the test setup that
-replaces the network layer. The last section is the plain-Dagger fallback for the modules Hilt does
-not reach. Every section is self-contained; load the one you need, not the file.
+## Contents
+
+- The App It Wires
+- Gradle and KSP Setup
+- Application and Android Entry Points
+- Modules
+- ViewModels
+- Assisted Injection
+- Multibindings
+- Entry Points for Non-Hilt Classes
+- Testing
+- Plain Dagger
+
+## The App It Wires
 
 The app it wires is an orders screen over an `OrderRepository` backed by an HTTP client and a Room
 database. Its implementation carries an `@Inject` constructor, which is what lets every later section

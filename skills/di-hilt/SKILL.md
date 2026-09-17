@@ -40,12 +40,11 @@ Not for the assembly decision itself (`di-composition-root`) and not for ViewMod
 
 ## When To Load The Reference
 
-`references/detailed-guide.md` carries one complete Hilt setup — build files through tests — plus the
-plain-Dagger fallback. Each section stands alone; load the section, not the file:
-`rg -n "^## " skills/di-hilt/references/detailed-guide.md`.
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
 | Need | Reference section |
 |---|---|
+| The app every section wires against, and why later sections write `@Binds` | `The App It Wires` |
 | Plugins, KSP, the artifacts and the version catalog entries | `Gradle and KSP Setup` |
 | `@HiltAndroidApp`, and which classes may hold an `@Inject` field | `Application and Android Entry Points` |
 | A module with both `@Binds` and `@Provides`, and a qualifier | `Modules` |
