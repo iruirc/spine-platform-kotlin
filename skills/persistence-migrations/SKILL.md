@@ -35,17 +35,13 @@ Not for choosing the database (`persistence-room-sqldelight`, `persistence-jvm-o
 repository boundary above it (`persistence-architecture`), and not for the deploy pipeline the
 server steps run inside (`release-ops-server`).
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries the mechanics per engine — Room's exported schemas, a hand
-migration, an `AutoMigration` with a rename spec and a `MigrationTestHelper` test; SQLDelight's
-`.sqm` numbering and verification task; Flyway's scripts and Liquibase's changelog; then one
-expand/contract change walked across four deploys and a chain test from an old dump. Every section
-is self-contained; load a section, not the file:
-`rg -n "^## " skills/persistence-migrations/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| The discipline every engine section assumes without restating it | `The Discipline` |
 | Turn on Room's schema export and commit the JSON | `Room — Exported Schemas` |
 | Write a `Migration(1, 2)` by hand | `Room — A Hand-Written Migration` |
 | Rename or drop a column without writing SQL | `Room — AutoMigration and Specs` |

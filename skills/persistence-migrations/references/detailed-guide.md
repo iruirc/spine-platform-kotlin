@@ -1,10 +1,19 @@
 # persistence-migrations — detailed guide
 
-One change — an order's `total` becomes `total_cents`, and a `placed_at` column arrives — carried
-through each engine: Room by hand, by auto-migration and under test; SQLDelight as a numbered
-`.sqm`; Flyway as versioned scripts; Liquibase as a changelog. Then the two things that only exist
-on a server: expand/contract across four deploys, and a chain test replayed from a production dump.
-Load a section, not the file.
+## Contents
+
+- The Discipline
+- Room — Exported Schemas
+- Room — A Hand-Written Migration
+- Room — AutoMigration and Specs
+- Room — MigrationTestHelper
+- SQLDelight — .sqm Files and Verification
+- Flyway — Scripts and Wiring
+- Liquibase — Changelog and Changesets
+- Expand and Contract Across Four Deploys
+- Server — Chain Test From an Old Dump
+
+## The Discipline
 
 Everything here assumes the discipline in the skill body. In particular: nothing below edits a file
 that has shipped, and every version pair has a test.
