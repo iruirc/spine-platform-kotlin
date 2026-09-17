@@ -34,9 +34,9 @@ Not for the graph itself, the argument types or the back stack (`nav-compose`, `
 and not for push delivery — what a notification carries in its payload and how it is built is
 `release-ops-android`; this skill starts at the URL inside it.
 
-## When To Load The Reference
-
 `references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
+
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|

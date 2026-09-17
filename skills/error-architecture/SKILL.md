@@ -37,9 +37,9 @@ Not for retry policy, backoff or `Retry-After` — that is `net-architecture` `#
 shape of the state around the error slot — `arch-mvvm`. Not for the cancellation mechanics these
 rules stand on — `concurrency-coroutines`.
 
-## When To Load The Reference
-
 `references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
+
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|

@@ -38,9 +38,9 @@ the whole root.
 Not for the assembly decision itself (`di-composition-root`) and not for ViewModel design
 (`arch-mvvm`) — this skill starts once Hilt is the answer.
 
-## When To Load The Reference
-
 `references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
+
+## When To Load The Reference
 
 | Need | Reference section |
 |---|---|

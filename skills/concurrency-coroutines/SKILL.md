@@ -37,9 +37,9 @@ Not for choosing between `Flow`, `StateFlow` and `SharedFlow` or for operator ch
 `reactive-flow`. Not for what a failed call becomes before the user sees it — `error-architecture`.
 Not for which HTTP client suspends how — `net-http-clients`.
 
-## When To Load The Reference
-
 `references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
+
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
