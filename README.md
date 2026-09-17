@@ -80,7 +80,7 @@ the ten topics here.
 
 ## The manifest
 
-`skills/manifest/SKILL.md` is the contract surface. Five tables, read by invoking the skill:
+`skills/manifest/SKILL.md` is the contract surface. Six tables, read by invoking the skill:
 
 | Table | Declares |
 |---|---|
@@ -89,13 +89,14 @@ the ten topics here.
 | `## Heuristics` | which repo signals (build plugins, imports, paths) pin which axis value — written so nested signals (a KMP build with an Android target) match exactly one row |
 | `## Topics` | topic → the skills that cover it, for the orchestrator's methodology skills |
 | `## Entrypoints` | `setup = kotlin-setup` — the platform half of installation |
+| `## Driver` | the driver a project gets when it never chose one, and the surfaces its projects run on |
 
 The manifest is the only thing spine-toolkit reads here. Everything else in this plugin is reached
 through it, or invoked by name by an agent.
 
 ## Requirements
 
-- `spine-toolkit` `>=1.5.0 <2`, declared as a dependency in `plugin.json`. An installed core
+- `spine-toolkit` `>=1.12.0 <2`, declared as a dependency in `plugin.json`. An installed core
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
 - The validators drive Android through `adb` and the `mobile` MCP, desktop apps through the same
   MCP, and servers with `curl`; a project with none of those available sets `drive_app: off` in its
@@ -106,7 +107,8 @@ through it, or invoked by name by an agent.
 
 English is the source of truth. User-facing strings live in `skills/<name>/locales/en.md` with a
 key-for-key `ru.md` beside it — in 1.0 that is `kotlin-setup` alone. The active language comes
-from the project config's `## Language` block; skill triggers are bilingual regardless.
+from the project config's `## Language` block. Whatever it is, the agents and `kotlin-setup` list
+their triggers in both languages; the knowledge skills list English ones.
 Convention: `conventions/i18n.md`.
 
 ## Development
@@ -116,7 +118,7 @@ scripts/test-foundation.sh all
 scripts/lint-i18n.sh
 scripts/lint-locales.sh
 scripts/lint-manifest.sh .
-scripts/lint-core-refs.sh . --core "$SPINE_TOOLKIT_CORE" --ref 1.5.0
+scripts/lint-core-refs.sh . --core "$SPINE_TOOLKIT_CORE"
 ```
 
 `SPINE_TOOLKIT_CORE` is a checkout of core; the suite falls back to one sitting beside this
