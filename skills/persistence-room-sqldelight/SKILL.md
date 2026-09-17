@@ -38,16 +38,13 @@ Not for what the database is *for* — offline policy, caching, the repository c
 database (`persistence-jvm-orm`), not for flags and settings (DataStore, in
 `persistence-architecture`).
 
-## When To Load The Reference
+`references/detailed-guide.md` lies beside this file; its `## Contents` names the sections — read only the ones the table points to.
 
-`references/detailed-guide.md` carries one worked stack per engine — entity, DAO, database, a
-repository with a `Flow` query, a transaction and an in-memory test in Room, then the same feature
-in SQLDelight from the `.sq` file down to the drivers — plus the Room-on-KMP setup. Every section is
-self-contained; load a section, not the file:
-`rg -n "^## " skills/persistence-room-sqldelight/references/detailed-guide.md`.
+## When To Load The Reference
 
 | Need | Reference sections |
 |---|---|
+| The shared `OrderRepository` port every engine section implements | `The Domain Side` |
 | Declare a Room table, its indices and its DAO | `Room — Entity and DAO` |
 | Wire the `RoomDatabase`, KSP and the Gradle plugin | `Room — Database and Wiring` |
 | Map entities to domain and expose an observable read | `Room — Repository and Flow Queries` |

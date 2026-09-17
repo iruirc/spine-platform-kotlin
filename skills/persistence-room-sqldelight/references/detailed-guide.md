@@ -1,8 +1,21 @@
 # persistence-room-sqldelight — detailed guide
 
-One feature — orders for a customer with their lines, observed as a `Flow`, refreshed
-transactionally, tested in memory — built twice, in Room and in SQLDelight, then the Room-on-KMP
-setup that makes the first one multiplatform. Load a section, not the file.
+## Contents
+
+- The Domain Side
+- Room — Entity and DAO
+- Room — Database and Wiring
+- Room — Repository and Flow Queries
+- Room — Transactions
+- Room — In-Memory Test
+- SQLDelight — The .sq File
+- SQLDelight — Gradle and Drivers
+- SQLDelight — Repository and Flow Queries
+- SQLDelight — Transactions
+- SQLDelight — In-Memory Test
+- Room on KMP
+
+## The Domain Side
 
 The domain side is the same in both halves and belongs to no engine: an `Order` with an `Instant`,
 an `OrderStatus` and a list of `OrderLine`, behind one port.
