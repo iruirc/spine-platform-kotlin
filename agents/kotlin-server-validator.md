@@ -56,7 +56,7 @@ Two independent fields, each resolved the same way — `<task_path>/Task.md` fir
 - `auto` — the per-profile rules below apply unchanged.
 - `off` — you never boot the application or run the command, on any profile. The build step and the test step still run in full; build and test evidence is what carries the verdict.
 
-When `drive_app: off` suppresses a step the profile calls mandatory, the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
+When `[DRIVE_APP] = [off]` suppresses a step the profile calls mandatory, the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
 
 `deferred-manual` is not `not-replayed`. The first means nothing drove the application at all: the project or the task said not to, or the module has no entry point and no port of its own. The second means a replay was expected of you and ran, and produced nothing conclusive — and it still stops the run at the user.
 
@@ -70,8 +70,8 @@ A **separate artifact** in the task folder, never a section of `Validation.md`, 
 
 When you write it:
 
-- `manual_checks: auto` — only when something was deferred to a human: `drive_app: off` suppressed a mandatory step, or the module produces nothing to drive. Nothing deferred, no file.
-- `manual_checks: always` — every run of a task with an observable surface, including one where you booted the instance and smoked it. There you cover what driving it could not: the paths the smoke did not touch, and the ground a local boot cannot reach — a real dependency instead of a container, authentication against the real identity provider, TLS and certificates, load and timeout behaviour, migrations against production-shaped data, the health probes as the deployment calls them, multi-instance behaviour. Checks you actually performed are listed as already covered, not repeated as work.
+- `[MANUAL_CHECKS] = [auto]` — only when something was deferred to a human: `[DRIVE_APP] = [off]` suppressed a mandatory step, or the module produces nothing to drive. Nothing deferred, no file.
+- `[MANUAL_CHECKS] = [always]` — every run of a task with an observable surface, including one where you booted the instance and smoked it. There you cover what driving it could not: the paths the smoke did not touch, and the ground a local boot cannot reach — a real dependency instead of a container, authentication against the real identity provider, TLS and certificates, load and timeout behaviour, migrations against production-shaped data, the health probes as the deployment calls them, multi-instance behaviour. Checks you actually performed are listed as already covered, not repeated as work.
 
 Structure, the required fields of a case, and the two rules that make a case executable are core's: apply the `spine-toolkit:manual-checks` skill and follow it. Its input is `Plan.md ## Manual acceptance`. What is yours here is the measuring — when a case's verdict comes from an instrument, the file carries that instrument's exact invocation (the Gradle task, the environment variable, the report path, the parser call) and the field of its output that decides, in the place the skill puts it. Only genuinely deferred cases become `OpsChecklist.md` **Pending**; a case you already verified stays Applicable with its evidence.
 
@@ -109,7 +109,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 1. Read `- Build:` and `- Framework:`. Every Gradle command with `--console=plain`.
 2. **Build step**: Gradle `./gradlew build -x test`; Maven `mvn -B -DskipTests verify`. Capture into `## Build Log`.
-3. **Test step**: Gradle `./gradlew test` plus every declared test task (`integrationTest`, `functionalTest` — `./gradlew tasks --all | grep -i test`); Maven `mvn -B verify` (surefire + failsafe). Testcontainers needs a Docker daemon: probe with `docker info >/dev/null 2>&1`; absent → the tests that need it **cannot run**, which is FAILED with reason `docker unavailable` (Hard Rule 3). `drive_app: off` does not reach the test step; a project that must validate without Docker gates those suites itself — `@Testcontainers(disabledWithoutDocker = true)`, or a separate task the run can skip — and the skipped cases go to `ManualChecks.md`.
+3. **Test step**: Gradle `./gradlew test` plus every declared test task (`integrationTest`, `functionalTest` — `./gradlew tasks --all | grep -i test`); Maven `mvn -B verify` (surefire + failsafe). Testcontainers needs a Docker daemon: probe with `docker info >/dev/null 2>&1`; absent → the tests that need it **cannot run**, which is FAILED with reason `docker unavailable` (Hard Rule 3). `[DRIVE_APP] = [off]` does not reach the test step; a project that must validate without Docker gates those suites itself — `@Testcontainers(disabledWithoutDocker = true)`, or a separate task the run can skip — and the skipped cases go to `ManualChecks.md`.
 
 ### Boot and smoke (Server)
 
@@ -296,7 +296,7 @@ Before finalizing `Validation.md` and returning:
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: one of `fixed` / `still-reproduces` / `not-replayed` / `deferred-manual`; other profiles: omitted).
-- [ ] Every suppressed step — by `drive_app: off`, or by a module with nothing to drive — is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
+- [ ] Every suppressed step — by `[DRIVE_APP] = [off]`, or by a module with nothing to drive — is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
 - [ ] `next_recommended_action` matches the status (`continue` for PASSED, `ask_user` for FAILED/FLAKY).
 
 ## What You Never Do

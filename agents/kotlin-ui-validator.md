@@ -56,7 +56,7 @@ Two independent fields, each resolved the same way — `<task_path>/Task.md` fir
 - `auto` — the per-profile rules below apply unchanged.
 - `off` — you drive nothing, on any profile, and you do not resolve a driver at all: there is nothing to drive, so pulling a driver's tables into context would buy nothing. The build step and the test step still run in full; build and test evidence is what carries the verdict.
 
-When a step the profile calls mandatory is suppressed — by `drive_app: off`, or by any of the three non-working driver states below — the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
+When a step the profile calls mandatory is suppressed — by `[DRIVE_APP] = [off]`, or by any of the three non-working driver states below — the check is **deferred, not dropped**: it goes into `ManualChecks.md` (see below), its titles go into `manual_checks:` in the return digest, and the matching `OpsChecklist.md` items are marked **Pending** — never Applicable, since you verified nothing. Every profile behaves the same way here, BUG included: for BUG the deferred check is the replay from `Reproduce.md` and `reproduction_status` is `deferred-manual` — you claim nothing about whether the bug is fixed, and the user runs the scenario.
 
 `deferred-manual` is not `not-replayed`. The first means nothing drove the app at all: the project or the task said not to, the lane produces no surface, no driver resolved, the driver could not be reached for this run's surface, it drives none of the surfaces this platform produces, or it names no capability the replay needs. The second means a replay was expected of you and ran, and produced nothing conclusive — and it still stops the run at the user.
 
@@ -70,10 +70,10 @@ For you `auto` is the live setting: you drive the app yourself, in the lane `- T
 it is resolved only when `drive_app` did not resolve to `off`, and only in a lane that produces a
 surface. A KMP library with no app module produces none: nothing to drive, no driver to resolve.
 
-Resolve in this order, first hit wins. `auto`, or a missing key, falls through; an explicit `—` is the
+Resolve in this order, first hit wins. `auto`, or a missing field, falls through; an explicit `—` is the
 project choosing no driver and ends the chain there.
 
-| Step | Source | Key |
+| Step | Source | Field |
 |---|---|---|
 | 1 | `<task_path>/Task.md` | `[DRIVER]` |
 | 2 | `CLAUDE-spine-toolkit.md` | `[DRIVER]` |
@@ -118,7 +118,7 @@ failing the run over it is not.
 which is worse than a deferred check — but the build and the tests still produce theirs, and stopping
 would take those away over a line in a config.
 
-All three non-working states take the branch `drive_app: off` already takes: cases into
+All three non-working states take the branch `[DRIVE_APP] = [off]` already takes: cases into
 `ManualChecks.md`, matching `OpsChecklist.md` items Pending, **verdict not lowered**. Report which one
 in `driver_status`. `off` is not among them — it is the project's own setting, not a driver condition,
 and needs no driver report.
@@ -155,8 +155,8 @@ A **separate artifact** in the task folder, never a section of `Validation.md`, 
 
 When you write it:
 
-- `manual_checks: auto` — only when something was deferred to a human: `drive_app: off` suppressed a mandatory step, or a driver state of `none` / `unavailable` / `incompatible` did, or the lane produces no surface, or the block for this run's surface named no capability the check needed. Nothing deferred, no file.
-- `manual_checks: always` — every run of a UI-bearing task, including one where you drove the app yourself. There you cover what driving it could not: what the happy path did **not** touch, and the ground no capability in the block reaches. Read the block rather than assuming the list: `push`, `biometrics`, `camera`, `permissions`, `background`, `network_conditions` and `multi_device` are the usual absences, and a driver that names one of them takes that check off the human's list. Checks you actually performed are listed as already covered, not repeated as work.
+- `[MANUAL_CHECKS] = [auto]` — only when something was deferred to a human: `[DRIVE_APP] = [off]` suppressed a mandatory step, or a driver state of `none` / `unavailable` / `incompatible` did, or the lane produces no surface, or the block for this run's surface named no capability the check needed. Nothing deferred, no file.
+- `[MANUAL_CHECKS] = [always]` — every run of a UI-bearing task, including one where you drove the app yourself. There you cover what driving it could not: what the happy path did **not** touch, and the ground no capability in the block reaches. Read the block rather than assuming the list: `push`, `biometrics`, `camera`, `permissions`, `background`, `network_conditions` and `multi_device` are the usual absences, and a driver that names one of them takes that check off the human's list. Checks you actually performed are listed as already covered, not repeated as work.
 
 Structure, the required fields of a case, and the two rules that make a case executable are core's: apply the `spine-toolkit:manual-checks` skill and follow it. Its input is `Plan.md ## Manual acceptance`. What is yours here is the measuring — when a case's verdict comes from an instrument, the file carries that instrument's exact invocation (the Gradle task, the environment variable, the report path, the parser call) and the field of its output that decides, in the place the skill puts it. Only genuinely deferred cases become `OpsChecklist.md` **Pending**; a case you already verified stays Applicable with its evidence.
 
@@ -375,7 +375,7 @@ Before finalizing `Validation.md` and returning:
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: one of `fixed` / `still-reproduces` / `not-replayed` / `deferred-manual`; other profiles: omitted).
-- [ ] Every suppressed step — by `drive_app: off`, by a driver state, or by a lane with no app to launch — is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
+- [ ] Every suppressed step — by `[DRIVE_APP] = [off]`, by a driver state, or by a lane with no app to launch — is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending.
 - [ ] `driver_status` is one of the four and matches what the body says happened; both driver lines are omitted only for `off` and for a lane that produces no surface.
 - [ ] `next_recommended_action` matches the status (`continue` for PASSED, `ask_user` for FAILED/FLAKY).
 

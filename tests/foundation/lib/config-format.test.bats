@@ -22,6 +22,20 @@ mentions() {
     for block in Language Mode Progress Scale Reporting Validation Docs Budgets Models Effort; do
       [ -z "$(mentions "$block" "$f")" ] || { echo "$f still names ## $block"; return 1; }
     done
-  done < <(find "$ROOT/skills" "$ROOT/agents" "$ROOT/conventions" "$ROOT/tests" -name '*.md' -o -name '*.bash')
+  done < <(find "$ROOT/skills" "$ROOT/agents" "$ROOT/conventions" "$ROOT/commands" "$ROOT/tests" \
+             -name '*.md' -o -name '*.bash')
   [ "$n" -ge 30 ] || { echo "scanned $n file(s), expected at least 30"; return 1; }
+}
+
+# No extension filter: the vendored lints are `.sh` and one workspace script is `.zsh`, and
+# enumerating suffixes is how a script lands outside the only guard that would have caught it.
+@test "no script of this platform names a moved block of the project config" {
+  n=0
+  while IFS= read -r f; do
+    n=$((n + 1))
+    for block in Language Mode Progress Scale Reporting Validation Docs Budgets Models Effort; do
+      [ -z "$(mentions "$block" "$f")" ] || { echo "$f still names ## $block"; return 1; }
+    done
+  done < <(find "$ROOT/scripts" -type f)
+  [ "$n" -ge 5 ] || { echo "scanned $n file(s), expected at least 5"; return 1; }
 }

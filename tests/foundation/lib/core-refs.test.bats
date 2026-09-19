@@ -21,18 +21,23 @@ setup() {
   [ -d "$CORE/skills" ] || skip "no spine-toolkit checkout beside this one"
   # The floor's tag is cut after the release that first satisfies it, so between the
   # bump and that release there is none. Degrade to the checkout as it sits, exactly
-  # as the vendored lint does, rather than check nothing.
+  # as the vendored lint does, rather than check nothing — and carry what was actually
+  # consulted into every message below, so none of them names a ref nobody read.
+  git -C "$CORE" rev-parse --git-dir >/dev/null 2>&1 \
+    || { echo "$CORE is not a git checkout"; return 1; }
   if git -C "$CORE" rev-parse -q --verify "$FLOOR^{commit}" >/dev/null 2>&1; then
-    core_skills="$(git -C "$CORE" ls-tree --name-only "$FLOOR" skills/ | sed 's|^skills/||')"
+    at="$FLOOR"
+    core_skills="$(git -C "$CORE" ls-tree --name-only "$at" skills/ | sed 's|^skills/||')"
   else
+    at="$CORE as it sits — the floor $FLOOR is not tagged there"
     core_skills="$(ls "$CORE/skills")"
   fi
-  [ -n "$core_skills" ] || { echo "no skills in $CORE at $FLOOR"; return 1; }
+  [ -n "$core_skills" ] || { echo "no skills in $at"; return 1; }
   bad=""
   while IFS= read -r hit; do
     name="${hit##*:}"
     if ! grep -qxF "$name" <<<"$core_skills"; then bad="$bad
-$hit does not exist in spine-toolkit $FLOOR"; fi
+$hit does not exist in spine-toolkit $at"; fi
   done < <(grep -rnoE 'spine-toolkit:[a-z][a-z0-9-]*' "$ROOT"/commands/*.md || true)
   while IFS= read -r hit; do
     name="${hit##*:}"; name="${name//\`/}"
