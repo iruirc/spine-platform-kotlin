@@ -34,7 +34,7 @@ Produce output in the sections described in the "Output Structure" section below
 
 In this order:
 
-1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `drive_app` default.
+1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `[DRIVE_APP]` default.
 2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch").
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
@@ -46,12 +46,12 @@ If `Task.md`, `Plan.md`, or — for BUG — `Reproduce.md` is missing, fail fast
 
 ### The drive_app switch
 
-Two independent keys, each resolved the same way — `<task_path>/Task.md` first, then `CLAUDE-spine-toolkit.md` → `## Validation`, then the default. A missing line, a missing section, or an unrecognised value falls through to the next step.
+Two independent fields, each resolved the same way — `<task_path>/Task.md` first, then `CLAUDE-spine-toolkit.md`, then the default. Both files spell the field the same way. A missing line in either, or an unrecognised value, falls through to the next step.
 
-| Key | `Task.md` | `## Validation` | Default | Governs |
-|---|---|---|---|---|
-| drive app | `[DRIVE_APP]` | `drive_app` | `auto` | whether **you** drive the app |
-| manual checks | `[MANUAL_CHECKS]` | `manual_checks` | `auto` | whether **a human** gets a script |
+| Field | Default | Governs |
+|---|---|---|
+| `[DRIVE_APP]` | `auto` | whether **you** drive the app |
+| `[MANUAL_CHECKS]` | `auto` | whether **a human** gets a script |
 
 - `auto` — the per-profile rules below apply unchanged.
 - `off` — you never boot the application or run the command, on any profile. The build step and the test step still run in full; build and test evidence is what carries the verdict.
@@ -318,7 +318,7 @@ you write into the user's project and for your final report:
 - **Structure stays EN**: section headings, field labels, status enums
   (`[STATUS] = [DONE]`, `[VALIDATION_STATUS] = PASSED`), parsed table headers.
   Never translate — downstream skills key off them.
-- **Prose in the project `## Language`** (from `CLAUDE-spine-toolkit.md`, or the
+- **Prose in the project `[LANG]`** (from `CLAUDE-spine-toolkit.md`, or the
   `lang` field passed in the dispatch contract): every sentence you compose
   under those headings, bullet notes, rationale, and the final summary you
   return to the orchestrator. `lang=ru` → Russian body under EN headings.

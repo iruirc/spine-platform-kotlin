@@ -19,7 +19,14 @@ setup() {
 # byte — so commands/, which names core skills too, is checked here instead.
 @test "commands/ obeys the same two rules the vendored lint applies" {
   [ -d "$CORE/skills" ] || skip "no spine-toolkit checkout beside this one"
-  core_skills="$(git -C "$CORE" ls-tree --name-only "$FLOOR" skills/ | sed 's|^skills/||')"
+  # The floor's tag is cut after the release that first satisfies it, so between the
+  # bump and that release there is none. Degrade to the checkout as it sits, exactly
+  # as the vendored lint does, rather than check nothing.
+  if git -C "$CORE" rev-parse -q --verify "$FLOOR^{commit}" >/dev/null 2>&1; then
+    core_skills="$(git -C "$CORE" ls-tree --name-only "$FLOOR" skills/ | sed 's|^skills/||')"
+  else
+    core_skills="$(ls "$CORE/skills")"
+  fi
   [ -n "$core_skills" ] || { echo "no skills in $CORE at $FLOOR"; return 1; }
   bad=""
   while IFS= read -r hit; do

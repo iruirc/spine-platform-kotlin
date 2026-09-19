@@ -9,7 +9,7 @@ description: |
 # Kotlin Setup
 
 The platform half of `/setup`. `spine-toolkit:setup` owns the config file — it creates
-`CLAUDE-spine-toolkit.md`, writes `## Language`, `## Mode`, `## Progress`, `## Platform` and the
+`CLAUDE-spine-toolkit.md`, writes `[LANG]`, `[WORKFLOW_MODE]`, `[PROGRESS]`, `## Platform` and the
 `CLAUDE.md` import line, then hands this skill the two blocks that are the platform's:
 **`## Stack` and `## Modules`**. This skill touches nothing else in the file and creates no file
 of its own.
@@ -28,8 +28,8 @@ resolved it before the config existed. Use it and skip steps 1-4. Otherwise, bef
 user-facing string:
 
 1. Read `CLAUDE-spine-toolkit.md` from the project root.
-2. Find the `## Language` section.
-3. Take the first non-empty line in that section, lowercase and trim it. That is `<lang>`.
+2. Find the `[LANG]` field.
+3. Take the field's value, lowercase and trim it. That is `<lang>`.
 4. If `<lang>` is `en` or `ru`, use it. Otherwise default to `en`.
 5. Read this skill's `locales/<lang>.md`. Look up keys by H2 header.
 6. If a key is missing, fall back to the same key in `locales/en.md`. If still missing, that's a bug — fail loudly with the key name.
@@ -146,7 +146,7 @@ back against `## Axes`, so a localized option label resolves nothing.
 ## What this skill does NOT do
 
 - Does NOT create or rename `CLAUDE-spine-toolkit.md`, `CLAUDE.md`, `Tasks/` or `Docs/` — that is `spine-toolkit:setup`.
-- Does NOT write `## Language`, `## Mode`, `## Progress`, `## Platform` or `## Agents`.
+- Does NOT write `[LANG]`, `[WORKFLOW_MODE]`, `[PROGRESS]`, `## Platform` or `## Agents`.
 - Does NOT create a Gradle build, sources, `libs.versions.toml`, lint configs, or `README.md` — that is `@spine-platform-kotlin:kotlin-init`.
 - Does NOT modify Kotlin code or build scripts.
 - Does NOT start workflows or call `spine-toolkit:orchestrator`.

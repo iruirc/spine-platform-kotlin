@@ -341,7 +341,7 @@ you write into the user's project and for your final report:
 - **Structure stays EN**: section headings, field labels, status enums
   (`[STATUS] = [DONE]`, `[VALIDATION_STATUS] = PASSED`), parsed table headers.
   Never translate — downstream skills key off them.
-- **Prose in the project `## Language`** (from `CLAUDE-spine-toolkit.md`, or the
+- **Prose in the project `[LANG]`** (from `CLAUDE-spine-toolkit.md`, or the
   `lang` field passed in the dispatch contract): every sentence you compose
   under those headings, bullet notes, rationale, and the final summary you
   return to the orchestrator. `lang=ru` → Russian body under EN headings.

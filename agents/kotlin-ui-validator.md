@@ -34,7 +34,7 @@ Produce output in the sections described in the "Output Structure" section below
 
 In this order:
 
-1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `## Validation` block: `drive_app`, `manual_checks`, `driver`.
+1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `[DRIVE_APP]`, `[MANUAL_CHECKS]` and `[DRIVER]` fields.
 2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` or `[DRIVER]` if this task overrides a project default (see "The drive_app switch" and "The driver").
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
@@ -46,12 +46,12 @@ If `Task.md`, `Plan.md`, or — for BUG — `Reproduce.md` is missing, fail fast
 
 ### The drive_app switch
 
-Two independent keys, each resolved the same way — `<task_path>/Task.md` first, then `CLAUDE-spine-toolkit.md` → `## Validation`, then the default. A missing line, a missing section, or an unrecognised value falls through to the next step.
+Two independent fields, each resolved the same way — `<task_path>/Task.md` first, then `CLAUDE-spine-toolkit.md`, then the default. Both files spell the field the same way. A missing line in either, or an unrecognised value, falls through to the next step.
 
-| Key | `Task.md` | `## Validation` | Default | Governs |
-|---|---|---|---|---|
-| drive app | `[DRIVE_APP]` | `drive_app` | `auto` | whether **you** drive the app |
-| manual checks | `[MANUAL_CHECKS]` | `manual_checks` | `auto` | whether **a human** gets a script |
+| Field | Default | Governs |
+|---|---|---|
+| `[DRIVE_APP]` | `auto` | whether **you** drive the app |
+| `[MANUAL_CHECKS]` | `auto` | whether **a human** gets a script |
 
 - `auto` — the per-profile rules below apply unchanged.
 - `off` — you drive nothing, on any profile, and you do not resolve a driver at all: there is nothing to drive, so pulling a driver's tables into context would buy nothing. The build step and the test step still run in full; build and test evidence is what carries the verdict.
@@ -76,7 +76,7 @@ project choosing no driver and ends the chain there.
 | Step | Source | Key |
 |---|---|---|
 | 1 | `<task_path>/Task.md` | `[DRIVER]` |
-| 2 | `CLAUDE-spine-toolkit.md` → `## Validation` | `driver:` |
+| 2 | `CLAUDE-spine-toolkit.md` | `[DRIVER]` |
 | 3 | this platform's manifest, `## Driver` | `default` |
 | 4 | — | `—` |
 
@@ -194,7 +194,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 1. Read `- Build:`; Gradle unless it says otherwise. Every command with `--console=plain`.
 2. **Build step**: Android `./gradlew :<app>:assembleDebug`; Desktop `./gradlew :<app>:build -x test` (the `compose.desktop` plugin's `packageDistributionForCurrentOS` is release work — not here); KMP library `./gradlew :<module>:build -x test`. Capture into `## Build Log`.
-3. **Test step**: Android `./gradlew :<app>:testDebugUnitTest` (plus `:<module>:test` for pure-Kotlin modules); Desktop `./gradlew :<app>:test`; KMP `./gradlew :<module>:allTests`. Read results per `## Reading Gradle Output`. `connectedDebugAndroidTest` only when the task's `Plan.md` names instrumented tests and an emulator is already running — booting one for tests is the project's choice, recorded in `## Validation`.
+3. **Test step**: Android `./gradlew :<app>:testDebugUnitTest` (plus `:<module>:test` for pure-Kotlin modules); Desktop `./gradlew :<app>:test`; KMP `./gradlew :<module>:allTests`. Read results per `## Reading Gradle Output`. `connectedDebugAndroidTest` only when the task's `Plan.md` names instrumented tests and an emulator is already running — booting one for tests is not yours to decide — only a `Plan.md` that names the AVD asks for it.
 
 ### Emulator lane (Android)
 
@@ -398,7 +398,7 @@ you write into the user's project and for your final report:
 - **Structure stays EN**: section headings, field labels, status enums
   (`[STATUS] = [DONE]`, `[VALIDATION_STATUS] = PASSED`), parsed table headers.
   Never translate — downstream skills key off them.
-- **Prose in the project `## Language`** (from `CLAUDE-spine-toolkit.md`, or the
+- **Prose in the project `[LANG]`** (from `CLAUDE-spine-toolkit.md`, or the
   `lang` field passed in the dispatch contract): every sentence you compose
   under those headings, bullet notes, rationale, and the final summary you
   return to the orchestrator. `lang=ru` → Russian body under EN headings.
