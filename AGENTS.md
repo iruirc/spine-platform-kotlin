@@ -17,5 +17,6 @@ Read `.claude/CLAUDE.md` first; it is the shared development guide for this repo
   `policy.allow_implicit_invocation: false` and no `default_prompt`. This prevents automatic
   selection but does not disable explicit `$skill` use.
 - After changing plugin metadata or shared skills, run the full foundation suite and the validators
-  Codex bundles with its system skills: `plugin-creator/scripts/validate_plugin.py .` for the
-  plugin, and `skill-creator/scripts/quick_validate.py skills/<name>` for each changed skill.
+  Codex bundles with its system skills. Resolve each path from the loaded system skill location:
+  `<plugin-creator-root>/scripts/validate_plugin.py .` for the plugin, and
+  `<skill-creator-root>/scripts/quick_validate.py skills/<name>` for each changed skill.
