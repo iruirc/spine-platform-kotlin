@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android Release Operations"
+  short_description: "Plan safe Android release operations"
+  default_prompt: "Use $release-ops-android to review this Android release plan."

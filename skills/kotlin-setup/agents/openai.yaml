@@ -1,0 +1,5 @@
+interface:
+  display_name: "Kotlin Toolkit Setup"
+  short_description: "Internal platform setup delegated by spine-toolkit"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compose State"
+  short_description: "Place and stabilize state in Compose UI"
+  default_prompt: "Use $compose-state to decide where state should live in this Compose UI."

@@ -4,16 +4,18 @@
 [![license](https://img.shields.io/github/license/iruirc/spine-platform-kotlin?color=555)](LICENSE)
 [![requires spine-toolkit](https://img.shields.io/badge/requires-spine--toolkit-0969da)](https://github.com/iruirc/spine-toolkit)
 
-The Kotlin platform plugin for **spine-toolkit**. One plugin for three surfaces — Android,
-Compose Desktop and JVM servers, with KMP as the way they share code — carrying sixteen
-specialized agents, twenty-nine architecture and infrastructure skills, and the manifest that
-declares all of it to the orchestrator.
+The Kotlin platform plugin for **spine-toolkit**, with native manifests for Claude Code and Codex.
+One plugin for three surfaces — Android, Compose Desktop and JVM servers, with KMP as the way they
+share code — carrying sixteen Claude Code agents, twenty-nine architecture and infrastructure
+skills, and the manifest that declares all of it to the orchestrator.
 
 It is not a standalone toolkit: on its own it has skills you can invoke by hand, but nothing that
 runs a task. spine-toolkit supplies the process; this plugin supplies who does the work and what
 they know.
 
 ## Install
+
+### Claude Code
 
 ```
 /plugin marketplace add iruirc/claude-marketplace
@@ -35,6 +37,32 @@ client and a Ktor server is configured once.
 
 A project from scratch is this plugin's own command: `/kotlin-init` creates one Gradle build for
 the chosen target and writes the toolkit config from the answers it collected.
+
+### Codex
+
+The repository includes `.codex-plugin/plugin.json`; `skills/`, their references, `scripts/`, and
+`conventions/` are shared with Claude Code. Codex installs a plugin from a marketplace entry whose
+path is relative to the marketplace root: for the personal marketplace,
+`~/.agents/plugins/marketplace.json`, that is `~/plugins/spine-platform-kotlin`. Put a copy of this
+repository there, then install it:
+
+```bash
+codex plugin add spine-platform-kotlin@personal
+```
+
+Start a new Codex session after installation. What Codex gets is a subset:
+
+- **Works:** the twenty-nine standalone architecture and infrastructure knowledge skills.
+- **Not supported in Codex yet:** the sixteen `agents/` and the `kotlin-init` command are Claude
+  Code components. `spine-toolkit` ships no Codex manifest, so nothing orchestrates tasks, and its
+  internal `manifest` and `kotlin-setup` skills cannot complete their workflows. Codex still
+  permits an explicit `$skill-name` invocation, but `policy.allow_implicit_invocation: false`
+  prevents these two skills from being selected automatically and their UI metadata offers no
+  starter prompt.
+
+Codex caches a plugin by version. To pick up a change, refresh the copy and reinstall; to reinstall
+at an unchanged version, run the `plugin-creator` cachebuster **on the copy**. The suffix it writes
+into `version` is not a release, and the foundation suite fails on a checkout that carries it.
 
 ## What it provides
 
@@ -120,6 +148,12 @@ scripts/lint-locales.sh
 scripts/lint-manifest.sh .
 scripts/lint-core-refs.sh . --core "$SPINE_TOOLKIT_CORE"
 ```
+
+The foundation suite also checks that the Claude Code and Codex manifests have the same plugin
+identity and release version, that every skill has Codex UI metadata, and that toolkit-driven
+skills cannot activate implicitly. `spine-ops: scripts/release.sh` moves the version in both
+manifests. Validate the Codex package with the validator bundled with Codex's `plugin-creator`
+skill before publishing a release.
 
 `SPINE_TOOLKIT_CORE` is a checkout of core; the suite falls back to one sitting beside this
 repository, and skips the check when there is none.

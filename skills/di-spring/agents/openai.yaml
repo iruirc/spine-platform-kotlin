@@ -1,0 +1,4 @@
+interface:
+  display_name: "Spring DI"
+  short_description: "Configure Spring dependency injection in Kotlin"
+  default_prompt: "Use $di-spring to improve dependency injection in this Kotlin server."

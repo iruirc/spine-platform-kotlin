@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Coroutines"
+  short_description: "Design safe coroutine scopes and dispatchers"
+  default_prompt: "Use $concurrency-coroutines to review coroutine ownership and cancellation here."

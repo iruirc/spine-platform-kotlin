@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Architecture"
+  short_description: "Design Kotlin Clean Architecture boundaries"
+  default_prompt: "Use $arch-clean to structure this Kotlin project with Clean Architecture."

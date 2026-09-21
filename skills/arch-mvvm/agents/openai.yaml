@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin MVVM"
+  short_description: "Build testable Kotlin MVVM presentation"
+  default_prompt: "Use $arch-mvvm to design this Kotlin presentation layer."

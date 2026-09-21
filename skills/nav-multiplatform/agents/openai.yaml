@@ -1,0 +1,4 @@
+interface:
+  display_name: "Multiplatform Navigation"
+  short_description: "Choose navigation for multiplatform UI"
+  default_prompt: "Use $nav-multiplatform to choose navigation for this multiplatform UI."

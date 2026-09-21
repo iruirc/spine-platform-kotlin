@@ -1,8 +1,9 @@
 # CLAUDE.md — spine-platform-kotlin
 
-> This repo is one Claude Code plugin: `spine-platform-kotlin`, the Kotlin knowledge and agents that
-> `spine-toolkit` dispatches to. It declares `spine-toolkit` a dependency and is useless without it.
-> This file configures Claude when it works on the plugin itself.
+> This repo is a dual-runtime Claude Code and Codex plugin: `spine-platform-kotlin`, the Kotlin
+> knowledge and Claude agents that `spine-toolkit` dispatches to. Claude Code declares
+> `spine-toolkit` as a dependency; Codex loads the shared skills only, since `spine-toolkit` ships
+> no Codex manifest. This file configures Claude when it works on the plugin itself.
 
 ## Language
 
@@ -30,6 +31,9 @@ en
 - `agents/` — sixteen `kotlin-*` Claude Code subagents, named by the manifest's `## Roles` table;
   `developer`, `tester` and `validator` fan out on `target`
 - `commands/` — `/kotlin-init`
+- `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` — host manifests with one identity
+  and one version, which `spine-ops: scripts/release.sh` moves in both
+- `AGENTS.md` — Codex repository guidance that points back to this shared development guide
 - `tests/foundation/` — bats suites; `tests/foundation/helpers/shape.bash` holds the structural checks
 - `scripts/` plus `conventions/i18n.md` — six **adapted forks** of core's files, each recording the
   core path it came from and that file's sha256. They are not copies — do not "restore" them to

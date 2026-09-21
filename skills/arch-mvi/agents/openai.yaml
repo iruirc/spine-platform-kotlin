@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin MVI"
+  short_description: "Build predictable Kotlin MVI state flows"
+  default_prompt: "Use $arch-mvi to design the state and effects for this Kotlin UI."

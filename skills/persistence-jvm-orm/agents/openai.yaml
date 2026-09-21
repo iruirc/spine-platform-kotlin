@@ -1,0 +1,4 @@
+interface:
+  display_name: "JVM Persistence"
+  short_description: "Choose and tune JVM persistence frameworks"
+  default_prompt: "Use $persistence-jvm-orm to choose a persistence layer for this Kotlin server."

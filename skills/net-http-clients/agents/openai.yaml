@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin HTTP Clients"
+  short_description: "Choose and configure Kotlin HTTP clients"
+  default_prompt: "Use $net-http-clients to choose and configure an HTTP client here."

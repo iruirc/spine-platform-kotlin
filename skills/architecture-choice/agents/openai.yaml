@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Architecture Choice"
+  short_description: "Choose a Kotlin architecture and stack"
+  default_prompt: "Use $architecture-choice to choose an architecture for this Kotlin project."

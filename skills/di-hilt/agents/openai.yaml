@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hilt and Dagger"
+  short_description: "Configure Hilt and Dagger for Android"
+  default_prompt: "Use $di-hilt to configure dependency injection for this Android project."

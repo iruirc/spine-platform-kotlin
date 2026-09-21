@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Persistence Architecture"
+  short_description: "Design Kotlin persistence and source-of-truth rules"
+  default_prompt: "Use $persistence-architecture to design persistence for this Kotlin project."

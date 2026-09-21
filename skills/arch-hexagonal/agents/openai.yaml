@@ -1,0 +1,4 @@
+interface:
+  display_name: "Hexagonal Architecture"
+  short_description: "Structure Kotlin servers with ports and adapters"
+  default_prompt: "Use $arch-hexagonal to design ports and adapters for this Kotlin server."

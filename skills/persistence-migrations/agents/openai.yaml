@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Database Migrations"
+  short_description: "Plan and verify Kotlin database migrations"
+  default_prompt: "Use $persistence-migrations to plan and test this database migration."

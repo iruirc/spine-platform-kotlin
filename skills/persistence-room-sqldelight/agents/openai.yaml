@@ -1,0 +1,4 @@
+interface:
+  display_name: "Room and SQLDelight"
+  short_description: "Choose Room or SQLDelight for local storage"
+  default_prompt: "Use $persistence-room-sqldelight to choose a local database for this Kotlin app."

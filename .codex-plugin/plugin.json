@@ -1,0 +1,37 @@
+{
+  "name": "spine-platform-kotlin",
+  "version": "1.5.0",
+  "description": "Kotlin platform knowledge for Android, Compose Desktop, JVM servers, CLI tools, and Kotlin Multiplatform projects.",
+  "author": {
+    "name": "Dmitry Nuzhin"
+  },
+  "repository": "https://github.com/iruirc/spine-platform-kotlin",
+  "license": "MIT",
+  "keywords": [
+    "kotlin",
+    "android",
+    "compose",
+    "jvm",
+    "kmp"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Spine Platform Kotlin",
+    "shortDescription": "Kotlin and Android engineering skills",
+    "longDescription": "Architecture, Compose, navigation, dependency injection, networking, persistence, coroutines, Gradle packaging, and release guidance for Kotlin projects.",
+    "developerName": "Dmitry Nuzhin",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/iruirc/spine-platform-kotlin",
+    "defaultPrompt": [
+      "Choose an architecture for this Kotlin project.",
+      "Review this Kotlin module and suggest improvements.",
+      "Help me split this Gradle build into modules."
+    ],
+    "brandColor": "#7F52FF"
+  }
+}

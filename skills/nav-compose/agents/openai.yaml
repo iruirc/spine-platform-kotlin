@@ -1,0 +1,4 @@
+interface:
+  display_name: "Compose Navigation"
+  short_description: "Build type-safe navigation for Compose UI"
+  default_prompt: "Use $nav-compose to design navigation for this Compose application."

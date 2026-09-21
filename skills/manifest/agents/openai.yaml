@@ -1,0 +1,5 @@
+interface:
+  display_name: "Kotlin Platform Manifest"
+  short_description: "Internal contract consumed by spine-toolkit"
+policy:
+  allow_implicit_invocation: false

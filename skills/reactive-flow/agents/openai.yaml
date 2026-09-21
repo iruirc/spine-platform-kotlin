@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Flow"
+  short_description: "Design and test Kotlin Flow pipelines"
+  default_prompt: "Use $reactive-flow to design and test this Kotlin Flow pipeline."

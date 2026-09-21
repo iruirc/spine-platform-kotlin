@@ -1,0 +1,4 @@
+interface:
+  display_name: "KMP Source Sets"
+  short_description: "Structure Kotlin Multiplatform source sets"
+  default_prompt: "Use $pkg-kmp-source-sets to structure these Kotlin Multiplatform source sets."

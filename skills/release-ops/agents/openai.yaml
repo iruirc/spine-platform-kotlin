@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Release Operations"
+  short_description: "Plan shared Kotlin release operations"
+  default_prompt: "Use $release-ops to review release readiness for this Kotlin project."

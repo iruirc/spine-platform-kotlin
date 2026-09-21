@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Server Release Operations"
+  short_description: "Plan reliable Kotlin server releases"
+  default_prompt: "Use $release-ops-server to review this Kotlin server release plan."

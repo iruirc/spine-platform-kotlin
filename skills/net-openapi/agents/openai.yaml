@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin OpenAPI"
+  short_description: "Integrate OpenAPI with Kotlin clients and servers"
+  default_prompt: "Use $net-openapi to plan this Kotlin OpenAPI integration."

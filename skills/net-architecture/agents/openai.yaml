@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Networking Architecture"
+  short_description: "Design resilient Kotlin networking boundaries"
+  default_prompt: "Use $net-architecture to design the networking boundary for this Kotlin project."

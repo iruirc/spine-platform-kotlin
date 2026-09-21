@@ -1,0 +1,4 @@
+interface:
+  display_name: "Koin"
+  short_description: "Configure Koin across Kotlin targets"
+  default_prompt: "Use $di-koin to design and verify this Koin dependency graph."

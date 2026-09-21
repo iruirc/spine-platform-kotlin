@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gradle Modules"
+  short_description: "Design maintainable Gradle module boundaries"
+  default_prompt: "Use $pkg-gradle-modules to split this Gradle build into modules."

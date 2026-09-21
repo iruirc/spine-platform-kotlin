@@ -1,0 +1,4 @@
+interface:
+  display_name: "Layered Architecture"
+  short_description: "Structure Kotlin servers with clear layers"
+  default_prompt: "Use $arch-layered to structure this Kotlin server into clear layers."

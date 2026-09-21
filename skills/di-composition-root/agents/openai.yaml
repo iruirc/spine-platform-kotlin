@@ -1,0 +1,4 @@
+interface:
+  display_name: "DI Composition Root"
+  short_description: "Assemble and scope a Kotlin dependency graph"
+  default_prompt: "Use $di-composition-root to design this Kotlin dependency graph."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Deep Links"
+  short_description: "Route deep links safely into Kotlin apps"
+  default_prompt: "Use $nav-deeplinks to design and test deep links for this Kotlin app."

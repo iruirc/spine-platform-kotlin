@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kotlin Error Architecture"
+  short_description: "Design consistent error flow across layers"
+  default_prompt: "Use $error-architecture to design error handling across this Kotlin project."
