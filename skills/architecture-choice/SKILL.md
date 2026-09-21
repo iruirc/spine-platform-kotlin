@@ -178,6 +178,7 @@ Cross-cutting (always, regardless of pattern):
    `Done.md → ## Objections` of the active task. Risks must stay visible.
 7. **Hand control** to `spine-platform-kotlin:kotlin-init` (new project) or
    `spine-platform-kotlin:kotlin-architect` (existing project) with the skill list from Stack Cookbook.
+   A host without those agents, such as Codex, ends here with the skill list for the user to follow.
 
 The output of this skill is one `## Stack` block in the active project guidance file and a list of
 skills to follow next — nothing more. Don't generate code here.
