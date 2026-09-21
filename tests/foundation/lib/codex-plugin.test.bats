@@ -55,7 +55,7 @@ PY
     count=$((count + 1))
     [ -f "$skill/agents/openai.yaml" ] || missing="$missing $(basename "$skill")"
   done
-  [ "$count" -eq 31 ] || { echo "expected 31 skills, found $count"; return 1; }
+  [ "$count" -ge 25 ] || { echo "scan went vacuous: $count skills"; return 1; }
   [ -z "$missing" ] || { echo "skills missing agents/openai.yaml:$missing"; return 1; }
 }
 

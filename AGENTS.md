@@ -16,5 +16,6 @@ Read `.claude/CLAUDE.md` first; it is the shared development guide for this repo
   no Codex manifest yet. Its internal `manifest` and `kotlin-setup` skills carry
   `policy.allow_implicit_invocation: false` and no `default_prompt`. This prevents automatic
   selection but does not disable explicit `$skill` use.
-- Run the full foundation suite, every changed skill validator, and the Codex plugin validator after
-  changing plugin metadata or shared skills.
+- After changing plugin metadata or shared skills, run the full foundation suite and the validators
+  Codex bundles with its system skills: `plugin-creator/scripts/validate_plugin.py .` for the
+  plugin, and `skill-creator/scripts/quick_validate.py skills/<name>` for each changed skill.
