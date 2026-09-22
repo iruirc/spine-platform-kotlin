@@ -24,12 +24,15 @@ setup() {
 }
 
 @test "the declared core floor reads everything this plugin relies on" {
-  # `surfaces` and the unpinned agent models all arrive by 1.12.0, but 2.0 is the
-  # floor: every config this plugin's skills and agents read names `[FIELD] = [value]`
-  # lines, and a 1.x core neither writes nor parses them.
+  # `surfaces` and the unpinned agent models all arrive by 1.12.0; 2.0 held the floor
+  # while the reason was the config format — every config this plugin's skills and
+  # agents read names `[FIELD] = [value]` lines, and a 1.x core neither writes nor
+  # parses them. 2.5.0 raises it: the agents that write test code name
+  # `spine-toolkit:test-authoring`, and `scripts/lint-core-refs.sh` resolves every
+  # core skill they name at this floor.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$output" = ">=2.0.0 <3" ] || { echo "floor: $output"; return 1; }
+  [ "$output" = ">=2.5.0 <3" ] || { echo "floor: $output"; return 1; }
 }
 
 @test "the vendored manifest lint is the copy that knows the Driver block" {

@@ -185,10 +185,12 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `compose-state` — what `runComposeUiTest` can observe from outside a Compose Multiplatform screen
 - `nav-multiplatform` — asserting the navigation call at the state-holder boundary instead of driving the graph on every target
 - `error-architecture` — golden tables for the mapper from a domain error to the shared error state
+- `test-frameworks` — the declaration, assertions, hooks, parameterization and failure output of each value of the `tests` axis, and the surfaces that force one
 
 ## Skills Reference (core)
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework this file is written in, decided before its first line
 
 ## Related Agents (spine-platform-kotlin)
 

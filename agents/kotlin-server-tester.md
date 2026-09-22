@@ -290,10 +290,12 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `persistence-migrations` — fixture-based migration tests
 - `concurrency-coroutines` — request-scope dispatchers under a test scheduler, cancellation discipline
 - `error-architecture` — golden tables for the mapper from a domain error to an HTTP problem detail or an exit code
+- `test-frameworks` — the declaration, assertions, hooks, parameterization and failure output of each value of the `tests` axis, and the surfaces that force one
 
 ## Skills Reference (core)
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework this file is written in, decided before its first line
 
 ## Related Agents (spine-platform-kotlin)
 

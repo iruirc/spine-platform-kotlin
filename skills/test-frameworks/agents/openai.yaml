@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test Frameworks"
+  short_description: "Help with Test Frameworks tasks"
+  default_prompt: "Use $test-frameworks to handle Test Frameworks work."

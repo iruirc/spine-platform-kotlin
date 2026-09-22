@@ -166,10 +166,12 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `error-architecture` — golden tables for error mappers
 - `persistence-migrations` — fixture-based migration tests
 - `arch-clean` — use-case tests without frameworks
+- `test-frameworks` — the declaration, assertions, hooks, parameterization and failure output of each value of the `tests` axis, and the surfaces that force one
 
 ## Skills Reference (core)
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework this file is written in, decided before its first line
 
 ## Related Agents (spine-platform-kotlin)
 

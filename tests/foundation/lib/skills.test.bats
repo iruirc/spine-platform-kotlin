@@ -35,12 +35,13 @@ setup() {
 @test "release-ops: shape" { assert_skill_shape "$ROOT/skills/release-ops"; }
 @test "release-ops-android: shape" { assert_skill_shape "$ROOT/skills/release-ops-android"; }
 @test "release-ops-server: shape" { assert_skill_shape "$ROOT/skills/release-ops-server"; }
+@test "test-frameworks: shape" { assert_skill_shape "$ROOT/skills/test-frameworks"; }
 
-@test "twenty-nine knowledge skills, every one named by a Topics row" {
+@test "thirty knowledge skills, every one named by a Topics row" {
   topics="$(sed -n '/^## Topics/,/^## /p' "$ROOT/skills/manifest/SKILL.md" | grep '→' \
               | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u)"
   n="$(printf '%s\n' "$topics" | grep -c . || true)"
-  [ "$n" -eq 29 ] || { echo "expected 29 topic skills, found $n"; return 1; }
+  [ "$n" -eq 30 ] || { echo "expected 30 topic skills, found $n"; return 1; }
   for d in "$ROOT"/skills/*/; do
     s="$(basename "$d")"
     case "$s" in manifest|kotlin-setup) continue ;; esac

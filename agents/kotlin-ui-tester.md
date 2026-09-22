@@ -292,10 +292,12 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `reactive-flow` — `StateFlow` vs `SharedFlow` under Turbine: which emissions a test must await
 - `persistence-room-sqldelight` — in-memory Room and the SQLDelight in-memory driver for a repository test
 - `error-architecture` — golden tables for the mapper from a domain error to `UiState.Error`
+- `test-frameworks` — the declaration, assertions, hooks, parameterization and failure output of each value of the `tests` axis, and the surfaces that force one
 
 ## Skills Reference (core)
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework this file is written in, decided before its first line
 
 ## Related Agents (spine-platform-kotlin)
 

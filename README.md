@@ -99,12 +99,14 @@ project whose target could not be resolved gets fewer claims, never wrong ones.
 - *Cross-cutting* — `error-architecture`.
 - *Packaging* — `pkg-gradle-modules`, `pkg-kmp-source-sets`.
 - *Release* — `release-ops` (shared and desktop), `release-ops-android`, `release-ops-server`.
+- *Testing* — `test-frameworks`: what a test looks like under each value of the `tests` axis,
+  and the surfaces that force one whatever the axis says.
 
 These are decision skills: which pattern at these inputs, where the boundary goes, what to inject
 with. For API-level reference — Compose modifiers, AGP migrations, Retrofit recipes — install a
 catalog beside this plugin: JetBrains' `Kotlin/kotlin-agent-skills` and the community
 `rcosteira79/android-skills` are the two this plugin was designed next to, and neither overlaps
-the ten topics here.
+the eleven topics here.
 
 ## The manifest
 
@@ -124,7 +126,7 @@ through it, or invoked by name by an agent.
 
 ## Requirements
 
-- `spine-toolkit` `>=2.0.0 <3`, declared as a dependency in `plugin.json`. An installed core
+- `spine-toolkit` `>=2.5.0 <3`, declared as a dependency in `plugin.json`. An installed core
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
 - The validators drive Android through `adb` and the `mobile` MCP, desktop apps through the same
   MCP, and servers with `curl`; a project with none of those available sets `[DRIVE_APP] = [off]`

@@ -29,17 +29,18 @@ setup() {
   missing=""
   for t in "state management" "navigation" "networking" "persistence" \
            "dependency graph" "concurrency" "errors" "packaging" "deep links" \
-           "release ops"; do
+           "release ops" "testing"; do
     grep -qE "^${t}[[:space:]]*→" <<<"$rows" || missing="$missing '$t'"
   done
   [ -z "$missing" ] || { echo "topic spine-toolkit names with no row here:$missing"; return 1; }
 }
 
-@test "no topic row beyond the ten core reads" {
+@test "no topic row beyond the eleven core reads" {
   # Rows start at column one with the topic name; the prose above the table also
-  # carries an arrow, so the count is anchored.
+  # carries an arrow, so the count is anchored. The eleventh is `testing`, which
+  # core added in 2.5.0 for the agents that write test code.
   n="$(sed -n '/^## Topics/,/^## Entrypoints/p' "$M" | grep -cE '^[a-z][a-z ]*→' || true)"
-  [ "$n" -eq 10 ] || { echo "expected 10 topic rows, found $n"; return 1; }
+  [ "$n" -eq 11 ] || { echo "expected 11 topic rows, found $n"; return 1; }
 }
 
 @test "every role that names an agent names a file that exists" {
@@ -108,7 +109,7 @@ EOF
   done
 }
 
-@test "the Topics table is exactly the spec's ten rows" {
+@test "the Topics table is exactly the spec's eleven rows" {
   rows="$(sed -n '/^## Topics/,/^## Entrypoints/p' "$M" | grep -E '^[a-z][a-z ]*→' | tr -s ' ' | sort)"
   expected="$(sort <<'EOF'
 state management → `architecture-choice`, `arch-mvvm`, `arch-mvi`, `arch-clean`, `arch-layered`, `arch-hexagonal`, `compose-state`
@@ -121,6 +122,7 @@ errors → `error-architecture`
 packaging → `pkg-gradle-modules`, `pkg-kmp-source-sets`
 deep links → `nav-deeplinks`
 release ops → `release-ops`, `release-ops-android`, `release-ops-server`
+testing → `test-frameworks`
 EOF
 )"
   [ "$rows" = "$expected" ] || { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$rows"); return 1; }
