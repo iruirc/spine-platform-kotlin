@@ -23,3 +23,14 @@ setup() {
 @test "kotlin-security: shape" { assert_agent_shape "$ROOT/agents/kotlin-security.md" kotlin-security; }
 @test "kotlin-diagnostics: shape" { assert_agent_shape "$ROOT/agents/kotlin-diagnostics.md" kotlin-diagnostics; }
 @test "kotlin-init: shape" { assert_agent_shape "$ROOT/agents/kotlin-init.md" kotlin-init; }
+
+@test "kotlin-security names the three ways it is called, and writes nothing in a workflow" {
+  f="$ROOT/agents/kotlin-security.md"
+  s="$(awk '$0=="## Invocation Context"{f=1;next} f&&/^## /{exit} f' "$f")"
+  for token in '**triage**' '**lens**' '**audit**' '**write no artifact and apply no patch**'; do
+    grep -qF "$token" <<<"$s" || { echo "## Invocation Context does not say $token"; return 1; }
+  done
+  ! grep -qF 'Your output must be appended/written to the task-stage file' "$f" \
+    || { echo "the lens is still told to write a stage file"; return 1; }
+  ! grep -qF 'during the Research panel' "$f" || { echo "Related Agents still describes a Research panel"; return 1; }
+}
