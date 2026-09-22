@@ -32,6 +32,10 @@ Produce output in the sections described in the "Output Structure" section below
 
 ## Test Structure
 
+The examples in this section are JUnit5. Which framework a file is actually written in is
+`spine-toolkit:test-authoring`'s decision; `test-frameworks` carries the declaration, the assertions
+and the hooks of every value the `tests` axis allows.
+
 ### AAA Pattern (mandatory)
 
 Every test follows **Arrange → Act → Assert**. No exceptions.
@@ -65,6 +69,9 @@ Examples:
 - `login_invalidCredentials_returnsAuthError()`
 - `calculateDiscount_orderAboveThreshold_appliesTenPercent()`
 
+Where the framework names a test with a string instead of an identifier — Kotest does — the same
+three parts go into the string; `test-frameworks` `### Declaration` shows the form.
+
 ### Test Size
 
 - **One behavior per test.** No "god tests" that verify five behaviors at once.
@@ -91,7 +98,9 @@ Examples:
 
 ## Environment Cleanup
 
-Every test must ensure clean state. Use `@BeforeEach` / `@AfterEach` to:
+Every test must ensure clean state. The hooks that run before and after a test belong to the
+framework — `test-frameworks` `### Lifecycle` for the value this file is written in. Whichever they
+are, use them to:
 
 - Reset in-memory storage and fake repositories.
 - Clear test databases (truncate tables or use transactions that roll back).
@@ -99,19 +108,8 @@ Every test must ensure clean state. Use `@BeforeEach` / `@AfterEach` to:
 - Cancel coroutine scopes and test dispatchers.
 - Reset DI container if overridden with test-specific bindings.
 
-```kotlin
-@BeforeEach
-fun setUp() {
-    fakeRepository = FakeUserRepository()
-    testDispatcher = StandardTestDispatcher()
-    service = UserService(fakeRepository, testDispatcher)
-}
-
-@AfterEach
-fun tearDown() {
-    testDispatcher.cancel()
-}
-```
+A hook that arranges more than the test in front of it needs is the shared mega-setup `### Test Size`
+forbids, in another place.
 
 ## Coroutines
 

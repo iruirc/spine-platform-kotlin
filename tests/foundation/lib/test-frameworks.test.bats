@@ -66,3 +66,44 @@ h2s() {
   grep -qE '^testing[[:space:]]*→[[:space:]]*`test-frameworks`$' "$MANIFEST" \
     || { echo "no testing row in the manifest ## Topics"; return 1; }
 }
+
+TESTERS="kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-tester"
+
+# The block every tester carries: from `## Hard Rules` to the first H2 that is not shared.
+common_block() {
+  awk '/^## /{ shared = ($0=="## Hard Rules" || $0=="## Test Structure" || $0=="## Mocking Policy" \
+                         || $0=="## Environment Cleanup" || $0=="## Coroutines")
+               if (!f && shared) f = 1
+               else if (f && !shared) exit }
+       f' "$1"
+}
+
+@test "the four testers carry one byte-identical copy of the shared block" {
+  # Both sides go through the same extraction: comparing against a captured string
+  # would compare a stripped trailing blank line, and report a difference nobody made.
+  ref="$ROOT/agents/kotlin-jvm-tester.md"
+  n="$(common_block "$ref" | wc -l | tr -d ' ')"
+  [ "$n" -ge 80 ] || { echo "the block extraction went vacuous: $n line(s)"; return 1; }
+  for a in $TESTERS; do
+    diff <(common_block "$ref") <(common_block "$ROOT/agents/$a.md") \
+      || { echo "$a's copy of the shared block differs"; return 1; }
+  done
+}
+
+@test "the shared block names no lifecycle hook of any framework" {
+  # Below this block each tester keeps the constructs its own surface forces — a Compose rule is
+  # JUnit4 whatever the axis says. Inside it, a hook is one framework taught as the default.
+  for a in $TESTERS; do
+    hits="$(common_block "$ROOT/agents/$a.md" \
+              | grep -oE '@BeforeEach|@AfterEach|@BeforeAll|@AfterAll|@Before\b|@After\b|beforeTest|afterTest' \
+              | sort -u | tr '\n' ' ')"
+    [ -z "$hits" ] || { echo "$a's shared block still teaches: $hits"; return 1; }
+  done
+}
+
+@test "the shared block says which framework its examples are written in" {
+  for a in $TESTERS; do
+    common_block "$ROOT/agents/$a.md" | grep -qF 'The examples in this section are JUnit5.' \
+      || { echo "$a's examples claim to be framework-neutral and are not"; return 1; }
+  done
+}
