@@ -41,7 +41,7 @@ Ask neutrally; do not attach "(recommended)" to an option unless a spine-platfor
 | 6 | `architecture` | Android, Desktop, Server, KMP (a CLI is Layered by construction and `kotlin-setup` writes no line for it); if the user is unsure, run `architecture-choice` and answer with its row |
 | 7 | `async` | Server only (`kotlinx.coroutines` unless the framework is Reactor-native and the user says so) |
 | 8 | `baseline` | every target (`API 26+` / `JVM 21` defaults) |
-| 9 | `tests` | every target (`JUnit5` default) |
+| 9 | `tests` | every target — offer the values `## Axes` lists for `tests` (`JUnit5` default) |
 
 Plus, not an axis: the root package (`com.example.app`), the project name, and whether to add `:core:*` modules (names, one line each).
 
@@ -56,14 +56,16 @@ For every target:
 - `.editorconfig` for ktlint, `config/detekt/detekt.yml` config (a detekt baseline is a separate `baseline.xml`, not generated here)
 - `.gitignore` (`build/`, `.gradle/`, `local.properties`, `.idea/`, `*.iml`, `.kotlin/`)
 - `README.md` with how to build, test and run
-- one test in the primary module that passes on first run
+- one test in the primary module that passes on first run, written from `test-frameworks`
+  `### Declaration` for the value answer 9 chose, with the dependency and the `Test` task wiring
+  from its `### Setup` — both in `gradle/libs.versions.toml`, nothing inline
 
 Per target, in the primary module:
 - **Android**: `AndroidManifest.xml`, `MainActivity` with `setContent`, one screen following `- Architecture:` (a `Screen` composable + `ViewModel` + `UiState`), a `NavHost` with that one route, the DI entry (`@HiltAndroidApp` / Koin `startKoin`), `res/values/strings.xml`, `themes.xml`; `compileSdk`/`minSdk` from `- Baseline:`
 - **Desktop**: `main.kt` with `application { Window(…) }`, one screen as above, `compose.desktop { application { mainClass = … } }`
-- **Server**: the framework's entry point, one health/hello endpoint through the layers the architecture names (controller → service → repository stub), configuration file with the port, the framework's test host test
-- **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test
-- **KMP**: `commonMain` with one public function and its `commonTest`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
+- **Server**: the framework's entry point, one health/hello endpoint through the layers the architecture names (controller → service → repository stub), configuration file with the port, the framework's test host test in the same value
+- **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test in the same value
+- **KMP**: `commonMain` with one public function and its `commonTest`, which `## Forced by surface` narrows to `kotlin.test`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
 
 Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with the answers already collected — `lang`, `mode`, `platform` = `spine-platform-kotlin`, and `stack` — so it renders them from its own templates without re-asking. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
 
@@ -71,7 +73,7 @@ Both Markdown config files belong to spine-toolkit, not to this agent: after the
 
 1. **Gradle wrapper.** `which gradle`; if missing, ask once whether to `brew install gradle` (never install silently). Then `gradle wrapper --gradle-version <latest stable>` at the root; the wrapper files are part of the scaffold — never gitignore them, never write `gradle-wrapper.jar` by hand.
 2. **Android SDK** (Android target only): `ANDROID_HOME` or `local.properties` `sdk.dir`; absent → say so and generate anyway — the user installs the SDK, the build is correct without it.
-3. **Verify the build**: `./gradlew build` for JVM targets, `./gradlew assembleDebug testDebugUnitTest` for Android. The scaffold is not done until this is green; a red build is reported, not hidden.
+3. **Verify the build**: `./gradlew build` for JVM targets, `./gradlew assembleDebug testDebugUnitTest` for Android. The scaffold is not done until this is green; a red build is reported, not hidden. A green build that ran no test is not green either: check the task collected the placeholder, because a value whose `Test` wiring is missing reports zero tests and exit 0.
 4. **Latest stable versions** for Kotlin, AGP, Compose, the framework: read them from the user's machine (`~/.gradle/caches` or the last project) or ask; never guess a version string.
 
 ## Module Assembly (DI options)
@@ -126,10 +128,12 @@ the folder layout and the conventions the generated scaffold must match.
 - `persistence-jvm-orm`
 - `persistence-migrations` — day-one migration discipline
 - `concurrency-coroutines`
+- `test-frameworks` — the first test's declaration and the build wiring that runs it, per value of the `tests` axis
 
 ## Skills Reference (core)
 
 - `spine-toolkit:setup` — the skill that writes both config files from the collected `stack`
+- `spine-toolkit:test-authoring` — which framework the first test of a new project is written in
 
 ## Related Agents (spine-platform-kotlin)
 

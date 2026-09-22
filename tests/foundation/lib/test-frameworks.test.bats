@@ -154,3 +154,16 @@ common_block() {
   done
   [ -z "$bad" ] || { echo "agents not bound to the rule:$bad"; return 1; }
 }
+
+@test "init offers every value of the tests axis and restates none of them" {
+  i="$ROOT/agents/kotlin-init.md"
+  grep -qF 'the values `## Axes` lists for `tests`' "$i" \
+    || { echo "init does not take its options from the manifest"; return 1; }
+}
+
+@test "init writes the first test and its build wiring from the skill" {
+  i="$ROOT/agents/kotlin-init.md"
+  grep -qF 'spine-toolkit:test-authoring' "$i" || { echo "no rule for the first test's framework"; return 1; }
+  grep -qF '`test-frameworks`' "$i" || { echo "the placeholder test is in no particular framework"; return 1; }
+  grep -qF '### Setup' "$i" || { echo "the build wiring is still this agent's own memory"; return 1; }
+}
