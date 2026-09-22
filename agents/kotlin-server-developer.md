@@ -64,7 +64,7 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
    - **Configuration problem** — wrong value, missing property, environment mismatch
    - **Data corruption** — invalid state in database or cache, schema mismatch
 3. **Implement the minimal fix.** Fix the root cause, not the symptoms. Don't refactor unrelated code in a bug fix.
-4. **Add a regression test.** Write a test that fails without the fix and passes with it. This prevents the bug from recurring.
+4. **Add a regression test.** Write a test that fails without the fix and passes with it. This prevents the bug from recurring. The test is written in the framework `spine-toolkit:test-authoring` picks for the file it lands in, with `test-frameworks` for its syntax — not in the one the last project used.
 
 ## Framework-Specific Guidance
 
@@ -209,12 +209,14 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
 - `error-architecture` — how errors flow: sealed hierarchies vs exceptions vs Result, adapter → core → HTTP mapping, RFC 9457 problem details, `@ControllerAdvice` and `StatusPages`
 - `pkg-gradle-modules` — splitting the build into Gradle modules: the archetypes, `api` vs `implementation`, the version catalog, convention plugins
 - `release-ops-server` — container images and health probes, twelve-factor configuration, graceful shutdown, migrations on deploy, observability, rollout strategies
+- `test-frameworks` — the syntax of the regression test, per value of the `tests` axis
 
 ## Skills Reference (core)
 
 - `spine-toolkit:docs-route` — run the route before committing a phase; answer the rows it opens in `Docs.md`
 - `spine-toolkit:task-walkthrough` — write `Walkthrough.md` at the end of the implementing stage
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework a regression test is written in
 
 ## Related Agents (spine-platform-kotlin)
 

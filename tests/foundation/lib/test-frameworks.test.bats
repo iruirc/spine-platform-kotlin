@@ -143,3 +143,14 @@ common_block() {
   grep -qF 'kotest-framework-engine' "$f" \
     || { echo "nothing says when commonTest may hold a Kotest spec"; return 1; }
 }
+
+@test "every agent that writes test code takes the choice from core and the syntax from the skill" {
+  bad=""
+  for a in kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-tester \
+           kotlin-diagnostics kotlin-compose-developer kotlin-server-developer kotlin-kmp-developer; do
+    f="$ROOT/agents/$a.md"
+    grep -qF 'spine-toolkit:test-authoring' "$f" || bad="$bad $a(choice)"
+    grep -qF '`test-frameworks`' "$f" || bad="$bad $a(syntax)"
+  done
+  [ -z "$bad" ] || { echo "agents not bound to the rule:$bad"; return 1; }
+}

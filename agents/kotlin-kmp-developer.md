@@ -59,7 +59,9 @@ This step is not optional and not satisfied by "I followed the project style" in
    (reproduces everywhere) or in an `actual` (reproduces on one platform).
 2. Classify: shared logic error, missing/incorrect `actual`, source-set visibility, dispatcher
    assumption that holds on one platform only (`Dispatchers.Main` absent on a plain JVM target).
-3. Minimal fix at the source set that owns it; add a regression test there.
+3. Minimal fix at the source set that owns it; add a regression test there. The framework is
+   `spine-toolkit:test-authoring`'s choice for that source set — `commonTest` narrows it, see
+   `test-frameworks` `## Forced by surface` — and its syntax comes from `test-frameworks`.
 
 ## Code Standards
 
@@ -122,12 +124,14 @@ This step is not optional and not satisfied by "I followed the project style" in
 - `concurrency-coroutines` — dispatcher per layer, scope ownership, cancellation discipline, `withContext` placement, testing with the coroutines test scheduler
 - `error-architecture` — how errors flow: sealed hierarchies vs exceptions vs Result, per-layer mapping, the `runCatching` cancellation trap, `UiState.Error`
 - `release-ops` — release concerns every target shares: versioning, CI lanes, crash reporting, feature flags, Compose Desktop distribution
+- `test-frameworks` — the syntax of the regression test, per value of the `tests` axis
 
 ## Skills Reference (core)
 
 - `spine-toolkit:docs-route` — run the route before committing a phase; answer the rows it opens in `Docs.md`
 - `spine-toolkit:task-walkthrough` — write `Walkthrough.md` at the end of the implementing stage
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework a regression test is written in
 
 ## Related Agents (spine-platform-kotlin)
 

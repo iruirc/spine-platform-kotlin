@@ -85,11 +85,13 @@ Bash for Gradle/Maven, adb, jcmd/jstack, curl; the project's driver for UI state
 - `persistence-migrations` — a migration that ran on one device and not another
 - `di-hilt`, `di-koin`, `di-spring` — a missing binding, a scope mismatch, a proxy bypass
 - `pkg-kmp-source-sets` — an `actual` mismatch
+- `test-frameworks` — the syntax of the sketch, per value of the `tests` axis
 
 ## Skills Reference (core)
 
 - `spine-toolkit:manual-checks` — the replay Validation runs is written from your `Reproduce.md`, so a case there must be executable as the skill defines it
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
+- `spine-toolkit:test-authoring` — which framework the sketch is written in
 
 ## Related Agents (spine-platform-kotlin)
 
@@ -110,7 +112,10 @@ Your response MUST be structured with these top-level sections:
 - `## Root Cause` — precise explanation with file:line references
 - `## Why It Happens` — the chain from root cause to symptom
 - `## Proposed Fix` — unified diff plus explanation; no fix yet applied
-- `## Regression Test` — signature + assertion sketch of the test that will prevent recurrence
+- `## Regression Test` — signature + assertion sketch of the test that will prevent recurrence, in
+  the framework `spine-toolkit:test-authoring` picks for the file it will live in (`test-frameworks`
+  for the syntax); a sketch in another framework is rewritten before it is run, or run and collected
+  by nothing
 - `## Confidence` — Low / Medium / High, with rationale
 
 ## Self-Verification
