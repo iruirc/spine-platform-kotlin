@@ -136,9 +136,7 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 ## Framework Notes
 
-- **JUnit5** (`- Tests: JUnit5`): `@Test`, `@ParameterizedTest` with `@MethodSource` for tables, `@Nested` for grouping, `@TempDir` for files, `assertThrows<T>` for exceptions. Assertions via `kotlin.test` or AssertJ, whichever the project already imports.
-- **JUnit4** (`- Tests: JUnit4`): `@RunWith` only for Robolectric; otherwise plain `@Test`; `@Rule` `TemporaryFolder` for files; `assertThrows` from `org.junit.Assert`.
-- **Kotest** (`- Tests: Kotest`): match the project's style (`StringSpec`, `FunSpec`, `BehaviorSpec`); `shouldBe` matchers; property tests with `checkAll` only where the invariant is genuinely universal; `beforeTest`/`afterTest` for cleanup.
+- **The framework itself**: `- Tests:` in `## Stack` names it, `spine-toolkit:test-authoring` says which value this file takes, and `test-frameworks` has the section for that value — how a test is declared so the runner collects it, how it asserts, its hooks, parameterization and report. None of that is repeated here.
 - **MockK**: `mockk<T>()` with `every { } returns`, `coEvery` for suspend functions, `verify` with exact `exactly =` counts; `relaxed = true` is a code smell in a unit test — it hides a missing stub.
 - **Turbine** for `Flow`: `flow.test { awaitItem(); awaitComplete() }`; assert every emission, never `first()` on a hot flow.
 - **Clock**: inject `kotlinx.datetime.Clock`, `java.time.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+; a fixed clock in tests, never `Clock.System` in an assertion.

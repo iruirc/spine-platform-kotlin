@@ -107,3 +107,25 @@ common_block() {
       || { echo "$a's examples claim to be framework-neutral and are not"; return 1; }
   done
 }
+
+@test "the jvm tester no longer carries a paragraph per axis value" {
+  f="$ROOT/agents/kotlin-jvm-tester.md"
+  notes="$(awk '$0=="## Framework Notes"{f=1;next} f&&/^## /{exit} f' "$f")"
+  [ -n "$notes" ] || { echo "no ## Framework Notes section"; return 1; }
+  hits="$(grep -oE '^- \*\*(JUnit5|JUnit4|Kotest)\*\*' <<<"$notes" | tr '\n' ' ')"
+  [ -z "$hits" ] || { echo "the axis values are still explained here: $hits"; return 1; }
+  grep -qF '`test-frameworks`' <<<"$notes" || { echo "and nothing points at where they went"; return 1; }
+  grep -qF '**MockK**' <<<"$notes" || { echo "the tooling that is not an axis value was lost too"; return 1; }
+}
+
+@test "the server tester says what each axis value does to a server environment" {
+  f="$ROOT/agents/kotlin-server-tester.md"
+  body="$(awk '$0=="### Framework Wiring"{f=1;next} f&&/^#{2,3} /{exit} f' "$f")"
+  [ -n "$body" ] || { echo "no ### Framework Wiring section"; return 1; }
+  for v in JUnit5 JUnit4 Kotest; do
+    grep -qF "$v" <<<"$body" || { echo "the table has no $v column"; return 1; }
+  done
+  for env in 'SpringExtension' 'Testcontainers' 'testApplication'; do
+    grep -qF "$env" <<<"$body" || { echo "no row for $env"; return 1; }
+  done
+}

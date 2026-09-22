@@ -136,6 +136,21 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 ## Server-Specific Testing
 
+### Framework Wiring
+
+The sections below are written in JUnit5. What boots the framework changes with `- Tests:`:
+
+| Environment | JUnit5 | JUnit4 | Kotest |
+|---|---|---|---|
+| Spring context (`@SpringBootTest` and the slices) | nothing to add — the annotations bring `SpringExtension` | `@RunWith(SpringRunner::class)` on the class | `override val extensions = listOf(SpringExtension)` in the spec, beside `@SpringBootTest` |
+| Testcontainers | `@Testcontainers` on the class, `@Container` on the field | `@get:ClassRule` / `@get:Rule` on the container | start it in `beforeSpec` and stop it in `afterSpec`, or install `ContainerExtension` from `kotest-extensions-testcontainers` |
+| Ktor `testApplication { }` | the block suspends: `@Test fun … = testApplication { }` | same | the spec body already suspends: `test("…") { testApplication { … } }` |
+
+`@MicronautTest` and `@QuarkusTest` are JUnit 5 extensions. Micronaut ships a Kotest module
+(`micronaut-test-kotest5`); Quarkus ships none, which makes `@QuarkusTest` one of the surfaces in
+`test-frameworks` `## Forced by surface` — that test is JUnit5 whatever the axis says, and the
+deviation is named in `## Notes`.
+
 ### Spring Boot
 
 - `@SpringBootTest` for full integration tests — loads the entire application context.
