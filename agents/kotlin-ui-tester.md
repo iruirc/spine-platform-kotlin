@@ -138,7 +138,11 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 ### Compose UI Testing
 
-The Compose test rule is a JUnit4 `@Rule`: a Compose test class uses `@Before`/`@After` (and `@RunWith` where Robolectric is needed) whatever `- Tests:` says — the `@BeforeEach`/`@AfterEach` of Environment Cleanup belong to the JUnit5 classes around it.
+The Compose test rule is a JUnit4 `@Rule`, so a Compose test class is JUnit4-shaped — `@Before` /
+`@After`, `@get:Rule`, and `@RunWith` where Robolectric is needed — whatever `- Tests:` says. So is
+a Robolectric test, and so is anything in `androidInstrumentedTest`: all three are rows of
+`test-frameworks` `## Forced by surface`. Everything else in this file takes the axis value, and
+`test-frameworks` has its hooks.
 
 - `createComposeRule()` for test rule — sets up the Compose test environment.
 - Find nodes: `onNodeWithText()`, `onNodeWithTag()`, `onNodeWithContentDescription()`.
@@ -205,7 +209,7 @@ fun loadUsers_success_emitsLoadedState() = runTest {
 
 ### Robolectric
 
-For Android-specific logic without a device — test code that depends on `Context`, `SharedPreferences`, `Resources`, and other Android framework classes.
+For Android-specific logic without a device — test code that depends on `Context`, `SharedPreferences`, `Resources`, and other Android framework classes. `RobolectricTestRunner` is a JUnit4 runner — see `## Forced by surface` — so a Robolectric class keeps JUnit4 hooks even in a JUnit5 module.
 
 ```kotlin
 @RunWith(RobolectricTestRunner::class)
@@ -249,12 +253,12 @@ fun loadData_success_updatesLiveData() {
 
 ### Test Placement (Android)
 
-| Test kind | Source set | Runs on | Gradle task |
-|---|---|---|---|
-| ViewModel, mapper, use case | `src/test` | JVM | `testDebugUnitTest` |
-| Compose component in isolation | `src/test` with Robolectric, or `src/androidTest` | JVM / device | `testDebugUnitTest` / `connectedDebugAndroidTest` |
-| Anything touching `Context`, resources, `SharedPreferences` | `src/test` with Robolectric | JVM | `testDebugUnitTest` |
-| Navigation graph end to end, permissions, real sensors | `src/androidTest` | device or emulator | `connectedDebugAndroidTest` |
+| Test kind | Source set | Runs on | Gradle task | Framework |
+|---|---|---|---|---|
+| ViewModel, mapper, use case | `src/test` | JVM | `testDebugUnitTest` | the axis value |
+| Compose component in isolation | `src/test` with Robolectric, or `src/androidTest` | JVM / device | `testDebugUnitTest` / `connectedDebugAndroidTest` | JUnit4 (Compose rule) |
+| Anything touching `Context`, resources, `SharedPreferences` | `src/test` with Robolectric | JVM | `testDebugUnitTest` | JUnit4 (Robolectric) |
+| Navigation graph end to end, permissions, real sensors | `src/androidTest` | device or emulator | `connectedDebugAndroidTest` | JUnit4 (AndroidX test) |
 
 Prefer the JVM row whenever it can observe the behaviour: an instrumented test costs an emulator boot and cannot run in the validator's default lane. Name in `## Notes` every test that needs a device, so the validator knows what it will not see without one.
 

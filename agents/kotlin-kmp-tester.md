@@ -140,16 +140,16 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 | Behaviour | Source set | Framework |
 |---|---|---|
-| Shared logic, contracts, mappers, ViewModels | `commonTest` | `kotlin.test` (`@Test`, `assertEquals`, `assertFailsWith`) — the only framework every target runs |
-| An `actual` | the platform test set (`androidUnitTest`, `jvmTest`, `desktopTest`) | the platform's framework: JUnit/Robolectric on Android, JUnit on JVM |
+| Shared logic, contracts, mappers, ViewModels | `commonTest` | `kotlin.test` (`@Test`, `assertEquals`, `assertFailsWith`) — or a Kotest spec where the module has `kotest-framework-engine`; never JUnit, which is JVM-only |
+| An `actual` | the platform test set (`androidUnitTest`, `jvmTest`, `desktopTest`) | the module's `- Tests:` value, except where Robolectric forces JUnit4 |
 | Compose Multiplatform screen | `commonTest` with `compose.uiTest` (`runComposeUiTest { setContent { } }`) | runs on every target that has a UI |
 | Something that needs a device | `androidInstrumentedTest` | JUnit4 + AndroidX test |
 
 A `commonTest` test cannot import MockK or Turbine unless the project's catalog makes them
 multiplatform dependencies; check `libs.versions.toml` before writing the import, and prefer
-hand-written fakes in `commonTest` — they compile everywhere. In `commonTest` the lifecycle
-hooks are `@BeforeTest`/`@AfterTest` from `kotlin.test`; the `@BeforeEach`/`@AfterEach` of
-Environment Cleanup are the platform-test-set (JVM) form.
+hand-written fakes in `commonTest` — they compile everywhere. The hooks there are `@BeforeTest` /
+`@AfterTest` from `kotlin.test`; the platform test sets take the hooks of the module's axis value,
+and `test-frameworks` `### Lifecycle` has both.
 
 ### Runner Matrix
 

@@ -129,3 +129,17 @@ common_block() {
     grep -qF "$env" <<<"$body" || { echo "no row for $env"; return 1; }
   done
 }
+
+@test "the ui tester calls its JUnit4 constructs a forced surface, not a default" {
+  f="$ROOT/agents/kotlin-ui-tester.md"
+  grep -qF '`test-frameworks`' "$f" || { echo "the skill is not named"; return 1; }
+  grep -qF 'Forced by surface' "$f" || { echo "the Compose rule and Robolectric read as the default"; return 1; }
+}
+
+@test "the kmp tester no longer calls kotlin.test the only framework every target runs" {
+  f="$ROOT/agents/kotlin-kmp-tester.md"
+  ! grep -qF 'the only framework every target runs' "$f" \
+    || { echo "Kotest has a multiplatform engine; the line is false"; return 1; }
+  grep -qF 'kotest-framework-engine' "$f" \
+    || { echo "nothing says when commonTest may hold a Kotest spec"; return 1; }
+}
