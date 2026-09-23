@@ -100,7 +100,10 @@ When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_
 - `spine-platform-kotlin:kotlin-architect` — co-reviews root cause in the Diagnose panel
 - `spine-platform-kotlin:kotlin-compose-developer`, `spine-platform-kotlin:kotlin-server-developer`, `spine-platform-kotlin:kotlin-kmp-developer` — apply the fix after approval
 - `spine-platform-kotlin:kotlin-security` — for bugs that turn out to be security defects
-- `spine-platform-kotlin:kotlin-jvm-tester`, `spine-platform-kotlin:kotlin-ui-tester`, `spine-platform-kotlin:kotlin-server-tester`, `spine-platform-kotlin:kotlin-kmp-tester` — write the regression test
+- `spine-platform-kotlin:kotlin-jvm-tester`, `spine-platform-kotlin:kotlin-ui-tester`,
+  `spine-platform-kotlin:kotlin-server-tester`, `spine-platform-kotlin:kotlin-kmp-tester` — write
+  the regression test, when the task owes one (`spine-toolkit:test-authoring`,
+  `## When the task owes no test`)
 
 ## Output Structure
 
