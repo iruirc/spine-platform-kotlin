@@ -112,10 +112,11 @@ Your response MUST be structured with these top-level sections:
 - `## Root Cause` — precise explanation with file:line references
 - `## Why It Happens` — the chain from root cause to symptom
 - `## Proposed Fix` — unified diff plus explanation; no fix yet applied
-- `## Regression Test` — signature + assertion sketch of the test that will prevent recurrence, in
-  the framework `spine-toolkit:test-authoring` picks for the file it will live in (`test-frameworks`
-  for the syntax); a sketch in another framework is rewritten before it is run, or run and collected
-  by nothing
+- `## Regression Test` — only when the task owes a test (`spine-toolkit:test-authoring`,
+  `## When the task owes no test`); otherwise leave the section out. Signature + assertion sketch of
+  the test that will prevent recurrence, in the framework `spine-toolkit:test-authoring` picks for
+  the file it will live in (`test-frameworks` for the syntax); a sketch in another framework is
+  rewritten before it is run, or run and collected by nothing
 - `## Confidence` — Low / Medium / High, with rationale
 
 ## Self-Verification

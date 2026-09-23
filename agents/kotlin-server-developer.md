@@ -64,7 +64,7 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
    - **Configuration problem** — wrong value, missing property, environment mismatch
    - **Data corruption** — invalid state in database or cache, schema mismatch
 3. **Implement the minimal fix.** Fix the root cause, not the symptoms. Don't refactor unrelated code in a bug fix.
-4. **Add a regression test.** Write a test that fails without the fix and passes with it. This prevents the bug from recurring. The test is written in the framework `spine-toolkit:test-authoring` picks for the file it lands in, with `test-frameworks` for its syntax — not in the one the last project used.
+4. **Add a regression test.** Unless the task owes none (`spine-toolkit:test-authoring`, `## When the task owes no test`): Write a test that fails without the fix and passes with it. This prevents the bug from recurring. The test is written in the framework `spine-toolkit:test-authoring` picks for the file it lands in, with `test-frameworks` for its syntax — not in the one the last project used.
 
 ## Framework-Specific Guidance
 
@@ -260,7 +260,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - Use `@Autowired` on a field — dependencies arrive through the primary constructor.
 - Add a second web framework to a project that already has one.
 - Ship a destructive migration without a documented rollback.
-- Write tests when NEED_TEST=false — `spine-platform-kotlin:kotlin-server-tester` does.
+- Write a test when the task owes none — `spine-toolkit:test-authoring`, `## When the task owes no test`.
 - Commit — the orchestrator's phase commit does.
 
 ## Output Language

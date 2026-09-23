@@ -60,7 +60,7 @@ This step is not optional and not satisfied by "I followed the project style" in
    - **Platform API issue** — permission not granted, API level incompatibility, missing feature check
    - **Desktop only: window/focus lifecycle, no process death** — a bug that "survives rotation" on Android has no analogue here
 3. **Implement the minimal fix with minimal side effects.** Fix the root cause, not the symptoms. Don't refactor unrelated code in a bug fix.
-4. **Add a regression test to prevent recurrence.** Write a test that fails without the fix and passes with it. The test is written in the framework `spine-toolkit:test-authoring` picks for the file it lands in, with `test-frameworks` for its syntax — not in the one the last project used.
+4. **Add a regression test to prevent recurrence.** Unless the task owes none (`spine-toolkit:test-authoring`, `## When the task owes no test`): Write a test that fails without the fix and passes with it. The test is written in the framework `spine-toolkit:test-authoring` picks for the file it lands in, with `test-frameworks` for its syntax — not in the one the last project used.
 5. **If a crash is related to lifecycle — check for coroutine scope leaks.** Ensure coroutines are launched in `viewModelScope` and collected with lifecycle awareness. Look for `GlobalScope` usage, leaked observers, and uncancelled jobs.
 
 ## Architecture Patterns
@@ -242,7 +242,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - Use `GlobalScope`.
 - Block the main thread.
 - Hardcode a string the user sees.
-- Write tests when NEED_TEST=false — `spine-platform-kotlin:kotlin-ui-tester` does.
+- Write a test when the task owes none — `spine-toolkit:test-authoring`, `## When the task owes no test`.
 - Commit — the orchestrator's phase commit does.
 
 ## Output Language

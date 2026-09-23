@@ -59,7 +59,8 @@ This step is not optional and not satisfied by "I followed the project style" in
    (reproduces everywhere) or in an `actual` (reproduces on one platform).
 2. Classify: shared logic error, missing/incorrect `actual`, source-set visibility, dispatcher
    assumption that holds on one platform only (`Dispatchers.Main` absent on a plain JVM target).
-3. Minimal fix at the source set that owns it; add a regression test there. The framework is
+3. Minimal fix at the source set that owns it; add a regression test there, unless the task owes
+   none (`spine-toolkit:test-authoring`, `## When the task owes no test`). The framework is
    `spine-toolkit:test-authoring`'s choice for that source set — `commonTest` narrows it, see
    `test-frameworks` `## Forced by surface` — and its syntax comes from `test-frameworks`.
 
@@ -175,7 +176,7 @@ Your response MUST be structured with these top-level sections so the orchestrat
 - Add a platform dependency to `commonMain`.
 - Write an `actual` for a platform the project does not target.
 - Change a shared contract without updating every `actual`.
-- Write tests when NEED_TEST=false — `spine-platform-kotlin:kotlin-kmp-tester` does.
+- Write a test when the task owes none — `spine-toolkit:test-authoring`, `## When the task owes no test`.
 - Commit — the orchestrator's phase commit does.
 
 ## Output Language
