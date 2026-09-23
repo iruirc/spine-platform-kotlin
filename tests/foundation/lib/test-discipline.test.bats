@@ -72,3 +72,15 @@ TESTERS="kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-test
     return 1
   fi
 }
+
+@test "core at the declared floor has the sections the agents point at" {
+  # lint-core-refs.sh resolves skill names, not sections, and test-authoring existed
+  # a minor before these sections did. Without this test the floor is a claim.
+  [ -d "$CORE/.git" ] || skip "no spine-toolkit checkout beside this one"
+  floor="$(python3 -c 'import json,sys,re; d=json.load(open(sys.argv[1]))["dependencies"]; v=[x["version"] for x in d if x["name"]=="spine-toolkit"][0]; print(re.search(r">=\s*(\d+\.\d+\.\d+)", v).group(1))' "$ROOT/.claude-plugin/plugin.json")"
+  git -C "$CORE" rev-parse -q --verify "$floor^{commit}" >/dev/null || skip "core has no tag $floor"
+  skill="$(git -C "$CORE" show "$floor:skills/test-authoring/SKILL.md")"
+  for h in '## What a good test is' '## Test doubles' '## Before you deliver' '## Review'; do
+    grep -qF "$h" <<<"$skill" || { echo "core $floor has no $h — the floor is too low"; return 1; }
+  done
+}
