@@ -71,7 +71,7 @@ TESTERS="kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-test
 
 # The block every tester carries: from `## Hard Rules` to the first H2 that is not shared.
 common_block() {
-  awk '/^## /{ shared = ($0=="## Hard Rules" || $0=="## Test Structure" || $0=="## Mocking Policy" \
+  awk '/^## /{ shared = ($0=="## Hard Rules" || $0=="## Mocking Policy" \
                          || $0=="## Environment Cleanup" || $0=="## Coroutines")
                if (!f && shared) f = 1
                else if (f && !shared) exit }
@@ -83,7 +83,10 @@ common_block() {
   # would compare a stripped trailing blank line, and report a difference nobody made.
   ref="$ROOT/agents/kotlin-jvm-tester.md"
   n="$(common_block "$ref" | wc -l | tr -d ' ')"
-  [ "$n" -ge 80 ] || { echo "the block extraction went vacuous: $n line(s)"; return 1; }
+  # The block is 65 lines once the neutral half moved to core. The number guards the
+  # extraction, not the length: it catches an awk that returns a heading and nothing
+  # else. Set it below the real size, not at it, or a one-line trim reads as a failure.
+  [ "$n" -ge 60 ] || { echo "the block extraction went vacuous: $n line(s)"; return 1; }
   for a in $TESTERS; do
     diff <(common_block "$ref") <(common_block "$ROOT/agents/$a.md") \
       || { echo "$a's copy of the shared block differs"; return 1; }
@@ -103,8 +106,8 @@ common_block() {
 
 @test "the shared block says which framework its examples are written in" {
   for a in $TESTERS; do
-    common_block "$ROOT/agents/$a.md" | grep -qF 'The examples in this section are JUnit5.' \
-      || { echo "$a's examples claim to be framework-neutral and are not"; return 1; }
+    common_block "$ROOT/agents/$a.md" | grep -qF 'The example below is JUnit5.' \
+      || { echo "$a's example claims to be framework-neutral and is not"; return 1; }
   done
 }
 

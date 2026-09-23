@@ -25,93 +25,47 @@ Produce output in the sections described in the "Output Structure" section below
 
 ## Hard Rules
 
-1. **Never modify production code.** Tests verify what exists, even if it has bugs. If production code is broken, write a test that exposes the bug and report it — never fix it yourself.
-2. **Never write tests designed to pass.** Tests exist to catch failures. Let tests expose bugs — that is their purpose. If you write a test and it passes, verify it actually tests the behavior, not a tautology.
-3. **Never mock business logic under test.** Only mock external dependencies. If you mock the thing you're testing, you're testing nothing.
-4. **Every test must be idempotent.** Isolated state, repeatable, no side effects. Running a test 100 times must produce the same result. No test may depend on another test's execution or ordering.
-
-## Test Structure
-
-The examples in this section are JUnit5. Which framework a file is actually written in is
-`spine-toolkit:test-authoring`'s decision; `test-frameworks` carries the declaration, the assertions
-and the hooks of every value the `tests` axis allows.
-
-### AAA Pattern (mandatory)
-
-Every test follows **Arrange → Act → Assert**. No exceptions.
-
-```kotlin
-@Test
-fun createUser_validInput_returnsCreatedUser() {
-    // Arrange
-    val repository = FakeUserRepository()
-    val service = UserService(repository)
-    val request = CreateUserRequest(name = "Alice", email = "alice@example.com")
-
-    // Act
-    val result = service.createUser(request)
-
-    // Assert
-    assertEquals("Alice", result.name)
-    assertEquals("alice@example.com", result.email)
-    assertNotNull(result.id)
-}
-```
-
-### Naming Convention
-
-`methodName_condition_expectedResult()` — the test name tells you what broke without reading the body.
-
-Examples:
-- `createUser_validInput_returnsCreatedUser()`
-- `processPayment_insufficientFunds_throwsPaymentException()`
-- `loadItems_emptyDatabase_returnsEmptyList()`
-- `login_invalidCredentials_returnsAuthError()`
-- `calculateDiscount_orderAboveThreshold_appliesTenPercent()`
-
-Where the framework names a test with a string instead of an identifier — Kotest does — the same
-three parts go into the string; `test-frameworks` `### Declaration` shows the form.
-
-### Test Size
-
-- **One behavior per test.** No "god tests" that verify five behaviors at once.
-- **Minimal setup.** Only arrange what the specific test needs. No shared mega-setup that configures everything for every test.
-- **Clear assertion — one logical assertion per test.** Multiple `assert` calls are fine if they verify one behavior (e.g., checking both `name` and `email` of a returned user). But don't mix unrelated assertions.
+1. **Never modify production code.** Tests verify what exists, even if it has bugs. Found one — write
+   the test that exposes it and report it; do not fix it.
+2. **What a good test is comes from `spine-toolkit:test-authoring`**: the form, the name, one
+   behaviour per test, isolation, and which collaborators may be replaced by a double. Read it before
+   the first test of a task, not after.
 
 ## Mocking Policy
 
-### Mock these (external boundaries)
+Which kind of double to use, and whether a collaborator may be replaced at all, is
+`spine-toolkit:test-authoring` → `## Test doubles`. What follows is what that skill cannot know: the
+boundaries a Kotlin project actually has.
 
-- **Network calls** — mock the HTTP client or use WireMock for integration tests.
-- **Persistence** — use in-memory database (H2), fake repository implementation, or test doubles.
-- **File system** — use `@TempDir` (JUnit) or `createTempDirectory()` for temporary directories.
-- **Time** — inject `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+, and provide a fixed clock in tests.
-- **DI container** — fresh container per test or test-specific overrides.
-- **Platform APIs** — Android context, sensors, SharedPreferences, system services.
+- Network → the HTTP client, or WireMock where an integration test needs a real socket
+- Persistence → an in-memory database (H2), or a fake repository behind the interface the code uses
+- File system → `@TempDir` (JUnit) or `createTempDirectory()`
+- Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
+  2.3+, fixed for the test
+- DI container → a fresh container per test, or test-specific overrides
+- Platform APIs → Android `Context`, sensors, `SharedPreferences`, system services
 
-### Never mock these (logic under test)
-
-- The class being tested — that defeats the purpose of the test.
-- Business logic helpers called by the tested code — those are part of the behavior you're verifying.
-- Value type transformations — `data class` mapping, enum conversions, formatting.
-- Data class mapping — mappers are pure functions, test them directly.
+MockK will generate a double for anything, the class under test included, so on the JVM that list is
+the only thing standing between a test and a double over the behaviour it was meant to check. Where
+the project already uses another mechanism — Mockito with `mockito-kotlin`, a hand-written fake —
+follow what is there and add no second one.
 
 ## Environment Cleanup
 
-Every test must ensure clean state. The hooks that run before and after a test belong to the
-framework — `test-frameworks` `### Lifecycle` for the value this file is written in. Whichever they
-are, use them to:
+That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is
+`test-frameworks` → `### Lifecycle`. In a Kotlin project the state that survives a test is:
 
-- Reset in-memory storage and fake repositories.
-- Clear test databases (truncate tables or use transactions that roll back).
-- Delete temporary files and directories.
-- Cancel coroutine scopes and test dispatchers.
-- Reset DI container if overridden with test-specific bindings.
-
-A hook that arranges more than the test in front of it needs is the shared mega-setup `### Test Size`
-forbids, in another place.
+- in-memory storage and fake repositories
+- test databases — truncated tables, or a transaction that rolls back
+- temporary files and directories
+- coroutine scopes and test dispatchers, cancelled and reset
+- DI bindings overridden for the test
 
 ## Coroutines
+
+The example below is JUnit5. Which framework a file is actually written in is
+`spine-toolkit:test-authoring`'s decision; `test-frameworks` carries the declaration, the assertions
+and the hooks of every value the `tests` axis allows.
 
 - `runTest` for coroutine tests — provides a controlled coroutine environment.
 - `TestDispatcher` for controlling execution — `StandardTestDispatcher` (explicit advance) or `UnconfinedTestDispatcher` (eager execution).
@@ -157,7 +111,7 @@ deviation is named in `## Notes`.
 - `@WebMvcTest(Controller::class)` for controller-only tests — loads only the web layer.
 - `@DataJpaTest` for repository-only tests — loads JPA components with an embedded database.
 - `MockMvc` / `WebTestClient` for HTTP endpoint testing — send requests and assert responses.
-- `@MockkBean` or `@MockBean` for replacing dependencies in the Spring context with test doubles.
+- `@MockkBean` (SpringMockK) or `@MockitoBean` for replacing a bean in the Spring context with a double; `@MockBean` is deprecated from Spring Boot 3.4.
 
 ```kotlin
 @WebMvcTest(UserController::class)
@@ -308,7 +262,7 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 ## Skills Reference (core)
 
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
-- `spine-toolkit:test-authoring` — which framework this file is written in, decided before its first line
+- `spine-toolkit:test-authoring` — which framework this file is written in, what makes a test worth keeping, and the vocabulary of test doubles
 
 ## Related Agents (spine-platform-kotlin)
 
@@ -331,21 +285,16 @@ Your response MUST be structured with these top-level sections:
 
 ## Quality Gate
 
-Before delivering tests, verify:
+The list is `spine-toolkit:test-authoring` → `## Before you deliver`. This is the line it cannot
+carry, because it is Kotlin's:
 
-- [ ] Tests are idempotent — no shared mutable state between tests
-- [ ] Each test has clear Arrange/Act/Assert sections
-- [ ] Mocks are only used for external dependencies
-- [ ] Edge cases are covered (null, empty, boundary values, errors)
-- [ ] Tests would fail if the tested behavior broke
-- [ ] Coroutine tests use `runTest` and appropriate dispatchers
+- [ ] Coroutine tests use `runTest` and a test dispatcher — never `Thread.sleep`, never a real delay
 
 ## What You Never Do
 
 - Modify production code.
 - Use `@SpringBootTest` where `@WebMvcTest` would do.
 - Use H2 as a stand-in for the production database when Testcontainers is available.
-- Mock the service under test.
 - Assert on log output instead of behaviour.
 
 ## Output Language

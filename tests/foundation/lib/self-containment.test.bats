@@ -37,14 +37,15 @@ setup() {
   pat='(\.\./(core|spine-toolkit|spine-platform-swift|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
   pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
   pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|spine-platform-swift|spine-platform-kotlin)/)'
-  # Three files are excluded by name: the two suites that look for a sibling checkout
+  # Four files are excluded by name: the three suites that look for a sibling checkout
   # of core (they skip rather than dangle when it is absent) and this one, which
-  # spells the patterns out. The cost is a blind spot inside those three files.
+  # spells the patterns out. The cost is a blind spot inside those four files.
   # .superpowers/ is gitignored scratch that never ships, and a review diff there
   # quotes the very files this scan excludes by name. Core excludes it from its
   # own i18n lint for the same reason.
   hits="$(grep -rnE --exclude-dir=.git --exclude-dir=.superpowers \
             --exclude=self-containment.test.bats --exclude=core-refs.test.bats --exclude=forks.test.bats \
+            --exclude=test-discipline.test.bats \
             "$pat" "$ROOT" | grep -vE '/\.claude/plugins/(cache|marketplaces)/' || true)"
   [ -z "$hits" ] || { echo "spine-platform-kotlin reference(s) to the core tree:"; echo "$hits"; return 1; }
 }
