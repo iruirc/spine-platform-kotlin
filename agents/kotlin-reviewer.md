@@ -130,10 +130,10 @@ Evaluate the code against each category below. Skip categories that don't apply.
 
 ### Testing Adequacy
 
-- **Missing tests**: new public behavior without corresponding tests.
-- **Test quality**: tests that verify implementation details instead of behavior, tautological assertions.
-- **Mock abuse**: mocking everything instead of using fakes, mocking the class under test.
-- **Edge cases uncovered**: only happy path tested, no error/boundary tests.
+Judged by `spine-toolkit:test-authoring` → `## Review`: an assertion that cannot fail, a double
+standing in for the behaviour under test, state crossing between tests, behaviour in the diff that no
+test names, and a test asserting more than one behaviour. Unlike the plan-quality findings of the
+neighbouring skills, a finding here may block.
 
 ## Framework-Specific Checks
 
