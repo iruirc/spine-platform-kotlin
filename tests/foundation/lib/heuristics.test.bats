@@ -39,6 +39,12 @@ setup() {
   ! grep -qE '→[[:space:]]*ecosystem=' "$M"
 }
 
+@test "the Client/Service/network row names the DI frameworks, not container-registered" {
+  row="$(sed -n '/^## Heuristics/,/^## Topics/p' "$M" | grep -F '*Client.kt')"
+  grep -qF 'Hilt, Koin, Dagger or Spring' <<<"$row" || { echo "row: $row"; return 1; }
+  ! grep -qF 'container-registered' <<<"$row" || { echo "row: $row"; return 1; }
+}
+
 @test "an http4k build resolves to target Server" {
   # http4k ships no Gradle plugin, so the plugin-based Server row never saw it.
   sed -n '/^## Heuristics/,/^## Topics/p' "$M" | grep -E 'org\.http4k' | grep -qE '→[[:space:]]*target=Server$'

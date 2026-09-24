@@ -126,7 +126,7 @@ path: `*Screen.kt`, `*Composable*.kt`, `ui/`, `presentation/`                   
 path: `*ViewModel.kt`, `*Store.kt`, `*Reducer.kt`, `*Presenter.kt`                → architecture (+ ui if a Compose state collection is present)
 path: `*Controller.kt`, `*Resource.kt`, `routes/`, `api/`                         → framework, architecture
 path: `*Repository.kt`, `*Dao.kt`, `data/`, `migration/`                          → async, tests
-path: `*Client.kt`, `*Service.kt`, `network/`                                     → async (+ di if container-registered)
+path: `*Client.kt`, `*Service.kt`, `network/`                                     → async (+ di if registered with Hilt, Koin, Dagger or Spring)
 path: `build.gradle.kts`, `settings.gradle.kts`, `gradle/libs.versions.toml`      → build, baseline, target
 path: `commonMain/`, `androidMain/`, `jvmMain/`, `iosMain/`                       → target (+ ui if a Compose import is present)
 path: `src/test/`, `src/androidTest/`, `*Test.kt`, `*Spec.kt`                     → tests
