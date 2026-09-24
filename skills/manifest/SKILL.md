@@ -73,7 +73,7 @@ di           = Hilt, Koin, Dagger, Spring, Manual
 framework    = Spring Boot, Ktor, Micronaut, Quarkus, http4k, Clikt, kotlinx-cli
 architecture = MVVM, MVI, Clean Architecture, Layered, Hexagonal
 build        = Gradle KTS, Gradle Groovy, Maven, Amper
-baseline     = API 21+, API 24+, API 26+, JVM 17, JVM 21
+baseline     = API 21+, API 23+, API 24+, API 26+, JVM 17, JVM 21, JVM 25
 tests        = JUnit5, JUnit4, Kotest
 
 ## Heuristics
@@ -88,6 +88,7 @@ token: `kotlin("multiplatform")` anywhere in the build                          
 token: `com.android.application` or `com.android.library`, no `kotlin("multiplatform")`      → target=Android
 token: `compose.desktop.application`, no Android plugin, no `kotlin("multiplatform")`         → target=Desktop
 token: `org.springframework.boot`, `io.ktor.plugin`, `io.micronaut.application` or `io.quarkus`, no Android, Desktop or multiplatform plugin → target=Server
+token: `org.http4k` in a build's dependencies, no Android, Desktop or multiplatform plugin → target=Server
 token: `application` plugin with `mainClass`, plus `clikt` or `kotlinx-cli`, no server framework plugin → target=CLI
 token: an Android or Desktop plugin AND a server framework plugin in one build, no `kotlin("multiplatform")` → target unresolved (no detection)
 

@@ -127,3 +127,7 @@ EOF
 )"
   [ "$rows" = "$expected" ] || { diff <(printf '%s\n' "$expected") <(printf '%s\n' "$rows"); return 1; }
 }
+
+@test "the baseline axis carries the current AndroidX floor and JVM 25" {
+  grep -qE '^baseline[[:space:]]*= API 21\+, API 23\+, API 24\+, API 26\+, JVM 17, JVM 21, JVM 25$' "$M"
+}

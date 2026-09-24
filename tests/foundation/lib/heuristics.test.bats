@@ -38,3 +38,8 @@ setup() {
 @test "no heuristic pins ecosystem" {
   ! grep -qE '→[[:space:]]*ecosystem=' "$M"
 }
+
+@test "an http4k build resolves to target Server" {
+  # http4k ships no Gradle plugin, so the plugin-based Server row never saw it.
+  sed -n '/^## Heuristics/,/^## Topics/p' "$M" | grep -E 'org\.http4k' | grep -qE '→[[:space:]]*target=Server$'
+}
