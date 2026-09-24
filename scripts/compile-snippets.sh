@@ -96,6 +96,9 @@ END {
     for (k = 1; k <= cnt[name SUBSEP "file"]; k++) out(unit, map, txt[name SUBSEP "file" SUBSEP k], org[name SUBSEP "file" SUBSEP k])
     out(unit, map, "package " pkg, "")
     for (k = 1; k <= cnt[name SUBSEP "import"]; k++) out(unit, map, txt[name SUBSEP "import" SUBSEP k], org[name SUBSEP "import" SUBSEP k])
+    # A default import loses to a unit import of the same simple name; a star default is never skipped.
+    delete bound
+    for (k = 1; k <= cnt[name SUBSEP "import"]; k++) { b = simplename(txt[name SUBSEP "import" SUBSEP k]); if (b != "") bound[b] = 1 }
     lists = (set == "test") ? mod " " name : name
     nl = split(lists, list, " ")
     for (j = 1; j <= nl; j++) {
@@ -104,6 +107,8 @@ END {
         fl++
         if (line ~ /^[ \t]*(#|$)/) continue
         if ((name SUBSEP "import " line) in seen) continue
+        b = simplename(line)
+        if (b != "" && (b in bound)) continue
         seen[name SUBSEP "import " line] = 1
         out(unit, map, "import " line, "tests/snippets/" list[j] ".imports:" fl)
       }
@@ -114,7 +119,14 @@ END {
     print "UNIT|" unit "|" map "|" rel "|" name "|" blocks[name]
   }
 }
-function out(unit, map, text, origin) { print text > unit; ln++; print ln "\t" origin > map }'
+function out(unit, map, text, origin) { print text > unit; ln++; print ln "\t" origin > map }
+function simplename(imp,    s) {
+  s = imp; sub(/^import[ \t]+/, "", s)
+  if (s ~ /\*$/) return ""
+  if (s ~ /[ \t]as[ \t]/) { sub(/^.*[ \t]as[ \t]+/, "", s); return s }
+  sub(/^.*\./, "", s)
+  return s
+}'
 
 files=0
 for f in "$root"/skills/*/SKILL.md "$root"/skills/*/references/detailed-guide.md; do
@@ -227,6 +239,7 @@ find "$maps" -name '*.map' | while IFS= read -r m; do
 done > "$tmp/lines"
 awk -F'\t' -v units="$units/" '
   NR == FNR { at[$1] = $2; next }
+  { gsub(/\033\[[0-9;]*m/, "") }
   /^e: / {
     line = $0; sub(/^e: (\[ksp\] )?(file:\/\/)?/, "", line)
     if (index(line, units) == 1 && match(line, /\.kt:[0-9]+/)) {
@@ -244,7 +257,7 @@ while IFS='|' read -r unit map rel name n; do
   [ "$unit" = CAT ] && continue
   label="$rel ($name)"
   dir="${unit%.kt}"
-  errs="$(grep -F "HIT|$dir." "$tmp/hits" | cut -d'|' -f3- || true)"
+  errs="$(grep -F "HIT|$dir." "$tmp/hits" | cut -d'|' -f3- | awk '!seen[$0]++' || true)"
   missing=""
   for t in $(tasks_for "$name"); do grep -qxF -- "$t" "$tmp/ran" || missing="$missing $t"; done
   if [ -n "$errs" ]; then

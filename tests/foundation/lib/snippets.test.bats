@@ -40,6 +40,9 @@ fake_jdk() {
   [ "$(grep -n 'class Counter(' "$u" | cut -d: -f1)" -lt "$(grep -n 'fun Counter.tickTwice' "$u" | cut -d: -f1)" ] \
     || { echo "blocks are out of file order"; return 1; }
   ! grep -qF 'notMarked' "$u" || { echo "an unmarked block was emitted"; return 1; }
+  o="$OUT/jvm/main/other/SKILL.kt"
+  grep -qxF 'import java.time.Instant' "$o" || { echo "the block's own import is missing"; return 1; }
+  ! grep -qxF 'import kotlin.time.Instant' "$o" || { echo "a default import shadows the block's own"; return 1; }
 }
 
 @test "a -test marker lands in the test source set with the module's imports and its own" {
