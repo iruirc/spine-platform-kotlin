@@ -1,0 +1,11 @@
+org.junit.jupiter.api.*
+org.springframework.beans.factory.annotation.Autowired
+org.springframework.boot.test.context.SpringBootTest
+org.springframework.boot.webmvc.test.autoconfigure.*
+org.springframework.boot.data.jpa.test.autoconfigure.*
+org.springframework.boot.testcontainers.service.connection.ServiceConnection
+org.springframework.test.context.bean.override.mockito.MockitoBean
+org.springframework.test.web.servlet.*
+org.testcontainers.junit.jupiter.*
+org.testcontainers.postgresql.PostgreSQLContainer
+io.mockk.*

@@ -1,0 +1,20 @@
+# okhttp3.* owns Response and Headers; a Retrofit block imports retrofit2.Response itself.
+kotlinx.coroutines.*
+kotlinx.serialization.*
+kotlinx.serialization.json.*
+okhttp3.*
+okhttp3.MediaType.Companion.toMediaType
+retrofit2.HttpException
+retrofit2.Retrofit
+retrofit2.create
+retrofit2.converter.kotlinx.serialization.asConverterFactory
+retrofit2.http.Body
+retrofit2.http.DELETE
+retrofit2.http.GET
+retrofit2.http.Header
+retrofit2.http.PATCH
+retrofit2.http.POST
+retrofit2.http.PUT
+retrofit2.http.Path
+retrofit2.http.Query
+java.io.IOException

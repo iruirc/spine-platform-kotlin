@@ -1,0 +1,16 @@
+kotlinx.coroutines.*
+kotlinx.coroutines.flow.*
+kotlinx.serialization.*
+kotlin.time.Clock
+kotlin.time.Instant
+androidx.compose.foundation.layout.*
+androidx.compose.material3.*
+androidx.compose.runtime.*
+androidx.compose.ui.*
+androidx.lifecycle.*
+androidx.lifecycle.viewmodel.compose.*
+androidx.navigation.*
+androidx.navigation.compose.*
+org.koin.dsl.module
+org.koin.core.module.dsl.*
+org.koin.compose.viewmodel.koinViewModel

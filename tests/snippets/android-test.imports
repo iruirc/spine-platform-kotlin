@@ -1,0 +1,14 @@
+# JUnit 4: Robolectric and the Compose test rule run on it.
+org.junit.*
+org.junit.runner.RunWith
+org.robolectric.RobolectricTestRunner
+org.robolectric.annotation.Config
+androidx.compose.ui.test.*
+androidx.compose.ui.test.junit4.*
+androidx.test.core.app.ApplicationProvider
+kotlin.test.assertEquals
+kotlin.test.assertIs
+kotlin.test.assertTrue
+kotlinx.coroutines.test.*
+app.cash.turbine.*
+io.mockk.*

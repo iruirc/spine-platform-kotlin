@@ -1,0 +1,17 @@
+# org.springframework.data.repository.* is left out: its Repository would clash with the stereotype's.
+org.springframework.boot.*
+org.springframework.boot.autoconfigure.SpringBootApplication
+org.springframework.boot.context.properties.*
+org.springframework.context.annotation.Bean
+org.springframework.context.annotation.Configuration
+org.springframework.context.annotation.Primary
+org.springframework.context.annotation.Profile
+org.springframework.stereotype.*
+org.springframework.web.bind.annotation.*
+org.springframework.http.*
+org.springframework.transaction.annotation.Transactional
+org.springframework.data.jpa.repository.*
+org.springframework.data.repository.CrudRepository
+org.springframework.jdbc.core.JdbcTemplate
+jakarta.persistence.*
+jakarta.validation.constraints.*
