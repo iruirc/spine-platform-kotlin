@@ -43,13 +43,14 @@ the server's ORM (`persistence-jvm-orm`), not for changing a schema that has shi
 ```
 ViewModel / use case        domain types only
         |
-Repository                  source-of-truth policy, mapping, dispatcher switch, failure mapping
+Repository                  source-of-truth policy, mapping, failure mapping
         |            \
    local source        remote source          both internal to :data
         |                    |
   Room / SQLDelight      OrdersApi            (JPA / Exposed / jOOQ on a server)
 ```
 
+<!-- compile: jvm -->
 ```kotlin
 // :domain — the port. Nothing here can tell a database from a network call.
 interface OrderRepository {
@@ -127,6 +128,10 @@ internal class OfflineFirstOrderRepository(
     override suspend fun refresh(customer: CustomerId): Result<Unit> =
         catching { dao.upsertAll(api.orders(customer.value).items.map(OrderDto::toEntity)) }
             .mapFailure { it.toDataError().toOrderError() }   // the domain never sees DataError
+
+    override suspend fun place(draft: OrderDraft): Result<Order> =
+        catching { draft.toEntity(syncState = "PENDING").also { dao.upsertAll(listOf(it)) }.toDomain() }
+            .mapFailure { it.toDataError().toOrderError() }   // the sync, not this call, sends it
 }
 ```
 

@@ -186,9 +186,9 @@ fun OrdersRoute(
    (`androidx.lifecycle:lifecycle-runtime-compose`, multiplatform since Lifecycle 2.8) — it stops
    collecting below `STARTED`. `collectAsState()` keeps a backgrounded screen re-rendering and keeps
    its upstream alive.
-2. **`collectAsState()` on Compose Desktop only**, where there is no lifecycle to observe. A Compose
-   Multiplatform screen in `commonMain` *is* the Android screen, so it takes the lifecycle-aware
-   collector like any other Android screen.
+2. **The same collector on Compose Desktop.** The window is a lifecycle owner too (ViewModel on
+   Every Target, above), so a desktop screen and a Compose Multiplatform screen in `commonMain` take
+   `collectAsStateWithLifecycle()` like any Android screen.
 3. **Derived flows are shared once, not re-collected per subscriber:**
 
 ```kotlin

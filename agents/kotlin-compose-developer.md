@@ -143,7 +143,7 @@ fun UserCard(
 
 9. **Injection follows `di-hilt` → "Entry Points".** The ViewModels, repositories and use cases you write take their dependencies as constructor `val`s.
 
-10. **Collect flows with `collectAsStateWithLifecycle()` — never `collectAsState()`** (**Android only**). The lifecycle-aware variant automatically stops collection when the UI is not visible, preventing unnecessary work and potential crashes. Desktop has no lifecycle owner to be aware of — collect with `collectAsState()` in the window's scope.
+10. **Collect flows with `collectAsStateWithLifecycle()` — never `collectAsState()`.** The lifecycle-aware variant automatically stops collection when the UI is not visible, preventing unnecessary work and potential crashes. On Desktop the window is the lifecycle owner: `arch-mvvm` → "ViewModel on Every Target".
 
 11. **Use `viewModelScope` for ViewModel coroutines — never create custom `CoroutineScope` in ViewModels.** `viewModelScope` is tied to the ViewModel lifecycle and cancels automatically when the ViewModel is cleared.
 

@@ -13,13 +13,11 @@ interface OrdersApi {
     suspend fun orders(customer: String): OrdersPage
 }
 
-interface OrderRepository {
-    fun observe(customer: CustomerId): Flow<List<Order>>
-    suspend fun refresh(customer: CustomerId): Result<Unit>
-}
+class OrderDraft
 
 fun OrderEntity.toDomain(): Order = TODO()
 fun OrderDto.toEntity(): OrderEntity = TODO()
+fun OrderDraft.toEntity(syncState: String): OrderEntity = TODO()
 
 sealed class DataError : Exception()
 sealed class OrderError : Exception()

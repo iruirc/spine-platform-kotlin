@@ -655,8 +655,8 @@ Guidance that applies to every test above:
 
 1. Which test dispatcher runs the ViewModel, and what a `stateIn` state needs in a test:
    `arch-mvvm` → "Testing ViewModel"
-2. Inject a dispatcher rather than calling `withContext(Dispatchers.IO)` inside the ViewModel where
-   you can; when it is injected, pass `StandardTestDispatcher(testScheduler)` from inside `runTest`,
+2. A ViewModel names no IO dispatcher (`concurrency-coroutines` → "Per-Layer Dispatchers"); when it
+   takes one for CPU work, pass `StandardTestDispatcher(testScheduler)` from inside `runTest`,
    or the `dispatcher` of the `Main` replacement, which is the same scheduler. A dispatcher built on any other
    scheduler is one `advanceUntilIdle()` never reaches. Layer-wide dispatcher placement is
    `concurrency-coroutines`.
