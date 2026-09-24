@@ -288,7 +288,7 @@ fun `emits loading then content`() = runTest {
    works as one that never loads. Either collect it — Turbine's `test { }` does, so does
    `backgroundScope.launch { state.collect { } }` — or build the subject on an
    `UnconfinedTestDispatcher` so the sharing coroutine starts eagerly. The dispatcher setup itself is
-   `concurrency-coroutines`'s `## Testing`; the `MainDispatcherRule` body and the
+   `concurrency-coroutines` → "Testing"; the `MainDispatcherRule` body and the
    standard-versus-unconfined rule are in `arch-mvvm`'s reference, section `Test Setup`.
 5. **Time-based operators run on virtual time like everything else.** `debounce` and `sample`
    complete instantly under `runTest`, and `awaitItem()` drives the scheduler on its own — reach for

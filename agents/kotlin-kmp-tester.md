@@ -52,8 +52,9 @@ follow what is there and add no second one.
 
 ## Environment Cleanup
 
-That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is
-`test-frameworks` → `### Lifecycle`. In a Kotlin project the state that survives a test is:
+That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is the
+Lifecycle subsection of the `test-frameworks` section for the `- Tests:` value. In a Kotlin
+project the state that survives a test is:
 
 - in-memory storage and fake repositories
 - test databases — truncated tables, or a transaction that rolls back
@@ -103,7 +104,7 @@ A `commonTest` test cannot import MockK or Turbine unless the project's catalog 
 multiplatform dependencies; check `libs.versions.toml` before writing the import, and prefer
 hand-written fakes in `commonTest` — they compile everywhere. The hooks there are `@BeforeTest` /
 `@AfterTest` from `kotlin.test`; the platform test sets take the hooks of the module's axis value,
-and `test-frameworks` `### Lifecycle` has both.
+and the Lifecycle subsections of `test-frameworks` have both.
 
 ### Runner Matrix
 

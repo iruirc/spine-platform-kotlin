@@ -105,3 +105,35 @@ section_cells() {
   done <<<"$GUIDES"
   [ -z "$hits" ] || { echo "$hits"; return 1; }
 }
+
+# A link to another skill's section is `<skill>` → "<H2>" on one line, <H2> an H2 of its SKILL.md.
+LINKED="$(printf '%s\n' skills/*/*.md skills/*/*/*.md agents/*.md commands/*.md README.md .claude/CLAUDE.md)"
+
+# Lines outside fences as `file:line:text`, for every file a link may sit in.
+prose() {
+  (cd "$ROOT" && while IFS= read -r f; do
+    awk -v f="$f" '/^[ \t]*(```|~~~)/ {fence = !fence; next} !fence {print f ":" FNR ":" $0}' "$f"
+  done <<<"$LINKED")
+}
+
+skill_names() { (cd "$ROOT/skills" && ls -d */ | tr -d / | paste -sd '|' -); }
+
+@test "every section link names an H2 of the linked skill's SKILL.md" {
+  n=0; bad=""
+  while IFS= read -r hit; do
+    loc="${hit%%:\`*}"; link="${hit#"$loc":}"
+    s="$(sed -E 's/^`([^`]+)`.*/\1/' <<<"$link")"; h="$(sed -E 's/^[^"]*"(.*)"$/\1/' <<<"$link")"
+    n=$((n + 1))
+    h2s "$ROOT/skills/$s/SKILL.md" | grep -qxF -- "$h" || bad="$bad"$'\n'"$loc: $s has no '## $h'"
+  done < <(prose | grep -oE "^[^:]+:[0-9]+:|\`($(skill_names))\` → \"[^\"]+\"" \
+             | awk '/:$/ {loc = $0; next} {print loc $0}')
+  [ "$n" -ge 25 ] || { echo "checked $n links; the scan went vacuous"; return 1; }
+  [ -z "$bad" ] || { echo "$bad"; return 1; }
+}
+
+@test "a section of another skill is linked by the arrow form, not named in prose" {
+  s="$(skill_names)"
+  hits="$(prose | grep -E "\`($s)\`('s)?[ ,(]*\`#{2,4} |\`($s)\` → \`#|\`($s)\` →[ ]*$" || true)"
+  wrapped="$(prose | awk -v re="\`($s)\`('s)?[ ,(]*$" 'p && /^[^:]+:[0-9]+:[ \t(]*`#{2,4} / {print prev} {p = ($0 ~ re); prev = $0}')"
+  [ -z "$hits$wrapped" ] || { printf '%s\n' "$hits" "$wrapped" | grep .; return 1; }
+}

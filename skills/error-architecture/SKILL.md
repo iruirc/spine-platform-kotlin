@@ -33,7 +33,7 @@ syntax of `try`/`catch`: the decision, taken once for the project, about which o
 - A god `AppError` has reached forty cases and every `when` over it ends in an `else`
 - A screen shows "Something went wrong" for a case the product owner can name precisely
 
-Not for retry policy, backoff or `Retry-After` — that is `net-architecture` `## Retry`. Not for the
+Not for retry policy, backoff or `Retry-After` — that is `net-architecture` → "Retry". Not for the
 shape of the state around the error slot — `arch-mvvm`. Not for the cancellation mechanics these
 rules stand on — `concurrency-coroutines`.
 
@@ -80,7 +80,7 @@ prevent.
 3. **`kotlin.Result` is one bit until you inspect it.** `Result<T>` says success or failure and
    nothing more; `exceptionOrNull()` returns `Throwable?`, so any per-reason branching is a `when`
    over types, which is the sealed family you would have declared anyway. Promote to a sealed
-   outcome the first time a caller writes that `when` (`arch-clean` `## Use Cases`).
+   outcome the first time a caller writes that `when` (`arch-clean` → "Use Cases").
 4. **A `suspend fun` returning `Result<T>` is legal.** The compiler restriction that made people
    invent wrapper types was lifted in Kotlin 1.5; a codebase still routing around it is copying a
    workaround, not a design.
@@ -268,7 +268,7 @@ sealed interface UiMessage {
 
 ## Retry and Idempotency
 
-`net-architecture` `## Retry` owns the policy — idempotent methods only, the 408/429/502/503/504
+`net-architecture` → "Retry" owns the policy — idempotent methods only, the 408/429/502/503/504
 list, `Retry-After` outranking the backoff, full jitter, capped attempts, and the cancellation check
 before the sleep. This skill owns one thing it depends on: **retryability is a property of the error
 type**, declared once, next to the type.

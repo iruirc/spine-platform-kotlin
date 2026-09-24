@@ -64,7 +64,7 @@ both.
    before promoting further; it catches the OEM-specific crash that the team's four phones do not.
 4. **A staged rollout can be halted, not reversed.** Android does not downgrade an installed app, so
    the only way back is a new, higher `versionCode` — which is exactly why the rollback path sets
-   core's `Binary distribution risk` tier (`release-ops` `## Feature Flags` holds the tiers).
+   core's `Binary distribution risk` tier (`release-ops` → "Feature Flags" holds the tiers).
 5. **Play App Signing changes what a lost key costs.** The upload key is the team's and is
    replaceable through support; the app signing key is Play's and is not the thing that gets lost.
 6. **The data-safety form is part of the release, not of the paperwork afterwards.** A new SDK that
@@ -167,14 +167,14 @@ density and language on Play's side.
    statically gives R8 no reason to keep it — and the lookup throws in the release build only.
 3. **A keep rule is a debt.** Every rule keeps code, names and metadata in the shipped binary;
    `-keep class com.example.** { *; }` is a way of not shrinking at all.
-4. **`mapping.txt` goes to the crash reporter from the release lane** (`release-ops`
-   `## Crash and Error Reporting`). Keep the file as a build artifact too — the reporter is not an
-   archive.
+4. **`mapping.txt` goes to the crash reporter from the release lane**
+   (`release-ops` → "Crash and Error Reporting"). Keep the file as a build artifact too — the
+   reporter is not an archive.
 5. **Assemble the release build on every push.** R8, resource shrinking and the signing config only
    run in that configuration, so a lane that never builds it discovers what was stripped on release
    day.
-6. **Play App Signing means two keys**, and only the upload one is in CI (`release-ops`
-   `## Secrets in CI`). The App Link fingerprint must match the *signing* key Play uses, not the
+6. **Play App Signing means two keys**, and only the upload one is in CI
+   (`release-ops` → "Secrets in CI"). The App Link fingerprint must match the *signing* key Play uses, not the
    upload key — the source of the `assetlinks.json` mismatch that only reproduces from Play
    (`nav-deeplinks`).
 
@@ -202,8 +202,8 @@ density and language on Play's side.
 
 ## Secure storage & transport
 
-- **Secrets go in a Keystore-backed store** — see `persistence-architecture` `## Small Data` and
-  `## Encryption`, which own the choice and the reason `EncryptedSharedPreferences` is not it any
+- **Secrets go in a Keystore-backed store** — see `persistence-architecture` → "Small Data" and
+  `persistence-architecture` → "Encryption", which own the choice and the reason `EncryptedSharedPreferences` is not it any
   more. What release adds is only the check: the release build must use the same store as debug,
   because a debug-only fallback that writes plaintext is a fallback that ships.
 - **`network_security_config.xml` with cleartext off**, and user-added CAs trusted in

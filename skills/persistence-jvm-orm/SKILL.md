@@ -169,7 +169,7 @@ fun Application.configureDatabase(dataSource: DataSource) {
 
 ## Transaction Boundary
 
-**The boundary is the service method — that is `arch-layered`'s `## Transaction Boundary`, and it
+**The boundary is the service method — that is `arch-layered` → "Transaction Boundary", and it
 does not change here.** Read it there: never on the controller, never on the repository, and on
 Ktor with Exposed the same placement spelled as `newSuspendedTransaction { }` around the service
 body. `arch-hexagonal` covers the variant where the core may not import the container.

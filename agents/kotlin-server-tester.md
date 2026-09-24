@@ -52,8 +52,9 @@ follow what is there and add no second one.
 
 ## Environment Cleanup
 
-That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is
-`test-frameworks` → `### Lifecycle`. In a Kotlin project the state that survives a test is:
+That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is the
+Lifecycle subsection of the `test-frameworks` section for the `- Tests:` value. In a Kotlin
+project the state that survives a test is:
 
 - in-memory storage and fake repositories
 - test databases — truncated tables, or a transaction that rolls back
@@ -102,7 +103,7 @@ The sections below are written in JUnit5. What boots the framework changes with 
 
 `@MicronautTest` and `@QuarkusTest` are JUnit 5 extensions. Micronaut ships a Kotest module
 (`micronaut-test-kotest5`); Quarkus ships none, which makes `@QuarkusTest` one of the surfaces in
-`test-frameworks` `## Forced by surface` — that test is JUnit5 whatever the axis says, and the
+`test-frameworks` → "Forced by surface" — that test is JUnit5 whatever the axis says, and the
 deviation is named in `## Notes`.
 
 ### Spring Boot

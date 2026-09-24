@@ -133,8 +133,8 @@ lint  →  unit  →  integration  →  assemble  →  release
    — split a lane into its own job to buy parallelism or an isolated environment, not by reflex.
 2. **Cache Gradle in CI or pay for a cold build every time.** `gradle/actions/setup-gradle` (or
    `actions/cache` over the Gradle user home, keyed by the version catalog and the lockfiles) plus
-   the build cache and the configuration cache — the same switches `pkg-gradle-modules`
-   `## Build Performance` sets locally, with the remote build-cache node pointed at CI.
+   the build cache and the configuration cache — the same switches
+   `pkg-gradle-modules` → "Build Performance" sets locally, with the remote build-cache node pointed at CI.
 3. **Fail fast across lanes, complete within one.** Nothing runs after a red lane; but `--continue`
    inside a lane turns twelve reruns into one report of every failing module.
 4. **`--scan` on the lane that fails.** A build scan names the slow task and the cache miss; without
@@ -143,14 +143,14 @@ lint  →  unit  →  integration  →  assemble  →  release
    a pull request from a fork (`## Secrets in CI`).
 6. **The release build gets assembled on every push, not on release day.** R8, resource shrinking
    and the signing config only run in that configuration, and a lane that never builds it finds out
-   what R8 strips at the worst moment (`release-ops-android` `## Binary`).
+   what R8 strips at the worst moment (`release-ops-android` → "Binary").
 
 ## Crash and Error Reporting
 
 | Surface | Pick one | Because |
 |---|---|---|
 | Android or Compose Desktop app | Firebase Crashlytics, Sentry, or Bugsnag | native and JVM crash grouping, plus a crash-free rate per release — the number a staged rollout is halted on |
-| JVM server | Sentry, or OpenTelemetry into the platform's own error tracker | an error already correlated with the trace and the request id it came from (`release-ops-server` `## Observability`) |
+| JVM server | Sentry, or OpenTelemetry into the platform's own error tracker | an error already correlated with the trace and the request id it came from (`release-ops-server` → "Observability") |
 
 1. **One reporter per surface.** Two SDKs both installing an uncaught-exception handler produce two
    partial truths and one argument about which dashboard is right.
@@ -162,7 +162,7 @@ lint  →  unit  →  integration  →  assemble  →  release
 4. **Send bugs, not outcomes.** A handled, expected failure is a log line; what belongs in the
    reporter is the unmapped and the unexpected. The taxonomy is `error-architecture`.
 5. **No PII in breadcrumbs, user properties or the message** — a crash reporter is a third party
-   (`error-architecture` `## Logging and PII`).
+   (`error-architecture` → "Logging and PII").
 6. **Bind it at the composition root, behind an interface** (`di-composition-root`), so tests and
    debug builds get a no-op and no layer below the root imports the vendor.
 

@@ -62,7 +62,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 3. Minimal fix at the source set that owns it; add a regression test there, unless the task owes
    none (`spine-toolkit:test-authoring`, `## When the task owes no test`). The framework is
    `spine-toolkit:test-authoring`'s choice for that source set — `commonTest` narrows it, see
-   `test-frameworks` `## Forced by surface` — and its syntax comes from `test-frameworks`.
+   `test-frameworks` → "Forced by surface" — and its syntax comes from `test-frameworks`.
 
 ## Code Standards
 

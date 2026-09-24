@@ -344,7 +344,7 @@ The shape above is what "keep the critical section to the mutation" costs: two s
 with `api.issue()` between them, not one lock held across a network round trip that every other
 caller queues behind. What it does not buy is single flight — two callers arriving together both call
 `issue()` and one result is dropped. Collapsing that into one call, with a cached `Deferred` so N
-concurrent 401s produce one refresh, is `net-architecture`'s `## Auth Refresh`.
+concurrent 401s produce one refresh, is `net-architecture` → "Auth Refresh".
 
 Two alternatives are often better. Confinement — state written from one coroutine only — needs no
 lock. And `StateFlow.update { }`, an atomic compare-and-set loop, for state that is also observed:

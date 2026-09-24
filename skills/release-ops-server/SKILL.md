@@ -88,7 +88,7 @@ Ktor build produces the same shape from `installDist` (the `application` plugin)
    heap either wastes the limit or is killed by it when the limit changes.
 4. **Layer ordering is the whole build-time story.** Dependencies change rarely and classes change
    every commit; a single fat-jar layer re-pushes 80 MB for a one-line fix.
-5. **The tag is immutable and carries the commit** (`release-ops` `## Versioning`) — that is what
+5. **The tag is immutable and carries the commit** (`release-ops` → "Versioning") — that is what
    makes "roll back" a deploy of a tag that still exists.
 
 ## Probes
@@ -142,13 +142,13 @@ ready.set(schema != null && schema >= MigrationVersion.fromVersion(EXPECTED_SCHE
 - **Environment variables over files** — one image, N environments, and anything that differs
   between staging and production is a variable, never a rebuild.
 - **Spring** binds them by relaxed naming: `APP_ORDERS_MAX_BATCH` reaches `app.orders.max-batch`,
-  typed through `@ConfigurationProperties` (`di-spring` `## Properties`), which also gives startup
+  typed through `@ConfigurationProperties` (`di-spring` → "Properties"), which also gives startup
   validation.
 - **Ktor** reads `ApplicationConfig` (`environment.config`) with `${?ENV_VAR}` substitution in
   `application.conf`, and the same values are readable in tests without a process.
 - **Secrets come from the platform's store** — Kubernetes Secrets, Vault, a cloud secret manager —
   mounted as environment variables or files at run time. Never baked into the image, never in the
-  repository; the build-time half of the same rule is `release-ops` `## Secrets in CI`.
+  repository; the build-time half of the same rule is `release-ops` → "Secrets in CI".
 
 1. **Fail at startup on a missing required value**, not on the first request that needs it. A typed
    binding with no default does this for free.
@@ -203,7 +203,7 @@ The discipline — expand/contract, additive first, never a rename in one deploy
    half-changed.
 4. **Expand, deploy, then contract in a later deploy.** During a rolling update old and new code run
    against the same schema at the same time; the expand step is what makes that legal, and the
-   contract step is what makes it temporary (`persistence-migrations` `## Zero-Downtime`).
+   contract step is what makes it temporary (`persistence-migrations` → "Zero-Downtime").
 5. **Failure stops the rollout; it does not roll the schema back.** The previous image has to keep
    running against the migrated schema — which is why the expand step is additive, and why a
    destructive one removes the option to stop.
@@ -223,7 +223,7 @@ The discipline — expand/contract, additive first, never a rename in one deploy
 2. **One request id, in the MDC, propagated as W3C `traceparent`**, so a log line and a trace can be
    joined without guessing at timestamps.
 3. **No PII in logs, and this is a release gate, not a style preference** — logs leave the process and
-   land in a third party's index. The redaction rule is `error-architecture` `## Logging and PII`.
+   land in a third party's index. The redaction rule is `error-architecture` → "Logging and PII".
 4. **Cardinality is what kills a metrics backend.** A user id, an order id or a raw path as a tag
    creates a series per value; template the path (`/orders/{id}`) and keep identifiers in the traces and logs.
 5. **A health endpoint is not a metric.** Alert on the RED series and on saturation; alerting on the
@@ -238,8 +238,8 @@ The discipline — expand/contract, additive first, never a rename in one deploy
 | canary | the failure mode is statistical — latency, error rate, a business metric — and there are automated gates to compare against |
 
 1. **Rollback is deploying the previous tag**, which works only because the tag is immutable
-   (`release-ops` `## Versioning`) and the schema is still compatible with it.
-2. **Behaviour changes ride a flag, not a deploy** (`release-ops` `## Feature Flags`). A flag flips
+   (`release-ops` → "Versioning") and the schema is still compatible with it.
+2. **Behaviour changes ride a flag, not a deploy** (`release-ops` → "Feature Flags"). A flag flips
    in seconds and needs no rollout; a deploy takes minutes and restarts everything.
 3. **Database changes are decoupled from the rollout by expand/contract**, so the rollout never has
    to be atomic with a schema step.

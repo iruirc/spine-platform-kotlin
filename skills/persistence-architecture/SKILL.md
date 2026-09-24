@@ -67,7 +67,7 @@ interface OrderRepository {
    rule; this skill only insists that the *entity* family stops here, exactly as the DTO family
    does, and for the same reason — an entity is shaped by the schema, a domain model by the rules.
 3. **One repository per aggregate, and the port says what while the implementation decides where**
-   — both are `arch-clean`'s (`## Repositories`). The delta this skill adds is *what* does the
+   — both are `arch-clean` → "Repositories". The delta this skill adds is *what* does the
    deciding: the source-of-truth policy below, picked once per aggregate, is the reason the local
    and remote sources can stay `internal`.
 4. **A repository returns `Result` or throws a domain error, never a storage exception.**
@@ -143,7 +143,7 @@ internal class OfflineFirstOrderRepository(
 1. **The storage API is `suspend` and `Flow`, and nothing else crosses the boundary.** Room and
    SQLDelight both offer that shape; a blocking call above `:data` is a choice, not a constraint.
 2. **`Dispatchers.IO` is a `:data` word.** The `withContext(Dispatchers.IO)` goes in the repository
-   or its local source — never in a use case (`arch-clean`, `## Use Cases`) and never in
+   or its local source — never in a use case (`arch-clean` → "Use Cases") and never in
    `commonMain` domain code. A ViewModel may *hold* an injected dispatcher, which is how
    `arch-mvvm` makes its own coroutines testable; what it must not do is wrap a repository call in
    a `withContext`, because that is it being told which layer blocks (`concurrency-coroutines`).

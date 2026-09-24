@@ -56,8 +56,8 @@ For every target:
 - `.editorconfig` for ktlint, `config/detekt/detekt.yml` config (a detekt baseline is a separate `baseline.xml`, not generated here)
 - `.gitignore` (`build/`, `.gradle/`, `local.properties`, `.idea/`, `*.iml`, `.kotlin/`)
 - `README.md` with how to build, test and run
-- one test in the primary module that passes on first run, written from `test-frameworks`
-  `### Declaration` for the value answer 9 chose, with its `### Setup`: the dependency in
+- one test in the primary module that passes on first run, written from the `test-frameworks`
+  section for the value answer 9 chose — its `### Declaration`, and its `### Setup`: the dependency in
   `gradle/libs.versions.toml`, the `Test` task wiring (`useJUnitPlatform()`, and
   `junit-platform-launcher` where the value needs it) in the module's build script
 
@@ -67,7 +67,7 @@ Every choice below comes from the dialog's answers, not from config lines — th
 - **Desktop**: `main.kt` with `application { Window(…) }`, one screen as above, `compose.desktop { application { mainClass = … } }`
 - **Server**: the framework's entry point, one health/hello endpoint through the layers the architecture names (controller → service → repository stub), configuration file with the port, the framework's test host test in the same value
 - **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test in the same value
-- **KMP**: `commonMain` with one public function and its `commonTest`, which `## Forced by surface` narrows to `kotlin.test`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
+- **KMP**: `commonMain` with one public function and its `commonTest`, which `test-frameworks` → "Forced by surface" narrows to `kotlin.test`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
 
 Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with `platform` = `spine-platform-kotlin` and `stack` — the answers this dialog collected, including `Gradle KTS` for `build` and `Spring` for `di` on Spring Boot — so it renders them from its own templates without re-asking. `lang` and `mode` are not passed: this agent never asked them, and setup asks them itself. On a KMP module whose `ui` answer is "no UI", pass `ui` = `none` in `stack` — the one value outside `## Axes` this agent passes, and only for KMP. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
 

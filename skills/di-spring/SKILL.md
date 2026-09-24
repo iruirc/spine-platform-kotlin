@@ -286,7 +286,7 @@ different `@MockkBean` sets are a minutes-long suite that mostly starts Spring.
 3. **`@Transactional` on a class the all-open plugin did not open.** Only the annotations
    `kotlin("plugin.spring")` knows are opened; a `final` helper the annotation was moved onto, or a
    `private` method, gets no proxy and no warning. Where the boundary belongs once the class is
-   proxyable — and why a self-call defeats it — is `arch-layered` `## Transaction Boundary`.
+   proxyable — and why a self-call defeats it — is `arch-layered` → "Transaction Boundary".
 4. **A `data class` as a `@Component` or `@Service`.** `equals`/`hashCode` compare injected
    collaborators, `toString()` prints them into logs — credentials included — and `copy()` hands out
    a second instance of what the container calls a singleton. A `data class` models a value:

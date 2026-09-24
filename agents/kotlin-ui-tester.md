@@ -52,8 +52,9 @@ follow what is there and add no second one.
 
 ## Environment Cleanup
 
-That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is
-`test-frameworks` → `### Lifecycle`. In a Kotlin project the state that survives a test is:
+That a test leaves nothing behind is `spine-toolkit:test-authoring`; what the hooks are called is the
+Lifecycle subsection of the `test-frameworks` section for the `- Tests:` value. In a Kotlin
+project the state that survives a test is:
 
 - in-memory storage and fake repositories
 - test databases — truncated tables, or a transaction that rolls back
@@ -95,7 +96,7 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 The Compose test rule is a JUnit4 `@Rule`, so a Compose test class is JUnit4-shaped — `@Before` /
 `@After`, `@get:Rule`, and `@RunWith` where Robolectric is needed — whatever `- Tests:` says. So is
 a Robolectric test, and so is anything in `androidInstrumentedTest`: all three are rows of
-`test-frameworks` `## Forced by surface`. Everything else in this file takes the axis value, and
+`test-frameworks` → "Forced by surface". Everything else in this file takes the axis value, and
 `test-frameworks` has its hooks.
 
 - `createComposeRule()` for test rule — sets up the Compose test environment.
