@@ -29,3 +29,15 @@ setup() {
   n="$(ls "$ROOT"/skills/*/SKILL.md "$ROOT"/skills/*/references/detailed-guide.md | wc -l | tr -d ' ')"
   grep -qE "^scanned $n files, [0-9]+ units, [0-9]+ blocks, 0 failed$" <<<"$output" || { echo "want $n files scanned: $output"; return 1; }
 }
+
+@test "a declaration removed since the last build does not resolve in the next one" {
+  r="$BATS_TEST_TMPDIR/root"
+  mkdir -p "$r/skills/stale" "$r/tests/snippets/stale"
+  printf '%s\n' '# Stale' '' '<!-- compile: jvm -->' '```kotlin' 'val answer = stub()' '```' > "$r/skills/stale/SKILL.md"
+  echo 'fun stub() = 42' > "$r/tests/snippets/stale/SKILL.jvm.kt"
+  run "$SNIP" "$r"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  echo 'fun other() = 0' > "$r/tests/snippets/stale/SKILL.jvm.kt"
+  run "$SNIP" "$r"
+  [ "$status" -eq 1 ] || { echo "the removed stub still resolved from the last build: $output"; return 1; }
+}
