@@ -18,6 +18,10 @@ setup() {
       skills/*|agents/*|commands/*|conventions/*|templates/*|scripts/*|tests/*) ;;
       *) continue ;;
     esac
+    # conventions/task-ranges.md is core's own file, pointed at from a required peer
+    # (spine-toolkit) rather than forked; the floor test in review-scope.test.bats
+    # checks it resolves there.
+    [ "$p" = "conventions/task-ranges.md" ] && continue
     q="$(printf '%s' "$p" | sed 's/<[^>]*>/*/g')"
     compgen -G "$ROOT/${q%/}" >/dev/null || missing="$missing $p"
   done
@@ -45,7 +49,7 @@ setup() {
   # own i18n lint for the same reason.
   hits="$(grep -rnE --exclude-dir=.git --exclude-dir=.superpowers \
             --exclude=self-containment.test.bats --exclude=core-refs.test.bats --exclude=forks.test.bats \
-            --exclude=test-discipline.test.bats \
+            --exclude=test-discipline.test.bats --exclude=review-scope.test.bats \
             "$pat" "$ROOT" | grep -vE '/\.claude/plugins/(cache|marketplaces)/' || true)"
   [ -z "$hits" ] || { echo "spine-platform-kotlin reference(s) to the core tree:"; echo "$hits"; return 1; }
 }

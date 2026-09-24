@@ -32,13 +32,12 @@ Produce output in the sections described in the "Output Structure" section below
 
 ### 1. Identify Scope
 
-If you were given a task folder, check it for an existing `Review.md` before anything else:
+If you were given a task folder, your task prompt names the ranges to review, one per repository of the task — the project and every module or library checkout it touched (`spine-toolkit`, `conventions/task-ranges.md`). Each range is named by its repository's path relative to the project root (`.` is the project itself); run git in `<project root>/<that path>`. Review exactly those ranges:
 
-- **No `Review.md` present** — first pass. Full scope: the whole diff of the task's branch (or the PR/files you were asked to review).
-- **`Review.md` present** — a re-review after fixes. Read it before writing anything new:
-  1. Take its `[REVIEWED_COMMIT] = <sha>` line and the prior Critical/Major findings.
-  2. `git rev-list <sha>..HEAD` (or the branch's equivalent). Non-empty → **incremental scope**: review only the commits/files touched since `<sha>`, and verify each prior Critical/Major finding — Resolved / Still open / Regressed. Do not re-read unchanged files from scratch.
-  3. Empty (no commits landed since `<sha>`) — nothing changed in code; don't invent a diff. Re-state the previous verdict's open items instead of re-scanning the tree.
+- **A first pass** — the ranges cover the whole task.
+- **A re-review** — the prompt names your previous `Review.md`. Read it first, review only the ranges, and verify each prior Critical/Major finding — Resolved / Still open / Regressed. Do not re-read unchanged files from scratch.
+- **No range holds a commit** — nothing changed in code; don't invent a diff. Re-state the previous verdict's open items instead of re-scanning the tree.
+- **A task prompt with no ranges** (a core older than 2.12.0) — the whole diff of the task's branch.
 
 Outside a task folder — an ad hoc PR/diff/files review on request — scope is whatever was asked: recent changes in the session, a named diff, or specific files, read thoroughly before commenting.
 
@@ -283,21 +282,22 @@ Semantics:
 - `CHANGES_REQUESTED` — there are concrete changes that must be made before merge / closure. The required items are listed in the body of `Review.md` under **Findings → Critical / Major** and summarized in **Follow-up**.
 - `DISCUSSION` — there are open questions or architectural doubts that require a conversation with the user before a decision can be made. The points are listed in the body of `Review.md` and will be copied by `spine-toolkit:workflow-review` into `Questions.md`.
 
-### Reviewed-commit line (mandatory, second line whenever you have a task folder)
+### Reviewed-commit line (mandatory, directly under the status line whenever you have a task folder)
 
 Immediately after the status line:
 
 ```
-[REVIEWED_COMMIT] = <full SHA of HEAD at review time>
+[REVIEWED_COMMIT] = .: <sha>
+[REVIEWED_COMMIT] = <library checkout>: <sha>
 ```
 
-Get it with `git rev-parse HEAD` right before you finish writing — it's what your own next re-review (see "1. Identify Scope") diffs from. Omit this line only when there is no task folder to write it into (an ad hoc PR/diff review).
+Paste the lines the command your task prompt names prints (`task-ranges.sh tips … --kind reviewed`), run right before you finish — one per repository; never assemble them yourself. Omit them only when there is no task folder to write into (an ad hoc PR/diff review).
 
 ### Summary
 Brief overview: scope reviewed, overall quality assessment (1-2 sentences).
 
 ### Scope
-Files/modules/commit range that was reviewed. On a re-review, say explicitly whether this was a full or incremental pass and name the commit range covered.
+Files/modules/commit range that was reviewed. On a re-review, say explicitly whether this was a full or incremental pass and name the commit range covered. Name each range per repository, as the prompt gave it.
 
 ### Findings
 
@@ -307,6 +307,9 @@ Group by severity, each finding includes Category, Location (`file:line`), Descr
 - **Major** (significant bugs / perf / architectural violations)
 - **Minor** (code quality, idiom, maintainability)
 - **Suggestions** (non-blocking ideas)
+
+### For Done
+This is the section core calls `## For Done` — core's Done stage closes every item in it; write it at the level of your other sections. Findings that editing files inside the task folder — `Done.md`, `Plan.md`, `Walkthrough.md` — closes without a single code commit. They do not make the status `CHANGES_REQUESTED` on their own; Done closes them. Omit the section when there are none.
 
 ### Previous findings (only on a re-review)
 One line per Critical/Major item from the prior `Review.md`: **Resolved** / **Still open** / **Regressed**, plus a one-line reason. Omit this section entirely on a first pass.
