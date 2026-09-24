@@ -170,3 +170,21 @@ axes() {
   done
   ! grep -qF 'A `grep` for the DI import outside `di/`' "$INIT" || { echo "the old check is still there"; return 1; }
 }
+
+@test "every value kotlin-init's dialog names is one its row's axis lists" {
+  n=0
+  while IFS= read -r row; do
+    axis="$(cell 2 <<<"$row" | ticks)"
+    while IFS= read -r v; do
+      [ -n "$v" ] || continue
+      in_axis "$axis" "$v" && { n=$((n + 1)); continue; }
+      # Not a value: an axis, a command, a heading, a skill, or the no-UI answer kotlin-setup defines.
+      axes | grep -qxF -- "$v" && continue
+      case "$v" in /*|'#'*) continue ;; esac
+      [ -d "$ROOT/skills/$v" ] && continue
+      [ "$axis/$v" = ui/none ] && continue
+      echo "row $axis names \`$v\`, which is not a $axis value"; return 1
+    done < <(cell 3 <<<"$row" | grep -oE '`[^`]+`' | ticks)
+  done < <(table_rows '| Order | Axis | Options and default |' "$INIT")
+  [ "$n" -ge 14 ] || { echo "checked $n values; the scan went vacuous"; return 1; }
+}
