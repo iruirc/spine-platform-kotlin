@@ -437,10 +437,9 @@ graph instead of taking parameters.
 
 ## Plain Dagger
 
-Hilt's components are generated against `Application`, `Activity`, `Fragment` and friends, so two
-situations fall outside it: a multi-module library with no Android dependency, and a non-Android JVM
-target (a CLI, a server module, a shared JVM core). There the same library is used through Dagger's
-own API, components written by hand.
+Hilt's components are generated against `Application`, `Activity`, `Fragment` and friends, so a
+graph a Hilt build needs outside them — a JVM module or tool of that build, or a hierarchy Hilt does
+not generate — is written through Dagger's own API, components by hand.
 
 ```kotlin
 @Singleton
@@ -483,7 +482,5 @@ interface JobComponent {
 }
 ```
 
-Take plain Dagger when the module cannot depend on Android, or when the component hierarchy has to
-differ from the one Hilt fixes. Take Hilt for everything in an Android app — writing those
-components by hand is the work Hilt exists to remove. Take Koin when the module must also compile for
-a non-JVM target: both of these are JVM annotation processors (`di-koin`).
+Inside the Android app itself, Hilt: writing those components by hand is the work Hilt exists to
+remove. Which build takes which container: `di-composition-root` → "Choosing the Container".

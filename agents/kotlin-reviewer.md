@@ -116,7 +116,7 @@ Evaluate the code against each category below. Skip categories that don't apply.
 - **Dependency direction**: reverse dependencies (repository importing controller types, domain depending on framework).
 - **God classes**: classes with too many responsibilities — should be split.
 - **Interfaces**: one missing or one needless, judged by `arch-clean` → "Interfaces and Concrete Classes".
-- **DI violations**: `new` in business logic, field injection, service locator pattern.
+- **DI violations**: `new` in business logic, field injection outside `di-hilt` → "Entry Points", service locator pattern.
 - **Circular dependencies**: packages or classes depending on each other.
 
 ### Kotlin Idioms

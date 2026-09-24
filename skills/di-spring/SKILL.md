@@ -14,7 +14,7 @@ and a `data class` is not a bean.
 
 > **Related skills:**
 > - `di-composition-root` — the role an `ApplicationContext` fills, and what a bootstrap step may do
-> - `di-koin` — the container to reach for on Ktor, http4k or a CLI, where there is no context to inherit
+> - `di-koin` — the container on Ktor or http4k: `di-composition-root` → "Choosing the Container"
 > - `arch-layered` — which layer each bean belongs to, and why `@Transactional` sits on the service
 > - `arch-hexagonal` — why the core carries no Spring annotation and the adapters carry all of them
 > - `persistence-jvm-orm` — the JPA half of the compiler-plugin story: `kotlin("plugin.jpa")` and entity design

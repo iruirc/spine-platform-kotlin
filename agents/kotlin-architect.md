@@ -39,7 +39,7 @@ design each module by its own target and put the boundary between them in
    `nav-compose` (single platform) or `nav-multiplatform` (KMP).
 5. Is it a KMP module? → Decide what goes in `commonMain` (logic, contracts, models) and what
    stays platform-specific; the seam between them is `pkg-kmp-source-sets` → "expect and actual".
-6. DI scope? → Hilt on Android-only, Koin on KMP; `- DI:` says which. Scope by component
+6. DI scope? → The container is `di-composition-root` → "Choosing the Container"; `- DI:` says which. Scope by component
    lifecycle (Singleton, ViewModel, Activity), never by convenience. See `di-hilt`, `di-koin`.
 
 ### Decision Framework for Server Components

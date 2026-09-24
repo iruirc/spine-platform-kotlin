@@ -141,7 +141,7 @@ fun UserCard(
 
 8. **`suspend` for I/O.** Functions that perform I/O must be `suspend`; where a `withContext` goes, and where none does, is `concurrency-coroutines` → "Per-Layer Dispatchers".
 
-9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
+9. **Injection follows `di-hilt` → "Entry Points".** The ViewModels, repositories and use cases you write take their dependencies as constructor `val`s.
 
 10. **Collect flows with `collectAsStateWithLifecycle()` — never `collectAsState()`** (**Android only**). The lifecycle-aware variant automatically stops collection when the UI is not visible, preventing unnecessary work and potential crashes. Desktop has no lifecycle owner to be aware of — collect with `collectAsState()` in the window's scope.
 

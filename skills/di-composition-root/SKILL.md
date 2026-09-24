@@ -1,6 +1,6 @@
 ---
 name: di-composition-root
-description: "Use when designing where a Kotlin app's object graph is assembled — Application class, main(), Spring context, Ktor module — what belongs there, sync vs async bootstrap, scopes (app / screen / request), the manual-graph option, and how Hilt, Koin, Dagger and Spring each fill the role. DI-framework agnostic."
+description: "Use when designing where a Kotlin app's object graph is assembled — Application class, main(), Spring context, Ktor module — what belongs there, sync vs async bootstrap, scopes (app / screen / request), the manual-graph option, which container each target takes, and how Hilt, Koin, Dagger and Spring each fill the role. DI-framework agnostic."
 ---
 
 # Composition Root
@@ -33,8 +33,9 @@ answer.
   `runBlocking` in `Application.onCreate`, or a `var` on the graph
 - The manual graph has crossed the size where every new dependency is a three-file edit
 
-Not for the mechanics of one framework — `di-hilt`, `di-koin`, `di-spring` own those. Not for
-choosing the framework — `architecture-choice` does that, and this skill is what the choice lands in.
+Not for the mechanics of one framework — `di-hilt`, `di-koin`, `di-spring` own those. Which
+framework a target takes is decided here, and `architecture-choice` writes the answer as the
+`- DI:` line.
 
 ## Why a Composition Root
 
@@ -133,15 +134,33 @@ fitting on any one of these:
 2. **A lifetime that is not "the process".** The moment something must live per screen, per request
    or per user session, `by lazy` has no way to say so and you start hand-rolling scopes — which is
    the framework's actual job (see Scopes).
-3. **Test overrides across many tests.** One fake is a constructor argument. Twenty tests each
-   swapping a different implementation want `@TestInstallIn` or a Koin override module, not twenty
-   subclasses of `AppGraph`.
+3. **Test overrides across many tests.** One fake is a constructor argument. A fake the whole suite
+   shares, or twenty tests each swapping their own, want the container's test seams — Hilt's
+   (`di-hilt` → "Testing") or a Koin override module — not twenty subclasses of `AppGraph`.
 4. **A multi-module graph.** When `:feature:orders` must contribute its own bindings without `:app`
    importing its internals, you want per-module modules — Hilt's `@InstallIn`, Koin's `module { }` —
    not one class that imports every module in the build (`pkg-gradle-modules`).
 
-Which framework then: Hilt on Android-only, Koin on KMP or Compose Desktop, Spring's own container on
-a Spring server, plain Dagger on a non-Android JVM module. Never two in one build.
+## Choosing the Container
+
+One row per target. A graph that has reached none of the four limits under Container vs Manual Graph
+stays manual on every target that lets you choose.
+
+| Target | Container | Because |
+|---|---|---|
+| Android | Hilt | a compile-time graph with components generated for the Android lifecycles |
+| Compose Desktop, KMP | Koin | no code generation, and one graph serves `commonMain` and every platform entry |
+| Ktor, http4k | Koin | the framework brings no container; `koin-ktor` installs into `Application.module()` |
+| Spring Boot | Spring's own | the `ApplicationContext` is the root already; Micronaut and Quarkus bring their own the same way |
+| CLI | manual | a handful of constructor calls at the top of `main()` (see When You Do Not Need One) |
+
+1. **Never two containers in one build.** Half the graph is invisible to the other half, and neither
+   verification test covers the seam.
+2. **Plain Dagger is not a row.** It is Hilt's own library with the components written by hand, for
+   a JVM module or a tool inside a Hilt build that needs a graph of its own (`di-hilt`).
+3. **A build already on a container keeps it** until a row's reason bites — a Hilt app gaining a
+   `commonMain` module is the usual one, and it is a migration, not a second container beside the
+   first.
 
 ## Scopes
 
@@ -270,7 +289,7 @@ In every other case the root pays for itself the first time an implementation ha
    passes alone and fails in a suite.
 7. **Two frameworks in one build** — Hilt for the app module and Koin for a shared one, so half the
    graph is invisible to the other half and neither verification test covers the seam. Pick one per
-   build (`architecture-choice`).
+   build (see Choosing the Container).
 8. **Configuration read where it is used** — services calling `BuildConfig`, `System.getenv` or
    `environment.config` for themselves. Every one of them is now untestable without the environment;
    read it once in the root and pass typed values down.

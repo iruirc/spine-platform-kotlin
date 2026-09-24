@@ -159,7 +159,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 8. **`suspend` for I/O.** Functions that perform I/O must be `suspend`; where a `withContext` goes, and where none does, is `concurrency-coroutines` → "Per-Layer Dispatchers".
 
-9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
+9. **Injection follows `di-hilt` → "Entry Points".** A service, a repository or a route handler is not framework-constructed, so it takes its dependencies as constructor `val`s.
 
 10. **No hardcoded configuration values.** URLs, timeouts, credentials, feature flags, and environment-specific settings must come from configuration (application.yml, application.conf, environment variables).
 

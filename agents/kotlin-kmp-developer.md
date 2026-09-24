@@ -82,7 +82,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 8. **`suspend` for I/O.** Functions that perform I/O must be `suspend`; where a `withContext` goes, and where none does, is `concurrency-coroutines` → "Per-Layer Dispatchers". In shared code the dispatcher is the injected `CoroutineDispatcher` (rule 13).
 
-9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
+9. **Injection follows `di-hilt` → "Entry Points".** Shared code has no framework-constructed class, so everything in `commonMain` takes its dependencies as constructor `val`s.
 
 10. **No hardcoded configuration values.** URLs, timeouts, credentials, feature flags, and environment-specific settings must come from configuration (application.yml, application.conf, environment variables, or a platform `actual` that reads it).
 

@@ -148,9 +148,9 @@ Each stack is the set of skills to follow next. Cross all of them off.
 
 Cross-cutting (always, regardless of pattern):
 
-- **DI** (parallel decision): `di-composition-root` is the entry point — it covers the manual graph
-  and where the root lives on each surface; `di-hilt` on Android-only, `di-koin` on KMP, Compose
-  Desktop or Ktor, `di-spring` inside a Spring context
+- **DI** (parallel decision): `di-composition-root` → "Choosing the Container"; the same skill
+  covers the manual graph and where the root lives, and `di-hilt`, `di-koin`, `di-spring` the
+  frameworks
 - **Errors:** `error-architecture` from day one
 - **Concurrency:** `concurrency-coroutines` — the dispatcher and scope rules per layer
 - **Networking:** `net-architecture`
@@ -165,7 +165,7 @@ Cross-cutting (always, regardless of pattern):
 | MVVM vs MVI | MVVM. Add a reducer to one screen when its state machine earns it |
 | Clean vs MVVM | MVVM. Extract use cases later — additive |
 | Layered vs Hexagonal | Layered. Go Hexagonal when the second external system arrives or tests need the framework out |
-| Hilt vs Koin | Hilt on Android-only; Koin on KMP or Desktop; never both |
+| Hilt vs Koin | `di-composition-root` → "Choosing the Container" |
 | Spring Boot vs Ktor | the one the team already runs in production |
 | Room vs SQLDelight | Room on Android-only; SQLDelight on KMP |
 | "Should we modularize?" | Not yet. One module until 2+ devs collide or the build hurts |

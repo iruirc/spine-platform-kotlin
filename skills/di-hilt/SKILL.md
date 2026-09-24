@@ -65,12 +65,11 @@ Not for the assembly decision itself (`di-composition-root`) and not for ViewMod
 | Codegen | KSP (or kapt) | KSP (or kapt) | none; Koin Annotations adds an optional KSP layer |
 | A missing binding | a build error naming the type and the component | a build error | a runtime failure, unless `verify()` runs in tests |
 | Build cost | annotation processing on every module with a module or an entry point | the same | zero |
-| Take it when | the app is Android-only and stays that way | a non-Android JVM module needs DI, or the generated component hierarchy is genuinely in the way | anything must compile for KMP, Compose Desktop or Ktor, or the graph is small enough that codegen is not worth its build time |
 
-Hilt on Android-only, Koin on KMP or Desktop, never both in one build — the same row
-`architecture-choice` lands on. Hilt *is* Dagger underneath, so the two are not a mix: a Hilt app
-that needs a plain Dagger component in a non-Android module is one project using both APIs of one
-library, which is fine and is the `Plain Dagger` reference section.
+Which one a build takes: `di-composition-root` → "Choosing the Container". Hilt *is* Dagger
+underneath, so the two are not a mix: a Hilt app that needs a plain Dagger component in a
+non-Android module is one project using both APIs of one library, which is fine and is the
+`Plain Dagger` reference section.
 
 ## Components and Scopes
 
@@ -223,6 +222,13 @@ val orders = EntryPointAccessors.fromApplication<OrdersEntryPoint>(context).orde
 mechanism is a named escape hatch and not a convenience. Declare the narrowest interface the caller
 needs, use it at the framework boundary only, and pass the results down as constructor parameters
 from there.
+
+Field injection belongs to a class the framework constructs, and to nothing else. An
+`@AndroidEntryPoint` Activity, Fragment, View, Service or receiver, and a `@HiltAndroidTest` class,
+cannot take constructor parameters, so `@Inject lateinit var` is how the graph reaches them. Every
+class Hilt or your code constructs — a ViewModel, a repository, a use case, a `@HiltWorker` — takes
+an `@Inject` constructor, so its dependencies stay in its signature and a unit test builds it without
+Hilt.
 
 ## KSP Setup
 

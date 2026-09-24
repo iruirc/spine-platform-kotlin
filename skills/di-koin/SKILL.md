@@ -283,12 +283,8 @@ runtime**, so a missing binding is a build error with Hilt and a first-resolve c
 `verify()` runs in CI; Hilt generates components wired to the Android lifecycles, while Koin gives
 you `viewModel { }` for the one lifecycle Android actually owns and `scope<T>` for the rest; and Hilt
 costs an annotation-processing round in every module that declares a binding, which Koin does not.
-The rule that follows is the one `di-hilt`'s comparison table and `architecture-choice` both land on:
-**Hilt on an Android-only app that stays Android-only; Koin the moment a module must also compile for
-iOS, desktop or a Ktor service** — because Hilt does not leave the JVM+Android world at all, and a
-shared `commonMain` graph is not something a Hilt project can grow into later without redoing it.
-Never both in one build: half the graph would be invisible to the other half, and neither check would
-cover the seam.
+Which one a build takes: `di-composition-root` → "Choosing the Container". Hilt does not leave the
+JVM+Android world, so an Android app that will share a `commonMain` graph pays for Hilt twice.
 
 ## Common Mistakes
 

@@ -241,7 +241,7 @@ No "god interfaces" with dozens of methods. Split into small, capability-based i
 
 High-level logic must not depend on low-level details: it reaches a database, a network or another module through a port. Which types are ports is `arch-clean` → "Interfaces and Concrete Classes".
 
-**Always use constructor injection.** No field injection, no `lateinit var` for dependencies, no `object` singletons for stateful services.
+**Injection follows `di-hilt` → "Entry Points".** No `object` singletons for stateful services.
 
 ---
 
@@ -266,7 +266,7 @@ Prefer simple, explicit code:
 
 Regardless of framework:
 
-- **Constructor injection only.** No field injection, no service locator pattern.
+- **Injection follows `di-hilt` → "Entry Points".** No service locator pattern.
 - **No `new` in business logic** — inject everything that has behavior.
 - Externalize configuration values (don't hardcode URLs, timeouts, credentials).
 - Use typed configuration classes over raw string maps.
