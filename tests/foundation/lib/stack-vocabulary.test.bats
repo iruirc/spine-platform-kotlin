@@ -83,3 +83,29 @@ axes() {
   grep -qF 'is `Micronaut` or `Quarkus`, `di` is not asked and gets no line' "$SETUP" \
     || { echo "no Micronaut/Quarkus DI rule"; return 1; }
 }
+
+@test "every line architecture-choice writes into ## Stack is a catalog value" {
+  n=0
+  while IFS= read -r row; do
+    arch="$(cell 2 <<<"$row" | ticks)"; di="$(cell 3 <<<"$row" | ticks)"
+    [ "$arch" = "—" ] || in_axis architecture "$arch" || { echo "$(cell 1 <<<"$row") writes Architecture: $arch"; return 1; }
+    [ "$di" = "—" ] || in_axis di "$di" || { echo "$(cell 1 <<<"$row") writes DI: $di"; return 1; }
+    n=$((n + 1))
+  done < <(table_rows '| Recommendation | `- Architecture:` | `- DI:` |' "$CHOICE")
+  [ "$n" -ge 15 ] || { echo "checked $n rows; the table went missing"; return 1; }
+  row="$(table_rows '| Recommendation | `- Architecture:` | `- DI:` |' "$CHOICE" | grep -F 'Matrix: CLI')"
+  [ "$(cell 2 <<<"$row")" = "—" ] || { echo "a CLI gets an Architecture line: $row"; return 1; }
+}
+
+@test "architecture-choice writes no comment or objection into the config" {
+  grep -qF '| Recommendation | `- Architecture:` | `- DI:` |' "$CHOICE" || { echo "the scan did not reach architecture-choice"; return 1; }
+  for gone in '<!-- Chosen' '`Objection:' 'Done.md'; do
+    ! grep -qF -- "$gone" "$CHOICE" || { echo "still there: $gone"; return 1; }
+  done
+}
+
+@test "architecture-choice reads the target before asking it, and asks before replacing DI" {
+  grep -qF 'a `- Target:` line answers the target surface axis' "$CHOICE" || { echo "target is re-asked"; return 1; }
+  grep -qF 'An existing `- DI:` line with a different value is replaced only after the user confirms' "$CHOICE" \
+    || { echo "DI is overwritten silently"; return 1; }
+}

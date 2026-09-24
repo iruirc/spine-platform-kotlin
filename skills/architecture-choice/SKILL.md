@@ -103,6 +103,37 @@ server, is usually neither pattern rather than both. The KMP row is the one **le
 shared domain, one presentation pattern per platform: the same pattern across two surfaces, not
 different patterns per feature.
 
+## Stack Lines
+
+What each recommendation writes into `## Stack` — catalog values only, because
+`spine-toolkit:stack-detect` matches nothing else. The Stack column above is the advice; this
+table is the record. `—` writes no line: the axis is either asked by `kotlin-setup` or, on a CLI,
+not an axis of that project.
+
+| Recommendation | `- Architecture:` | `- DI:` |
+|---|---|---|
+| Matrix: solo, simple CRUD, Android | `MVVM` | — |
+| Matrix: modest logic, Android | `MVVM` | `Hilt` |
+| Matrix: modest logic, Desktop | `MVVM` | `Koin` |
+| Matrix: screen state machine | `MVI` | — |
+| Matrix: rich domain, 2–3 devs | `Clean Architecture` | — |
+| Matrix: 4+ devs, feature modules | `Clean Architecture` | — |
+| Matrix: KMP sharing logic | `Clean Architecture` | `Koin` |
+| Matrix: Spring Boot, CRUD-heavy | `Layered` | `Spring` |
+| Matrix: any server, rich domain | `Hexagonal` | — |
+| Matrix: Micronaut / Quarkus | `Layered` | — |
+| Matrix: CLI | — | — |
+| Fast Path: throwaway Android prototype | `MVVM` | `Manual` |
+| Fast Path: greenfield Android Compose app | `MVVM` | `Hilt` |
+| Fast Path: KMP client with shared logic | `Clean Architecture` | `Koin` |
+| Fast Path: Spring Boot CRUD service | `Layered` | `Spring` |
+| Fast Path: Ktor service with rich rules | `Hexagonal` | `Koin` |
+| Fast Path: CLI tool | — | — |
+| Fast Path: Compose Desktop utility | `MVVM` | `Manual` |
+
+A Micronaut or Quarkus service with a rich domain takes `Hexagonal` the same way; its DI is the
+framework's container and gets no line.
+
 ## Stack Cookbook
 
 Each stack is the set of skills to follow next. Cross all of them off.
@@ -147,8 +178,8 @@ Cross-cutting (always, regardless of pattern):
 2. **Mixing patterns by feature** — one feature MVVM, the next MVI, a third Clean: nobody joining
    the project can predict where logic lives. The KMP split (shared domain, per-platform
    presentation) is **not** this — one pattern per layer, not one per feature
-3. **Choosing without writing it down** — record the choice in the active project guidance file's
-   `## Stack` so every later task reads one source of truth instead of re-deciding
+3. **Choosing without writing it down** — record the choice in `## Stack` through Stack Lines
+   so every later task reads one source of truth instead of re-deciding
 4. **Refusing to migrate when the signals appear** — see the signals in `arch-layered`. A stack
    fits a project's current size, not its whole lifetime
 5. **Letting a library pick the architecture** — "we use Compose, therefore MVVM" is fine; "we use
@@ -159,23 +190,23 @@ Cross-cutting (always, regardless of pattern):
 1. **Find and read the active project guidance file.** Prefer `CLAUDE-spine-toolkit.md` if present,
    otherwise `CLAUDE.md`, otherwise the active task documentation. If its `## Stack` already names an
    architecture and the user isn't refactoring — this skill is done; follow that pattern's skill.
+   Read the other lines too: a `- Target:` line answers the target surface axis, and the
+   questionnaire does not ask it again.
 2. **Try Fast Path.** If a Fast Path scenario clearly applies — skip the questionnaire and recommend.
 3. **Otherwise collect the Five Axes** from the user using the active agent's available question
    mechanism. If no structured question tool exists, ask concise plain-text questions. Don't infer
-   the target surface from the project name or from vibes — ask.
+   the target surface from the project name or from vibes — take it from `- Target:` or ask.
 4. **Pick the matching row** from the Decision Matrix. If two rows fit — apply the When in Doubt
    defaults.
-5. **Write the choice into the active project guidance file's `## Stack`** in the existing bullet
-   format — `- Architecture: <stack>` and `- DI: <framework>`, the labels `kotlin-setup` writes.
-   Values are the manifest's own spellings (`MVVM`, `MVI`, `Clean Architecture`, `Layered`,
-   `Hexagonal`; `Hilt`, `Koin`, `Dagger`, `Spring`, `Manual`), because that is what
-   `spine-toolkit:stack-detect` matches against. Don't invent fields. Record a short context line
-   above the section as a comment: `<!-- Chosen YYYY-MM-DD: <axes summary> -> <stack> -->`. When a
-   caller (such as `kotlin-setup`) asked for the value, return it instead of writing — during setup
-   that caller is the only writer.
-6. **If the user disagrees with the recommendation** — record their choice as-is, then add
-   `Objection: <reason from the matrix or Fast Path>` either directly under `## Stack`, or in
-   `Done.md → ## Objections` of the active task. Risks must stay visible.
+5. **Write the choice into the active project guidance file's `## Stack`**: the lines Stack Lines
+   gives for the chosen row, `- Architecture: <value>` and `- DI: <value>`, and nothing for a `—`
+   cell. No other line, no comment.
+   An existing `- DI:` line with a different value is replaced only after the user confirms — the
+   DI answer may have come from `kotlin-setup` with a reason this compass does not see. When a caller (such as `kotlin-setup`) asked for the value, return
+   it instead of writing — during setup that caller is the only writer.
+6. **If the user disagrees with the recommendation** — record their choice as-is, and state the
+   objection (the matrix row or Fast Path line it rests on) in your answer to them. The config
+   carries values, not arguments.
 7. **Hand control** to `spine-platform-kotlin:kotlin-init` (new project) or
    `spine-platform-kotlin:kotlin-architect` (existing project) with the skill list from Stack Cookbook.
    A host without those agents, such as Codex, ends here with the skill list for the user to follow.
