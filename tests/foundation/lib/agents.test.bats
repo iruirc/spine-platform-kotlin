@@ -34,3 +34,12 @@ setup() {
     || { echo "the lens is still told to write a stage file"; return 1; }
   ! grep -qF 'during the Research panel' "$f" || { echo "Related Agents still describes a Research panel"; return 1; }
 }
+
+@test "no agent recommends a DI library the di axis does not list" {
+  [ "$(ls "$ROOT"/agents/*.md | wc -l)" -ge 16 ] || { echo "the scan went vacuous"; return 1; }
+  ! grep -l 'Kodein' "$ROOT"/agents/*.md
+}
+
+@test "the compose developer says what a Views project gets" {
+  grep -qF 'When `## Stack` says `- UI: Views`' "$ROOT/agents/kotlin-compose-developer.md"
+}

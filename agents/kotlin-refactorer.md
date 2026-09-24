@@ -294,7 +294,7 @@ Regardless of framework:
 - Avoid `@Autowired` on fields — use constructor injection (Kotlin's `val` in primary constructor).
 
 **Ktor:**
-- Use Koin, Kodein or manual DI.
+- Use Koin or manual DI.
 - Configure via `application.conf` (HOCON) or environment variables.
 
 **Micronaut:**

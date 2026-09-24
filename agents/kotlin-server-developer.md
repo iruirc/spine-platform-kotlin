@@ -84,7 +84,7 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
 - Route handlers in `routing { }` blocks — keep handlers thin, delegate to services.
 - **Plugins** for cross-cutting concerns — authentication, content negotiation, CORS, logging, rate limiting.
 - `application.conf` (HOCON) for configuration — access via `environment.config`.
-- **Koin or Kodein** for dependency injection — define modules, inject into route handlers.
+- **Koin** for dependency injection — define modules, inject into route handlers.
 - Use `StatusPages` plugin for centralized error handling.
 - Use `ContentNegotiation` plugin with kotlinx.serialization for JSON serialization.
 - Organize routes by feature: one file per feature area, installed in the main `Application` module.

@@ -149,7 +149,7 @@ neighbouring skills, a finding here may block.
 - Thin route handlers — business logic in services, not in `routing { }` blocks.
 - `StatusPages` for centralized error handling, not try-catch in every route.
 - `ContentNegotiation` configured once, not manual serialization.
-- Koin/Kodein modules organized by feature.
+- Koin modules organized by feature.
 
 ### Micronaut
 
