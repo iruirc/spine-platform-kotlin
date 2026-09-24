@@ -64,6 +64,11 @@ axes() {
   grep -qF '`report_axis_renamed`' "$SETUP" || { echo "the rewrite is not reported"; return 1; }
 }
 
+@test "the rewrite rule fires only on a label that is not already a line label" {
+  grep -qF 'A label that is no line label but matches the text of' "$SETUP" \
+    || { echo "step 2 still rewrites a correct line to itself"; return 1; }
+}
+
 @test "question labels are distinct within each locale" {
   for lang in en ru; do
     labels="$(awk '/^## auq_axis_[a-z]+_label$/ {getline; print}' "$L/$lang.md")"

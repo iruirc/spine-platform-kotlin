@@ -74,7 +74,7 @@ axis lines, and the file answers that directly.
      unresolved.
    ↓ it holds `- <label>: <value>` lines → a line is that axis's value UNLESS its value is still
      an angle-bracketed option list (an unanswered template line).
-     A label that matches the text of an `auq_axis_<axis>_label` key in any of this skill's locales
+     A label that is no line label but matches the text of an `auq_axis_<axis>_label` key in any of this skill's locales
      is that axis's line written with its question label: rewrite the label to the axis's line
      label, keep the value, and report `report_axis_renamed`. A label matching no line label and no question label is kept
      verbatim and reported as `report_axis_unknown` — losing a value the user wrote is worse than
