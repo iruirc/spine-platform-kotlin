@@ -177,7 +177,7 @@ the code it was written beside and never with the API.
 private val spec = OpenApiInteractionValidator.createFor("specs/orders.yaml").build()
 
 @Test
-fun `placing an order matches the spec`() {
+fun postOrders_validDraft_matchesSpec() {
     mockMvc.post("/orders") { contentType = APPLICATION_JSON; content = draftJson }
         .andExpect { status { isCreated() } }
         .andExpect { match(openApi().isValid(spec)) }

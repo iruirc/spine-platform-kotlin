@@ -264,7 +264,7 @@ fun handle(request: Request): Mono<Response> = mono { service.handle(request) }
 
 ```kotlin
 @Test
-fun `emits loading then content`() = runTest {
+fun state_ordersLoaded_emitsLoadingThenContent() = runTest {
     viewModel.state.test {
         assertEquals(OrdersUiState(isLoading = true), awaitItem())
         assertEquals(OrdersUiState(orders = twoOrders), awaitItem())

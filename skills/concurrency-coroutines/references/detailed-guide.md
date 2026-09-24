@@ -420,7 +420,7 @@ control — an OkHttp `Interceptor` or `Authenticator` (`net-http-clients`).
 ## Testing — runTest and Virtual Time
 
 ```kotlin
-@Test fun `retries twice then gives up`() = runTest {
+@Test fun byId_threeFailures_retriesTwiceThenFails() = runTest {
     val api = FlakyApi(failures = 3)
     val result = catching { RetryingOrders(api, delay = 30.seconds).byId("1") }
 
@@ -468,7 +468,7 @@ reaches: the test hangs, times out, or passes because the assertion ran before t
 test forever.
 
 ```kotlin
-@Test fun `emits on every insert`() = runTest {
+@Test fun stream_orderInserted_emitsNewList() = runTest {
     val seen = mutableListOf<List<Order>>()
     backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
         repository.stream().toList(seen)          // never completes — and that is fine

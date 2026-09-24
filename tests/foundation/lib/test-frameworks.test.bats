@@ -179,3 +179,18 @@ common_block() {
   grep -qF '`test-frameworks`' "$i" || { echo "the placeholder test is in no particular framework"; return 1; }
   grep -qF '### Setup' "$i" || { echo "the build wiring is still this agent's own memory"; return 1; }
 }
+
+@test "no Kotlin sample names a function with a backticked identifier" {
+  # A backticked sentence drops the method_condition_expected shape ## JUnit5 asks for.
+  out="$(cd "$ROOT" && find skills agents -name '*.md' -print0 | xargs -0 awk '
+    FNR == 1 { fence = 0 }
+    /^[ \t]*```/ { if (fence) fence = 0; else { fence = 1; kt = ($0 ~ /```kotlin[ \t]*$/); if (kt) blocks++ }; next }
+    fence && kt && /@Test/ { tests++ }
+    fence && kt && /fun[ \t]+`/ { print FILENAME ":" FNR ": " $0 }
+    END { print "scanned " blocks + 0 " " tests + 0 }')"
+  hits="$(grep -v '^scanned ' <<<"$out" || true)"
+  read -r _ blocks tests < <(grep '^scanned ' <<<"$out")
+  [ "$blocks" -ge 300 ] && [ "$tests" -ge 50 ] \
+    || { echo "scanned $blocks kotlin block(s), $tests @Test line(s); the scan went vacuous"; return 1; }
+  [ -z "$hits" ] || { echo "$hits"; return 1; }
+}

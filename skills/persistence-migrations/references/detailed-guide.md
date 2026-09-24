@@ -448,7 +448,7 @@ class MigrationChainTest {
     })
 
     @Test
-    fun `the chain runs from v7 to head and keeps every order`() {
+    fun migrate_fromV7ToHead_keepsEveryOrder() {
         val before = dataSource.count("select count(*) from orders")
 
         val result = Flyway.configure().dataSource(dataSource).load().migrate()

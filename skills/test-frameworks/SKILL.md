@@ -73,8 +73,8 @@ class CheckoutServiceTest {
 ```
 
 The method name is the test's name. A backticked sentence name is legal Kotlin and compiles, but it
-loses the `method_condition_expected` shape the tester's naming rule asks for — put the sentence in
-`@DisplayName` instead and keep the identifier.
+loses the `method_condition_expected` shape `spine-toolkit:test-authoring` asks for — put the
+sentence in `@DisplayName` instead and keep the identifier.
 
 ### Assertions
 

@@ -227,7 +227,7 @@ class InMemoryOrders : OrderRepository {
 }
 
 @Test
-fun `declines an order the payment gateway refuses`() {
+fun placeOrder_gatewayRefuses_fails() {
     val placeOrder = PlaceOrderUseCase(InMemoryOrders(), RefusingGateway, FixedTime(now))
     assertTrue(placeOrder(command).isFailure)
 }

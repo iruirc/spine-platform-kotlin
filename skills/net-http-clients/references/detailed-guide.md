@@ -147,7 +147,7 @@ class OrdersServiceTest {
     fun stop() = server.shutdown()
 
     @Test
-    fun `sends the cursor and parses the page`() = runTest {
+    fun orders_cursorGiven_sendsItAndParsesPage() = runTest {
         server.enqueue(
             MockResponse()
                 .setResponseCode(200)
@@ -293,7 +293,7 @@ class KtorOrdersApiTest {
     }
 
     @Test
-    fun `sends the cursor and parses the page`() = runTest {
+    fun orders_cursorGiven_sendsItAndParsesPage() = runTest {
         val (api, engine) = api {
             respond(
                 content = """{"items":[{"id":"o1","total":1250,"currency":"EUR"}],"nextCursor":"c2"}""",
@@ -381,7 +381,7 @@ class DownloadTest {
     fun stop() = server.shutdown()
 
     @Test
-    fun `cancelling the scope cancels the OkHttp call`() = runBlocking {
+    fun download_scopeCancelled_cancelsOkHttpCall() = runBlocking {
         server.start()
         server.enqueue(MockResponse().setBody("payload").setHeadersDelay(10, TimeUnit.SECONDS))
         val into = File.createTempFile("download", null)
@@ -483,7 +483,7 @@ class OrdersClientTest {
     private val client = OrdersClient(configuredOrdersClient(builder, props, factory = null))
 
     @Test
-    fun `sends the cursor and parses the page`() {
+    fun orders_cursorGiven_sendsItAndParsesPage() {
         server.expect(requestTo("https://api.example.com/orders?cursor=c1"))
             .andExpect(method(HttpMethod.GET))
             .andExpect(header("Authorization", "Bearer test-token"))
@@ -547,7 +547,7 @@ class ReactiveOrdersClient(private val web: WebClient) {
 ```kotlin
 class ReactiveOrdersClientTest {
     @Test
-    fun `sends the cursor and parses the page`() = runTest {
+    fun orders_cursorGiven_sendsItAndParsesPage() = runTest {
         lateinit var seen: ClientRequest
         val web = WebClient.builder().baseUrl("https://api.example.com").exchangeFunction { request ->
             seen = request

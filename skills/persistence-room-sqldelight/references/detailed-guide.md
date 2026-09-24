@@ -235,7 +235,7 @@ class OrderDaoTest {
 
     @After fun tearDown() = db.close()
 
-    @Test fun `observe re-emits when a line is added to an observed order`() = runTest {
+    @Test fun observeByCustomer_lineAdded_reEmits() = runTest {
         dao.upsertOrder(orderEntity(id = "o-1", customerId = "c-1"))
 
         dao.observeByCustomer("c-1").test {
@@ -454,7 +454,7 @@ class OrderQueriesTest {
 
     @AfterTest fun tearDown() = driver.close()
 
-    @Test fun `selectByCustomer re-emits when a matching order is inserted`() = runTest {
+    @Test fun selectByCustomer_matchingOrderInserted_reEmits() = runTest {
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
         db.orderQueries.selectByCustomer("c-1").asFlow().mapToList(dispatcher).test {
             assertEquals(0, awaitItem().size)

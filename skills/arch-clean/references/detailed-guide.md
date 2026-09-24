@@ -563,7 +563,7 @@ class CancelOrderTest {
     private val clock = Clock.System   // replaced per test below
 
     @Test
-    fun `a shipped order cannot be cancelled`() = runTest {
+    fun invoke_shippedOrder_rejectsWithoutRefund() = runTest {
         val orders = FakeOrderRepository(listOf(order.copy(status = OrderStatus.Shipped)))
         val payments = FakePaymentRepository()
 
@@ -574,7 +574,7 @@ class CancelOrderTest {
     }
 
     @Test
-    fun `cancelling after the window is rejected`() = runTest {
+    fun invoke_afterCancellationWindow_rejects() = runTest {
         val late = object : Clock { override fun now() = order.placedAt + 25.hours }
         val result = CancelOrder(FakeOrderRepository(listOf(order)), FakePaymentRepository(), late)(order.id)
         assertIs<OrderError.Rejected>(result.exceptionOrNull())
@@ -591,7 +591,7 @@ a captured payload; the repository gets fakes for its sources and assertions on 
 ```kotlin
 // :data/src/test — OrderRepositoryImplTest.kt
 @Test
-fun `a failed refresh still serves the cache`() = runTest {
+fun orders_refreshFails_servesCache() = runTest {
     val api = FakeOrderApi().apply { failWith(IOException()) }
     val dao = FakeOrderDao(seeded = listOf(orderWithLines))
 
@@ -601,7 +601,7 @@ fun `a failed refresh still serves the cache`() = runTest {
 }
 
 @Test
-fun `an unknown status maps to Unknown rather than throwing`() {
+fun toDomain_unknownStatus_mapsToUnknown() {
     val order = json.decodeFromString<OrderDto>(ORDER_WITH_FUTURE_STATUS).toDomain()
     assertEquals(OrderStatus.Unknown, order.status)
 }
@@ -641,7 +641,7 @@ screen depends on:
 ```kotlin
 // :feature:orders/src/test — OrdersViewModelTest.kt
 @Test
-fun `an offline failure renders the offline message`() = runTest {
+fun onEvent_offlineFailure_rendersOfflineMessage() = runTest {
     val repo = FakeOrderRepository().apply { failure = OrderError.Offline }
     val viewModel = OrdersViewModel(
         getOrders = GetOrders(repo),

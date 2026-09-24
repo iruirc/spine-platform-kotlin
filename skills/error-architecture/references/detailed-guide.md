@@ -216,7 +216,7 @@ The mappers are pure functions over closed families, so the test is a list. Addi
 internal class DataErrorMappingTest {
     @ParameterizedTest(name = "{0} becomes {1}")
     @MethodSource("cases")
-    fun `every data error maps to a domain error`(input: DataError, expected: OrderError) {
+    fun toOrderError_everyDataError_mapsToDomainError(input: DataError, expected: OrderError) {
         assertEquals(expected, input.toOrderError())
     }
 
@@ -240,7 +240,7 @@ Equality works because the domain cases are `data object`s and `data class`es. `
 
 ```kotlin
 @Test
-fun `an unmapped status becomes Unexpected and keeps the original`() {
+fun toOrderError_unmappedStatus_becomesUnexpectedWithOriginal() {
     val mapped = DataError.Http(418, null).toOrderError()
 
     assertIs<OrderError.Unexpected>(mapped)
@@ -253,7 +253,7 @@ moment the user leaves it.
 
 ```kotlin
 @Test
-fun `cancellation is rethrown, never returned as a failure`() = runTest {
+fun catching_cancelled_rethrowsInsteadOfFailure() = runTest {
     var result: Result<Int>? = null
 
     val job = launch { result = catching { awaitCancellation() } }
@@ -460,7 +460,7 @@ asserts only the status passes while the body says something else entirely.
 ```kotlin
 // Spring — MockMvc, the service stubbed to fail
 @Test
-fun `a forbidden order answers 403 with a problem body and no message`() {
+fun getOrder_forbidden_answers403ProblemWithoutMessage() {
     every { orders.byId(OrderId("42")) } throws OrderError.Forbidden
 
     mockMvc.get("/orders/42").andExpect {
@@ -475,7 +475,7 @@ fun `a forbidden order answers 403 with a problem body and no message`() {
 ```kotlin
 // Ktor — testApplication, the route throwing what the service would
 @Test
-fun `an invalid order answers 422 with a per-field list`() = testApplication {
+fun getOrder_invalid_answers422WithFieldList() = testApplication {
     val invalid = OrderError.Invalid(listOf(Violation("quantity", "must-be-positive")))
     application { installErrorHandling(); routing { get("/orders/42") { throw invalid } } }
 

@@ -238,7 +238,7 @@ class DeepLinkParserTest {
     )
 
     @Test
-    fun `known shapes map to their route and everything else to null`() {
+    fun parse_everyCase_mapsKnownShapeToRouteAndRestToNull() {
         val failures = cases.mapNotNull { (url, expected) ->
             val actual = DeepLinkParser.parse(url)
             "$url -> $actual, expected $expected".takeIf { actual != expected }

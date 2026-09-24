@@ -326,7 +326,7 @@ class SearchReducerTest {
     private val loading = SearchState(query = "kotlin", submittedQuery = "kotlin", status = Status.Loading)
 
     @Test
-    fun `transitions`() {
+    fun reduce_everyCase_returnsExpectedState() {
         val cases = listOf(
             Case(SearchState(query = "kotlin"), SearchIntent.SubmitClicked, loading),
             Case(SearchState(), SearchIntent.SubmitClicked, SearchState()),           // blank query: no-op

@@ -172,7 +172,7 @@ class OrderJpaRepositoryTest(
     }
 
     @Test
-    fun `reads an order with its lines in one query`() {
+    fun findByCustomerWithLines_orderWithLines_readsInOneQuery() {
         val order = OrderEntity(customerId = CUSTOMER, placedAt = Instant.now(), status = NEW)
         order.addLine(OrderLineEntity(sku = "SKU-1", quantity = 2, unitPriceCents = 1_500))
         em.persist(order)
@@ -350,7 +350,7 @@ class ExposedOrderRepositoryTest {
     private val repository = ExposedOrderRepository()
 
     @Test
-    fun `round-trips an order with its lines`() = transaction {
+    fun save_orderWithLines_byIdReturnsLines() = transaction {
         addLogger(StdOutSqlLogger)                 // test-only: prints the statements
         val order = anOrder(lines = 2)
         repository.save(order)
@@ -454,7 +454,7 @@ class OrderReadPathQueryCountTest(
     }
 
     @Test
-    fun `reading orders with lines costs one statement`() {
+    fun findByCustomerWithLines_linesTouched_preparesOneStatement() {
         val stats = em.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
         stats.clear()
         jpa.findByCustomerWithLines(CUSTOMER).forEach { it.lines.size }   // touch the association

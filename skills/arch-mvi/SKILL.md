@@ -237,7 +237,7 @@ The reducer is a pure function, so its test is a table and needs no dispatcher, 
 
 ```kotlin
 @Test
-fun `transitions`() {
+fun reduce_everyCase_returnsExpectedState() {
     val cases = listOf(
         // state, intent, expected
         Triple(

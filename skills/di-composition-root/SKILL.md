@@ -243,7 +243,7 @@ resolves.** What that looks like per framework:
 
 ```kotlin
 @Test
-fun `graph resolves with a test config`() {
+fun appGraph_testConfig_resolvesEveryDependency() {
     val graph = AppGraph(Config.forTests(dbPath = ":memory:"))
 
     assertNotNull(graph.orders)
