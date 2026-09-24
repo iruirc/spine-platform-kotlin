@@ -4,8 +4,6 @@
 
 - Shared Type
 - The Chain — Where withContext Sits
-- Cancellation — runCatching Swallows It
-- Cancellation — A Safe runCatching
 - Cancellation — ensureActive in a Loop
 - Cancellation — Cleanup Under NonCancellable
 - Cancellation — withTimeout and withTimeoutOrNull
@@ -27,6 +25,9 @@
 ```kotlin
 data class Order(val id: String, val total: Long)
 ```
+
+Every `catching { }` below is the helper in
+`error-architecture` → "The runCatching Rule".
 
 Client samples are Android's and compile unchanged on Compose Multiplatform and Compose Desktop
 except where noted; server samples name their framework.
@@ -90,49 +91,6 @@ fake and no dispatcher. Where Room replaces SQLDelight the `withContext` disappe
 runs on Room's executor already — and returns only for what *surrounds* the call: a parse, a file
 write, ten thousand rows (`persistence-architecture`).
 
-## Cancellation — runCatching Swallows It
-
-The mechanism: cancelling a job makes the next suspension point throw `CancellationException`, and
-that throw is how the coroutine unwinds. `runCatching` catches `Throwable`.
-
-```kotlin
-// wrong
-suspend fun load(id: String): Result<Order> = runCatching { api.order(id) }
-```
-
-Two failures at once. The caller sees `Result.failure(CancellationException)` and maps it to an error
-state, so a user who pressed Back gets an alert; and the coroutine is still cancelled, so every later
-suspension throws and the "recovery" path silently does nothing. A `catch (e: Exception)` around a
-suspending call and a `catch (e: Throwable)` in a base class are the same trap wearing other clothes.
-
-## Cancellation — A Safe runCatching
-
-One helper, used everywhere `runCatching` was reached for.
-
-```kotlin
-suspend inline fun <T> catching(block: () -> T): Result<T> =
-    try {
-        Result.success(block())
-    } catch (e: TimeoutCancellationException) {
-        currentCoroutineContext().ensureActive()   // an outer deadline cancelled us — rethrow
-        Result.failure(e)                          // our own withTimeout expired — a real failure
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
-        Result.failure(e)
-    }
-```
-
-Cancellation is rethrown before anything else sees it, and stays a `CancellationException` — do not
-wrap it, map it, or log it as an error. The timeout arm comes first because
-`TimeoutCancellationException` is a subtype: a `withTimeout` *inside* the block is a deadline the
-caller must see, while an outer one expiring is a cancellation that has to propagate.
-`ensureActive()` separates them — it throws only when this job is already cancelled — and the same
-call in the general `catch` covers a library that swallowed the cancellation and threw its own.
-
-What the failures become past this point — a sealed domain error, an `UiState.Error`, an RFC 9457
-body — is `error-architecture`. This helper only guarantees that cancellation never reaches it.
-
 ## Cancellation — ensureActive in a Loop
 
 A loop with no suspension point inside it never notices that its job was cancelled.
@@ -189,7 +147,7 @@ val orders = withTimeoutOrNull(5.seconds) { loadOrders(userId) } ?: emptyList()
 — the same trap as `runCatching`. A timeout caught *outside* does not cancel the enclosing
 coroutine: the exception belongs to the scope `withTimeout` created, not to its parent. And a
 wrapper rethrowing every `CancellationException` rethrows a real expiry too, so the deadline never
-becomes a visible failure — the arm `Cancellation — A Safe runCatching` adds.
+becomes a visible failure — the reason `catching` has a timeout arm.
 
 The client's connect/read/write timeouts answer a different question — they bound one attempt and
 throw an `IOException` a retry layer can act on, while `withTimeout` bounds the whole operation

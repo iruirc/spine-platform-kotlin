@@ -11,7 +11,7 @@ syntax of `try`/`catch`: the decision, taken once for the project, about which o
 `Result` and a thrown exception carries a failure across each boundary, and who translates.
 
 > **Related skills:**
-> - `concurrency-coroutines` — the cancellation discipline every rule here depends on, and the `catching` helper this skill reuses
+> - `concurrency-coroutines` — the cancellation discipline every rule here depends on; the `catching` helper it uses is this skill's
 > - `arch-clean` — the use case's return type, `Result<T>` or a sealed outcome: the choice deferred there is taken here
 > - `arch-mvvm` — the `UiState.Error` slot this skill fills, and the sealed-vs-data-class shape around it
 > - `arch-layered` — the controller or CLI command that turns a service failure into a status code or an exit code
@@ -127,8 +127,12 @@ coroutine to fail silently on its next suspension.
 ```kotlin
 // wrong: a Back press becomes an error state, and the cancelled coroutine keeps running
 val result = runCatching { repository.load(id) }
+```
 
-// right: rethrow it, then handle the rest
+The helper that replaces it, in every suspending caller:
+
+<!-- compile: jvm -->
+```kotlin
 suspend inline fun <T> catching(block: () -> T): Result<T> =
     try {
         Result.success(block())
@@ -138,20 +142,27 @@ suspend inline fun <T> catching(block: () -> T): Result<T> =
     } catch (e: CancellationException) {
         throw e
     } catch (e: Throwable) {
+        currentCoroutineContext().ensureActive()   // a library swallowed our cancellation — rethrow
         Result.failure(e)
     }
 ```
 
-1. **One helper, in one shared module, used everywhere `runCatching` was reached for.** This is
-   `concurrency-coroutines`' `catching` — the same function, not a second one; that skill owns the
-   three cancellation rules and the reason the timeout arm comes first.
-2. **`catch (e: Exception)` around a suspending call is the same trap in other clothes.** Where a
-   helper does not fit, the first arm is `catch (e: CancellationException) { throw e }` and the real
-   handling follows it.
-3. **Cancellation is never mapped, logged as an error, reported, or shown.** It is not a failure of
+1. **One helper, in one shared module, used everywhere `runCatching` was reached for.** Every
+   skill's `catching` is this function, not a second one, and `runCatching` is not used in
+   coroutine code.
+2. **`ensureActive()` runs before every `Result.failure`.** It throws only when this job is already
+   cancelled. In the timeout arm, which comes first because `TimeoutCancellationException` is a
+   `CancellationException`, it tells an outer deadline, which must propagate, from a `withTimeout`
+   inside the block, a failure the caller must see. In the general arm it catches a library that
+   swallowed our cancellation and threw its own exception: without it, the cancelled coroutine
+   returns a failure and runs on with `isActive` false.
+3. **`catch (e: Exception)` around a suspending call is the same trap in other clothes.** Where the
+   helper does not fit, the first arm is `catch (e: CancellationException) { throw e }`, and the
+   general arm calls `currentCoroutineContext().ensureActive()` before it handles anything.
+4. **Cancellation is never mapped, logged as an error, reported, or shown.** It is not a failure of
    anything; it is the machinery telling you the caller left. A `CancellationException` arriving in
    a mapper's `when` means rule 1 was skipped somewhere upstream.
-4. **A `finally` that must still run needs `withContext(NonCancellable)`** — releasing a lock,
+5. **A `finally` that must still run needs `withContext(NonCancellable)`** — releasing a lock,
    writing a final audit row. Business work inside it is an uncancellable coroutine.
 
 ## Server Presentation

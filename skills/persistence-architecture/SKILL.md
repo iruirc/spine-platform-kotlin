@@ -70,9 +70,8 @@ interface OrderRepository {
    — both are `arch-clean` → "Repositories". The delta this skill adds is *what* does the
    deciding: the source-of-truth policy below, picked once per aggregate, is the reason the local
    and remote sources can stay `internal`.
-4. **A repository returns `Result` or throws a domain error, never a storage exception.**
-   `SQLiteConstraintException`, `IOException` and `PersistenceException` are engine facts;
-   `error-architecture` names what they become.
+4. **A storage or network exception never leaves the repository.** What it becomes is
+   `error-architecture` → "Layer-by-Layer Mapping".
 5. **Fakes are the point.** The layer above is tested against an in-memory implementation of the
    port with no database at all; the real implementation gets its own integration test
    (`persistence-room-sqldelight`).
@@ -113,9 +112,9 @@ One policy per aggregate, written down, chosen by one question: **must this work
 8. **Mixing policies across one app is normal, mixing them for one aggregate is not.** Orders
    database-first and the currency list network-first is a design; orders both ways is a race.
 
+<!-- compile: jvm -->
 ```kotlin
 // :data — database-first. The Flow is the whole read path; refresh only writes.
-// DataError is a sealed Throwable family (`error-architecture`): kotlin.Result carries nothing else.
 internal class OfflineFirstOrderRepository(
     private val dao: OrderDao,
     private val api: OrdersApi,
@@ -126,14 +125,8 @@ internal class OfflineFirstOrderRepository(
         dao.observeByCustomer(customer.value).map { rows -> rows.map(OrderEntity::toDomain) }
 
     override suspend fun refresh(customer: CustomerId): Result<Unit> = withContext(io) {
-        try {
-            dao.upsertAll(api.orders(customer.value).items.map(OrderDto::toEntity))
-            Result.success(Unit)
-        } catch (e: CancellationException) {
-            throw e                                  // never a failure: the screen left
-        } catch (e: IOException) {
-            Result.failure(DataError.Unreachable(e)) // the rows on disk are still valid
-        }
+        catching { dao.upsertAll(api.orders(customer.value).items.map(OrderDto::toEntity)) }
+            .mapFailure { it.toDataError().toOrderError() }   // the domain never sees DataError
     }
 }
 ```

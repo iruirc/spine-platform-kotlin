@@ -301,9 +301,8 @@ different problems, and adding both at once fixes neither.
    instrumentation without an extra rule. `StateFlow` works on all three targets; convert `LiveData`
    as you touch it (`reactive-flow`).
 7. **`viewModelScope.launch { repository.load() }` with no error handling** — one thrown exception
-   and the screen sits on `Loading` forever with no way back. Catch, rethrow `CancellationException`,
-   map the rest into the state. `runCatching` does **not** count: it swallows cancellation
-   (`error-architecture`).
+   and the screen sits on `Loading` forever with no way back. Wrap the call in `catching` and map
+   the failure into the state: `error-architecture` → "The runCatching Rule".
 8. **`init { load() }`** — the constructor does I/O, so every test must arrange every dependency
    before the ViewModel exists, and the load can never be repeated, which is why such screens grow a
    second undocumented reload path. Use `stateIn(WhileSubscribed)`, or an explicit event the Route

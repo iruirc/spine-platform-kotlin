@@ -18,7 +18,7 @@ flow's **lifecycle**: which scope collects it and what cancels the collection.
 > - `arch-layered` — the service method that is the transaction boundary a suspending call runs inside
 > - `net-architecture` — the request that dies with its scope, and single-flight refresh behind a `Mutex`
 > - `persistence-architecture` — `Dispatchers.IO` as a `:data` word, Room's executor vs SQLDelight's caller thread
-> - `error-architecture` — the `runCatching` trap, and what a cancellation must never be mapped to
+> - `error-architecture` — the `catching` helper, the `runCatching` trap, and what a cancellation must never be mapped to
 > - `compose-state` — `LaunchedEffect` and `rememberCoroutineScope()`, the two composition-scoped starters
 > - `di-composition-root` — the app scope this skill hands work to, and why bootstrap never blocks
 
@@ -45,7 +45,6 @@ Not for which HTTP client suspends how — `net-http-clients`.
 |---|---|
 | The shared `Order` type every section uses, and the client/server sample convention | `Shared Type` |
 | A ViewModel → use case → repository → data source chain with the one `withContext` in it | `The Chain — Where withContext Sits` |
-| Proof that `runCatching` eats cancellation, and the helper that does not | `Cancellation — runCatching Swallows It`, `Cancellation — A Safe runCatching` |
 | A CPU loop that stays cancellable, and cleanup that still runs after cancel | `Cancellation — ensureActive in a Loop`, `Cancellation — Cleanup Under NonCancellable` |
 | Deadlines that throw versus deadlines that return null | `Cancellation — withTimeout and withTimeoutOrNull` |
 | Two independent loads in one use case, and the variant where one may fail alone | `Fan-out — coroutineScope and async`, `Fan-out — supervisorScope and Per-Child Failure` |
@@ -147,32 +146,11 @@ this stop".
 Cancellation is cooperative: it sets a flag and makes the *next* suspension point throw
 `CancellationException`. Three rules keep the chain intact.
 
-**1. Never catch `CancellationException` — and `runCatching` catches it.**
+**1. A `catch` around a suspending call never keeps `CancellationException`.**
 
-```kotlin
-// wrong: a Back press becomes an error state, and the cancelled coroutine keeps running
-val result = runCatching { repository.load(id) }
+`error-architecture` → "The runCatching Rule"
 
-// right: rethrow it, then handle the rest
-suspend inline fun <T> catching(block: () -> T): Result<T> =
-    try {
-        Result.success(block())
-    } catch (e: TimeoutCancellationException) {
-        currentCoroutineContext().ensureActive()   // an outer deadline cancelled us — rethrow
-        Result.failure(e)                          // our own withTimeout expired — a real failure
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
-        Result.failure(e)
-    }
-```
-
-`runCatching` catches `Throwable`, so it catches the cancellation the machinery uses to unwind: the
-coroutine stays cancelled, every later suspension throws, and the user is shown a real error. Same
-trap in a `catch (e: Exception)` around a suspending call. The timeout arm is there because
-`TimeoutCancellationException` is a subtype: a deadline the block set for itself is a failure the
-caller must see, one set outside it is a cancellation to rethrow, and `ensureActive()` tells them
-apart. `error-architecture` owns what the remaining failures become.
+Every `catching` in this skill and its reference is the helper that section owns.
 
 **2. A loop with no suspension point is not cancellable — call `ensureActive()` or `yield()`.**
 
@@ -352,8 +330,9 @@ needs a **wider owner**.
 1. **`withContext(Dispatchers.IO)` in a ViewModel or a use case.** It moves a decision about where
    blocking happens up into a layer that cannot know. The repository call is already main-safe or it
    is a bug in the repository (`arch-clean`, `persistence-architecture`).
-2. **`runCatching` around a suspending call.** It catches `CancellationException`, so a cancelled
-   coroutine reports a failure to the user and keeps running. Rethrow cancellation first.
+2. **`runCatching` around a suspending call.** A cancelled coroutine reports a failure to the user
+   and keeps running:
+   `error-architecture` → "The runCatching Rule".
 3. **`GlobalScope.launch { }`.** No owner, no cancellation, no exception handler, no test seam. An
    application-scoped `CoroutineScope` from the graph does the same job and can be stopped.
 4. **`value = value.copy(...)` on a `StateFlow` from two coroutines.** A read-modify-write that

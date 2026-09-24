@@ -112,7 +112,7 @@ Replace Java-style patterns with Kotlin equivalents:
 | `instanceof` + cast | Smart cast after `is` check |
 | `switch` | `when` (exhaustive for sealed types) |
 | Getter/setter boilerplate | Properties |
-| `try { } catch (Exception e) { }` | `runCatching { }` or explicit catches |
+| `try { } catch (Exception e) { }` | explicit catches; around a suspending call, `error-architecture` → "The runCatching Rule" |
 | `StringBuffer`/`StringBuilder` | `buildString { }` |
 | `for` loop with index | `forEachIndexed` / `mapIndexed` |
 
