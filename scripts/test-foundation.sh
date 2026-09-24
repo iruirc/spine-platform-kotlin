@@ -2,7 +2,7 @@
 # Adapted from spine-toolkit scripts/test-foundation.sh sha256:11626b8b730021a82aa492e67cfe1b44d67d997726e9ddd27c4b507c820c8493
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
-# Usage: scripts/test-foundation.sh [unit|all]
+# Usage: scripts/test-foundation.sh [unit|all|snippets]
 set -euo pipefail
 
 target="${1:-all}"
@@ -21,5 +21,7 @@ suites=("$root/tests/foundation/lib")
 case "$target" in
   unit) bats "$root/tests/foundation/lib" ;;
   all)  bats "${suites[@]}" ;;
-  *)    echo "usage: $0 [unit|all]" >&2; exit 2 ;;
+  # Minutes of Gradle, so `all` leaves it out; `snippets` is run on its own and in CI.
+  snippets) bats "$root/tests/foundation/snippets" ;;
+  *)    echo "usage: $0 [unit|all|snippets]" >&2; exit 2 ;;
 esac
