@@ -51,7 +51,7 @@ axes() {
 
 @test "every stack line the plugin names uses a line label" {
   labels="$(table_rows '| Axis | Line label |' "$SETUP" | cell 2 | ticks)"
-  found="$(grep -rhoE '`- [A-Z][A-Za-z]*:' "$ROOT/agents" "$ROOT/skills" "$ROOT/commands" | sed 's/^`- //; s/:$//' | sort -u)"
+  found="$(grep -rhoE '`- [A-Z][A-Za-z ]*:' "$ROOT/agents" "$ROOT/skills" "$ROOT/commands" | sed 's/^`- //; s/:$//' | sort -u)"
   [ "$(grep -c . <<<"$found")" -ge 5 ] || { echo "found $(grep -c . <<<"$found") labels; the scan went vacuous"; return 1; }
   while IFS= read -r l; do
     grep -qxF -- "$l" <<<"$labels" || { echo "\`- $l:\` is named somewhere but is no line label"; return 1; }
