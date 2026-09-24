@@ -1,6 +1,6 @@
 {
   "name": "spine-platform-kotlin",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "description": "Kotlin platform knowledge for Android, Compose Desktop, JVM servers, CLI tools, and Kotlin Multiplatform projects.",
   "author": {
     "name": "Dmitry Nuzhin"
