@@ -195,18 +195,20 @@ Cross-cutting (always, regardless of pattern):
 2. **Try Fast Path.** If a Fast Path scenario clearly applies — skip the questionnaire and recommend.
 3. **Otherwise collect the Five Axes** from the user using the active agent's available question
    mechanism. If no structured question tool exists, ask concise plain-text questions. Don't infer
-   the target surface from the project name or from vibes — take it from `- Target:` or ask.
+   the target surface from the project name or from vibes — take it from `- Target:`, or from
+   the caller that invoked this skill, or ask.
 4. **Pick the matching row** from the Decision Matrix. If two rows fit — apply the When in Doubt
    defaults.
 5. **Write the choice into the active project guidance file's `## Stack`**: the lines Stack Lines
    gives for the chosen row, `- Architecture: <value>` and `- DI: <value>`, and nothing for a `—`
    cell. No other line, no comment.
    An existing `- DI:` line with a different value is replaced only after the user confirms — the
-   DI answer may have come from `kotlin-setup` with a reason this compass does not see. When a caller (such as `kotlin-setup`) asked for the value, return
-   it instead of writing — during setup that caller is the only writer.
-6. **If the user disagrees with the recommendation** — record their choice as-is, and state the
-   objection (the matrix row or Fast Path line it rests on) in your answer to them. The config
-   carries values, not arguments.
+   DI answer may have come from `kotlin-setup` with a reason this compass does not see. When a
+   caller (such as `kotlin-setup`) asked for the value, return it instead of writing — during setup
+   that caller is the only writer.
+6. **If the user disagrees with the recommendation** — record their choice as its catalog value,
+   and state the objection (the matrix row or Fast Path line it rests on) in your answer to them.
+   The config carries values, not arguments.
 7. **Hand control** to `spine-platform-kotlin:kotlin-init` (new project) or
    `spine-platform-kotlin:kotlin-architect` (existing project) with the skill list from Stack Cookbook.
    A host without those agents, such as Codex, ends here with the skill list for the user to follow.
