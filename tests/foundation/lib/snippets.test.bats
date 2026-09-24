@@ -32,6 +32,7 @@ fake_jdk() {
   grep -qxF 'unit skills/demo/SKILL.md (jvm), 2 block(s)' <<<"$output" || { echo "$output"; return 1; }
   u="$OUT/jvm/main/demo/SKILL.kt"
   [ "$(sed -n 1p "$u")" = '@file:OptIn(ExperimentalCoroutinesApi::class)' ] || { head -3 "$u"; return 1; }
+  [ "$(grep -c '^@file:OptIn' "$u")" -eq 1 ] || { echo "the @file annotation was not hoisted once"; return 1; }
   [ "$(sed -n 2p "$u")" = 'package snippets.demo.skill' ] || { head -3 "$u"; return 1; }
   [ "$(grep -cxF 'import kotlinx.coroutines.ExperimentalCoroutinesApi' "$u")" -eq 1 ] || { echo "the import was not hoisted once"; return 1; }
   grep -qxF 'import kotlinx.coroutines.flow.*' "$u" || { echo "the module's default imports are missing"; return 1; }

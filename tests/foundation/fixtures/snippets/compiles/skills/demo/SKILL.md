@@ -124,6 +124,7 @@ The same unit, later in the file:
 
 <!-- compile: jvm -->
 ```kotlin
+@file:OptIn(ExperimentalCoroutinesApi::class)
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 fun Counter.tickTwice(): Instant { tick(); return tick() }

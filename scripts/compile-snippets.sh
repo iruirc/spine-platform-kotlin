@@ -50,7 +50,7 @@ BEGIN {
 function norm(s) { sub(/[ \t]+#.*$/, "", s); sub(/^#.*$/, "", s); sub(/[ \t]+$/, "", s); return s }
 function err(msg) { print "ERR|" rel ":" FNR ": " msg }
 function keep(name, kind, text, origin) {
-  if (kind == "import") { if ((name SUBSEP text) in seen) return; seen[name SUBSEP text] = 1 }
+  if (kind == "import" || kind == "file") { if ((name SUBSEP text) in seen) return; seen[name SUBSEP text] = 1 }
   k = ++cnt[name SUBSEP kind]; txt[name SUBSEP kind SUBSEP k] = text; org[name SUBSEP kind SUBSEP k] = origin
 }
 pending {
@@ -238,7 +238,7 @@ awk -F'\t' -v units="$units/" '
   }
   last != "" && /^[^ \t>*\[]/ && !/^(w|i): |^FAILURE|^BUILD / { print last "  " $0; next }
   { last = "" }' "$tmp/lines" "$log" > "$tmp/hits"
-grep '^> Task ' "$log" | grep -v ' FAILED$' | awk '{ print $3 }' > "$tmp/ran" || true
+grep '^> Task ' "$log" | grep -vE ' (FAILED|SKIPPED)$' | awk '{ print $3 }' > "$tmp/ran" || true
 
 while IFS='|' read -r unit map rel name n; do
   [ "$unit" = CAT ] && continue
