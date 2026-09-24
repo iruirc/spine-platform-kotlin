@@ -35,3 +35,6 @@ Kept stack line `{old}` as it is — no axis by that name exists today. Nothing 
 
 ## report_modules_written
 Wrote {n} module line(s) into `## Modules` — those modules resolve to a different stack than the root.
+
+## report_axis_renamed
+Renamed stack line `{old}` to `{new}` — it carried a question's label instead of the axis's; the value is unchanged.

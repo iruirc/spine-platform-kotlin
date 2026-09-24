@@ -1,0 +1,85 @@
+#!/usr/bin/env bats
+# A `## Stack` line is `- <Line label>: <value>` with a value `## Axes` lists; any other
+# label or value is one spine-toolkit:stack-detect never reads, and its axis is asked on every task.
+
+setup() {
+  ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
+  M="$ROOT/skills/manifest/SKILL.md"
+  SETUP="$ROOT/skills/kotlin-setup/SKILL.md"
+  L="$ROOT/skills/kotlin-setup/locales"
+  CHOICE="$ROOT/skills/architecture-choice/SKILL.md"
+  INIT="$ROOT/agents/kotlin-init.md"
+  CMD="$ROOT/commands/kotlin-init.md"
+}
+
+axis_values() {
+  sed -n '/^## Axes$/,/^## Heuristics$/p' "$M" | grep -E "^$1[[:space:]]*=" \
+    | sed 's/^[^=]*=//' | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+in_axis() { axis_values "$1" | grep -qxF -- "$2"; }
+
+table_rows() {
+  awk -v h="$1" '$0 == h {f = 1; next} f && /^\|[-| ]+\|$/ {next} f && /^\|/ {print; next} f {exit}' "$2"
+}
+
+cell() { awk -F'|' -v n="$(( $1 + 1 ))" '{ gsub(/^[ \t]+|[ \t]+$/, "", $n); print $n }'; }
+
+ticks() { tr -d '`'; }
+
+line_label() {
+  table_rows '| Axis | Line label |' "$SETUP" | while IFS= read -r row; do
+    [ "$(cell 1 <<<"$row" | ticks)" = "$1" ] && cell 2 <<<"$row" | ticks
+  done
+}
+
+axes() {
+  sed -n '/^## Axes$/,/^## Heuristics$/p' "$M" | grep -oE '^[a-z][a-z-]*[[:space:]]*=' \
+    | grep -oE '^[a-z-]+' | grep -vx ecosystem
+}
+
+@test "every axis has one line label, and step 4 writes it" {
+  n=0
+  for a in $(axes); do
+    [ "$(line_label "$a" | grep -c .)" -eq 1 ] || { echo "$a: $(line_label "$a" | grep -c .) line labels"; return 1; }
+    n=$((n + 1))
+  done
+  [ "$n" -ge 9 ] || { echo "checked $n axes; the scan went vacuous"; return 1; }
+  grep -qF '`- <Line label>: <value>`' "$SETUP" || { echo "step 4 does not write the line label"; return 1; }
+  ! grep -qF '<Label>' "$SETUP" || { echo "a <Label> placeholder is still in kotlin-setup"; return 1; }
+}
+
+@test "every stack line the plugin names uses a line label" {
+  labels="$(table_rows '| Axis | Line label |' "$SETUP" | cell 2 | ticks)"
+  found="$(grep -rhoE '`- [A-Z][A-Za-z]*:' "$ROOT/agents" "$ROOT/skills" "$ROOT/commands" | sed 's/^`- //; s/:$//' | sort -u)"
+  [ "$(grep -c . <<<"$found")" -ge 5 ] || { echo "found $(grep -c . <<<"$found") labels; the scan went vacuous"; return 1; }
+  while IFS= read -r l; do
+    grep -qxF -- "$l" <<<"$labels" || { echo "\`- $l:\` is named somewhere but is no line label"; return 1; }
+  done <<<"$found"
+}
+
+@test "a line labelled with a question label is rewritten to the line label, and reported" {
+  grep -qF 'matches the text of an `auq_axis_<axis>_label` key in any of this skill'"'"'s locales' "$SETUP" \
+    || { echo "step 2 has no rewrite rule for question labels"; return 1; }
+  grep -qF '`report_axis_renamed`' "$SETUP" || { echo "the rewrite is not reported"; return 1; }
+}
+
+@test "question labels are distinct within each locale" {
+  for lang in en ru; do
+    labels="$(awk '/^## auq_axis_[a-z]+_label$/ {getline; print}' "$L/$lang.md")"
+    [ "$(grep -c . <<<"$labels")" -ge 9 ] || { echo "$lang: the scan went vacuous"; return 1; }
+    dup="$(sort <<<"$labels" | uniq -d)"
+    [ -z "$dup" ] || { echo "$lang: shared by two axes: $dup"; return 1; }
+  done
+}
+
+@test "Axes by Target asks a KMP module no framework or async, and a Spring Boot server no DI" {
+  rows="$(table_rows '| `target` | Asked (if still unresolved) |' "$SETUP")"
+  kmp="$(grep -E '^\| KMP \|' <<<"$rows")"
+  [ -n "$kmp" ] || { echo "no KMP row"; return 1; }
+  ! grep -qE 'every axis|`framework`|`async`' <<<"$kmp" || { echo "KMP row: $kmp"; return 1; }
+  grep -qF 'is `Spring Boot`, `di` is not asked and the line is `- DI: Spring`' "$SETUP" \
+    || { echo "no Spring Boot DI rule"; return 1; }
+  grep -qF 'is `Micronaut` or `Quarkus`, `di` is not asked and gets no line' "$SETUP" \
+    || { echo "no Micronaut/Quarkus DI rule"; return 1; }
+}

@@ -31,3 +31,11 @@ setup() {
     grep -q "\`$k\`" "$body" || { echo "locale key named nowhere in the body: $k"; return 1; }
   done
 }
+
+@test "a label rewrite is reported with its old and new line, in both locales" {
+  for lang in en ru; do
+    grep -qx '## report_axis_renamed' "$L/$lang.md" || { echo "missing in $lang.md"; return 1; }
+    grep -A1 -x '## report_axis_renamed' "$L/$lang.md" | grep -q '{old}.*{new}' \
+      || { echo "$lang.md: the entry lacks {old} or {new}"; return 1; }
+  done
+}

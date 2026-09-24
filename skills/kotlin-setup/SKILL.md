@@ -72,11 +72,13 @@ axis lines, and the file answers that directly.
 2. Read ## Stack from config_path.
    ↓ it holds only the template's placeholder → no axis has a value yet; every axis is
      unresolved.
-   ↓ it holds `- <Label>: <value>` lines → a line is that axis's value UNLESS its value is still
-     an angle-bracketed option list (an unanswered template line). A label matching no current
-     axis is kept verbatim and reported as `report_axis_unknown` — losing a value the user wrote
-     is worse than carrying an unread line. This platform has renamed no axis, so there is no
-     rename table; one appears here the day an axis is renamed.
+   ↓ it holds `- <label>: <value>` lines → a line is that axis's value UNLESS its value is still
+     an angle-bracketed option list (an unanswered template line).
+     A label that matches the text of an `auq_axis_<axis>_label` key in any of this skill's locales
+     is that axis's line written with its question label: rewrite the label to the axis's line
+     label, keep the value, and report `report_axis_renamed`. A label matching no line label and no question label is kept
+     verbatim and reported as `report_axis_unknown` — losing a value the user wrote is worse than
+     carrying an unread line.
 
    Then fill the still-unresolved axes — and only those — from the input's `stack`. The config
    wins wherever it holds an answered line. Take an input value only if this manifest's ## Axes
@@ -92,7 +94,8 @@ axis lines, and the file answers that directly.
    - `architecture`: if the user says "I don't know" / "advise me" → run `architecture-choice`,
      bring its result back as the answer plus a one-line justification.
 
-4. Write ## Stack: one `- <Label>: <value>` line per axis that has a value, in the manifest's
+4. Write ## Stack: one `- <Line label>: <value>` line per axis that has a value — the label from
+   Stack Line Labels, never a question label — in the manifest's
    ## Axes order, replacing the template's placeholder line — then, beneath them and verbatim,
    the lines step 2 preserved because their label matches no current axis. An axis the target
    does not need gets no line: a `- UI:` line on a server project is a claim nothing verified.
@@ -112,7 +115,8 @@ axis lines, and the file answers that directly.
    server in one build) gets its answer without asking twice.
 
 6. Return {stack_lines, notes} to spine-toolkit:setup, which renders the one report. `notes`
-   holds the step-2 `report_axis_unknown` lines and the step-5 `report_modules_written` line,
+   holds the step-2 `report_axis_renamed` and `report_axis_unknown` lines and the step-5
+   `report_modules_written` line,
    already rendered in <lang>, and is empty when there was nothing to report.
 ```
 
@@ -126,14 +130,39 @@ Which axes step 3 asks, per resolved `target`. `target` itself is always first.
 | Desktop | `ui`, `di`, `architecture`, `baseline`, `tests`, `build` |
 | Server | `framework`, `async`, `di`, `architecture`, `baseline`, `tests`, `build` |
 | CLI | `framework`, `baseline`, `tests`, `build` |
-| KMP | every axis except `ecosystem` |
+| KMP | `ui`, `di`, `architecture`, `baseline`, `tests`, `build` |
 
-`async` is not asked on Android or Desktop: `kotlinx.coroutines` is the only answer a Compose
-project gives, and the heuristics pin it from the first `suspend fun`. A project that really
-runs RxJava on Android has the line detected, never asked.
+`async` is not asked on Android, Desktop or KMP: `kotlinx.coroutines` is the only answer a Compose
+or shared module gives, and the heuristics pin it from the first `suspend fun`. A project that
+really runs RxJava on Android has the line detected, never asked. `framework` means nothing to a
+KMP shared module, and its `ui` question offers "no UI" beside the catalog values — that answer
+writes no `- UI:` line.
+
+On a Server, the framework decides DI.
+When `framework` is `Spring Boot`, `di` is not asked and the line is `- DI: Spring`.
+When it is `Micronaut` or `Quarkus`, `di` is not asked and gets no line: the container is the
+framework's own, and no DI skill of this plugin covers it. A CLI gets no
+`- DI:` or `- Architecture:` line: its layers are `arch-layered`'s, its graph is built in `main()`.
 
 Axis values are proper nouns from the catalog and are **never translated**: the answer is matched
 back against `## Axes`, so a localized option label resolves nothing.
+
+## Stack Line Labels
+
+The label of each `## Stack` line — the only spelling `spine-toolkit:stack-detect`, the agents and
+the other skills read. The question labels in the locale files are for asking, never for writing.
+
+| Axis | Line label |
+|---|---|
+| `target` | `Target` |
+| `ui` | `UI` |
+| `async` | `Async` |
+| `di` | `DI` |
+| `framework` | `Framework` |
+| `architecture` | `Architecture` |
+| `build` | `Build` |
+| `baseline` | `Baseline` |
+| `tests` | `Tests` |
 
 ## Edge cases
 
