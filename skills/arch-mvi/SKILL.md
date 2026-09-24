@@ -135,12 +135,13 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
    starts nothing.
 4. **The store is the only writer.** `dispatch` runs `reduce` and assigns; every other component
    reads. If two coroutines can dispatch at once, serialize — a `MutableStateFlow.update { }` around
-   `reduce`, an actor, or Orbit's own per-container dispatch queue.
+   `reduce`, or an actor. Orbit does not do it for you: every `intent { }` runs as a coroutine of its
+   own, and only each `reduce { }` is one atomic `update`.
 5. **`State` must be a `data class` with equality that means something.** `distinctUntilChanged` in
    `StateFlow` is what stops the screen recomposing on every keystroke that changed nothing, and a
    `List` field also costs Compose skipping (`compose-state`).
-6. **The store lives where a ViewModel would.** On Android and in `commonMain`, that *is* a
-   `ViewModel` with `viewModelScope`; on Compose Desktop, an object owned by the window scope.
+6. **The store is a `ViewModel` on every target**, Compose Desktop included:
+   `arch-mvvm` → "ViewModel on Every Target".
 
 ## Library Choice
 
@@ -170,27 +171,22 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
 
 ## Side Effects
 
-An effect is what cannot be re-rendered: navigate away, show a snackbar, open a share sheet, fire a
-haptic. Everything still true after a configuration change belongs in `State`.
+What is an effect, what carries it, and the one kind kept in state is
+`arch-mvvm` → "One-shot Effects". A hand-rolled store declares its channel the same way:
 
 ```kotlin
 private val _effects = Channel<SearchEffect>(Channel.BUFFERED)
 val effects: Flow<SearchEffect> = _effects.receiveAsFlow()
 ```
 
-1. **`Channel(Channel.BUFFERED)` + `receiveAsFlow()` is the default** for a hand-rolled store: one
-   screen, one collector, buffered across the recreation gap. `arch-mvvm` states the trade-offs
-   against a state field and a `SharedFlow`, and they apply here unchanged.
-2. **Never put a one-shot in `State`.** A `navigateTo` field is a state that is true twice —
-   once when set, once after rotation — and the second one navigates under the user.
-3. **The reducer never emits.** Effects are sent by the executor, or by the store *after* `reduce`
+1. **An effect kept in `State` is consumed by an intent.** The Route dispatches `ReceiptOpened` and
+   the reducer clears the field — never a `_state` write from outside `dispatch`.
+2. **The reducer never emits.** Effects are sent by the executor, or by the store *after* `reduce`
    returns, from the branch that already knows the intent. Reducer purity is the reason a transition
    can be replayed in a test loop.
-4. **On Orbit, `postSideEffect` is the only path**, and the container's `sideEffectFlow` the only
+3. **On Orbit, `postSideEffect` is the only path**, and the container's `sideEffectFlow` the only
    consumer. Do not add a private `Channel` beside it: one screen with two effect streams has two
    delivery guarantees and one arrival order nobody controls.
-5. **One `sealed interface SearchEffect` per screen**, so the Route's `when` stays exhaustive and a
-   new effect is a compile error at the only place that handles them.
 
 ## Compose Integration
 
@@ -302,9 +298,9 @@ a single `UiState` is already unidirectional.
    to observe, the table test is gone, and two intents arriving together interleave inside the one
    function that was supposed to be atomic. Move the call to the executor and let it dispatch a
    Result intent.
-2. **Effects kept in `State`** — a `navigateTo: ResultId?` field. It fires again after every
-   configuration change until something remembers to null it out, and the "something" is the
-   composable, which now writes state. Use the effect channel.
+2. **A one-shot kept in `State` with no process death to survive** — a `navigateTo: ResultId?`
+   field: `arch-mvvm` → "One-shot Effects". Where one is warranted, clearing it from the composable
+   instead of by an intent is mistake 7.
 3. **UI-dispatchable Result intents.** `LoadFailed` in the same public sealed interface as
    `SubmitClicked` means a composable can fake a failure, and a reviewer cannot tell the screen's
    real input surface from the executor's. Split them, or keep the internal half `internal`.
@@ -320,9 +316,8 @@ a single `UiState` is already unidirectional.
 7. **Reintroducing a second writer** — a `_state.value = …` somewhere outside `dispatch`, usually in
    `init` or a Flow collector. The reducer is no longer the whole story, and the transition log no
    longer replays the screen. Feed that collector's emissions in as intents.
-8. **`LaunchedEffect(Unit)` around effect collection on Android**, with no `flowWithLifecycle`. The
-   backgrounded screen keeps consuming, and the navigation lands under whatever the user opened
-   next (mistake 1 of `arch-mvvm`'s binding rules, in its effect form).
+8. **`LaunchedEffect(Unit)` around effect collection on Android**, with no `flowWithLifecycle`:
+   `arch-mvvm` → "One-shot Effects".
 9. **A library adopted for the word.** Orbit or MVIKotlin added to keep one screen's `when`
    exhaustive buys a container lifecycle, a testing idiom and a migration for the next reader — the
    hand-rolled sixty lines were the whole pattern.

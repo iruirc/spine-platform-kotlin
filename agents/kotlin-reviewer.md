@@ -212,13 +212,13 @@ neighbouring skills, a finding here may block.
 Consult these skills when reviewing code against architectural / framework expectations. The skill body is the source of truth for "what correct looks like" in this project:
 
 - `architecture-choice` — the stack the project already committed to; a review judges against that choice, it does not re-litigate it
-- `arch-mvvm` — MVVM boundaries: `StateFlow` in the ViewModel, one `UiState` per screen, events up, no navigation call from a composable
+- `arch-mvvm` — MVVM boundaries: `StateFlow` in the ViewModel, one `UiState` per screen, events up, one-shot effects out
 - `arch-mvi` — MVI boundaries: intents in, a pure reducer, side effects on their own channel, no state mutated outside the reducer
 - `arch-clean` — the Clean Architecture dependency rule: the domain imports no framework, use cases own the orchestration, DTO mapping stays in the data layer
 - `arch-layered` — layering on a server or CLI: entry point → service → repository → domain, with the transaction boundary on the service
 - `arch-hexagonal` — ports and adapters: a framework-free core, every outbound call through a port the core itself declares
 - `compose-state` — PR red flags: `mutableStateOf` without `remember` (reset on every recomposition); `remember` where state must survive process death (`rememberSaveable` or the ViewModel); `LaunchedEffect(Unit)` where the key should be the value that changes (the effect never restarts); an unstable parameter type or a lambda allocated per recomposition, which defeats skipping
-- `nav-compose` — Navigation Compose: type-safe `@Serializable` routes, nested graphs, results passed back explicitly, no `NavController` held by a ViewModel
+- `nav-compose` — Navigation Compose: type-safe `@Serializable` routes, nested graphs, results passed back explicitly; where navigation may live is `nav-compose` → "The Boundary"
 - `nav-multiplatform` — KMP navigation: one library for the whole project (navigation-compose, Decompose or Voyager), back handling and state preservation per platform
 - `nav-deeplinks` — URL to typed Route: every entry point parsed by the same parser, cold start buffered behind auth, no route parsing inlined in an Activity
 - `net-architecture` — PR red flags: a DTO or transport response type crossing the ApiClient boundary into a ViewModel or the domain; retry on a non-idempotent POST without an idempotency key; token refresh without single-flight (one 401 storm re-refreshes per call); interceptor order that logs before redaction

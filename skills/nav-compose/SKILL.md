@@ -268,12 +268,15 @@ BackHandler(enabled = state.hasUnsavedChanges) { // Android; Desktop draws its o
 
 Three composables per destination, and each one knows strictly less than the one above it:
 
+<!-- compile: android -->
 ```kotlin
-composable<Route.OrderDetail> {
-    OrderDetailRoute(
-        onBack = { navController.popBackStack() },
-        onOpenInvoice = { id -> navController.navigate(Route.Invoice(id)) },
-    )
+fun NavGraphBuilder.orderDetail(navController: NavHostController) {
+    composable<Route.OrderDetail> {
+        OrderDetailRoute(
+            onBack = { navController.popBackStack() },
+            onOpenInvoice = { id -> navController.navigate(Route.Invoice(id)) },
+        )
+    }
 }
 
 @Composable
@@ -283,19 +286,37 @@ fun OrderDetailRoute(
     viewModel: OrderDetailViewModel = hiltViewModel(), // Android; koinViewModel() on Desktop
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    OrderDetailScreen(state = state, onEvent = viewModel::onEvent, onBack = onBack)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel, lifecycle) {
+        viewModel.effects.flowWithLifecycle(lifecycle).collect { effect ->
+            when (effect) {
+                OrderDetailEffect.Saved -> onBack()
+            }
+        }
+    }
+    OrderDetailScreen(
+        state = state,
+        onEvent = viewModel::onEvent,
+        onBack = onBack,
+        onOpenInvoice = onOpenInvoice,
+    )
 }
 ```
 
-1. **The ViewModel never sees a `NavController`** — not as a constructor parameter, not through DI,
-   not as a field set after construction.
-2. **The Screen receives lambdas** — `onNavigateToDetail: (String) -> Unit`, `onBack: () -> Unit` —
-   and takes no `NavController` and no ViewModel, which is what makes it previewable and testable
-   with no graph present.
-3. **The Route is the only composable holding both.** It resolves the ViewModel, collects the state,
-   and turns a ViewModel effect into a lambda call. The effect channel itself is `arch-mvvm`'s; this
-   file only fixes the place it lands.
-4. **Lambdas are named for the intent, not the mechanism** — `onOpenInvoice`, never `navigate`, so
+1. **A `NavController` lives in the composition and nowhere else** — not in a ViewModel (constructor
+   parameter or a field set later), not in a DI binding, bare or wrapped. `rememberNavController()`
+   builds a new one each time the Activity is recreated, so anything that outlives the composition
+   holds the old one: it leaks that Activity and navigates a graph no longer on screen.
+2. **A destination known at the call site is a lambda.** The graph wires `onOpenInvoice`, the Screen
+   calls it, and the ViewModel is not involved.
+3. **A destination the ViewModel decides is an effect.** Save succeeded, so go back; the session
+   expired, so sign in. The ViewModel emits `OrderDetailEffect.Saved`, and the Route — the only
+   composable holding both the ViewModel and the lambdas — collects it and calls `onBack`. How the
+   effect is carried and collected is `arch-mvvm` → "One-shot Effects".
+4. **The Screen receives lambdas** — `onOpenInvoice: (String) -> Unit`, `onBack: () -> Unit` — and
+   takes no `NavController` and no ViewModel, which is what makes it previewable and testable with no
+   graph present.
+5. **Lambdas are named for the intent, not the mechanism** — `onOpenInvoice`, never `navigate`, so
    the same Screen serves a tablet pane that opens the invoice beside it rather than above it.
 
 ## Deep Links
@@ -339,9 +360,10 @@ fun openingAnOrderNavigatesToDetail() {
 1. **A string route with an argument interpolated into it** — `"order/${id}"` registered on one side
    and parsed on the other. A typo is a runtime crash on a screen nobody opens in review, the id has
    no type, and the first value containing a slash or a space silently matches nothing.
-2. **A `NavController` in the ViewModel** — injected, passed in, or set from the composable. It
-   leaks the graph into the one layer that must not know a graph exists, and the ViewModel is then
-   untestable without one and the screen unreachable from a second graph.
+2. **A `NavController` in the ViewModel or in DI** — injected, passed in, set from the composable,
+   or wrapped in a singleton. It leaks the graph into the one layer that must not know a graph
+   exists, the ViewModel is then untestable without one and the screen unreachable from a second
+   graph, and the controller outlives the composition that built it.
 3. **A whole object as a route argument** — the loaded `Order` serialized into the destination. The
    route is saved state and can be written as a URL, so the payload is size-capped, already stale
    when the screen reads it, and visible to anyone who can see the link. Pass the id.

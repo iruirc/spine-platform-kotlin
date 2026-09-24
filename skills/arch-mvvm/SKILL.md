@@ -62,6 +62,19 @@ On KMP all four live in `commonMain`: `androidx.lifecycle.ViewModel` and `viewMo
 multiplatform since Lifecycle 2.8, so no expect/actual is needed. For a small screen the state and
 event types may share a file with the screen — the boundary is the discipline, not the file count.
 
+## ViewModel on Every Target
+
+`androidx.lifecycle.ViewModel`, `viewModelScope` and `SavedStateHandle` are multiplatform, so the
+screen's state holder is a `ViewModel` on Android, on Compose Desktop and in `commonMain` alike: one
+class, no `expect`/`actual`, no second holder for the desktop. An `arch-mvi` store is the same class
+with a reducer inside.
+
+1. **Resolve it the same way everywhere** — `hiltViewModel()` on Android with Hilt, `koinViewModel()`
+   on Desktop and KMP.
+2. **On Compose Desktop the window is its owner.** Every Compose window is a `ViewModelStoreOwner`
+   that clears its store when the window is disposed, and a navigation back-stack entry is an owner
+   inside it exactly as on Android.
+
 ## Component Responsibilities
 
 **Model** — domain entities, repositories, use cases. Plain Kotlin: `suspend` functions and `Flow`,
@@ -144,12 +157,16 @@ share sheet, a haptic. Anything still true after a configuration change belongs 
 1. **Default to `Channel` + `receiveAsFlow()`** for navigation and snackbars: one screen, one
    collector, buffered across the configuration-change gap — with one element's worth of risk, since
    `receiveAsFlow()` can take an item out of the channel just as collection is cancelled.
-2. **Collect effects lifecycle-aware** — `viewModel.effects.flowWithLifecycle(lifecycle)`, not a bare
+2. **A `UiState` field plus a consume event only for an effect that must survive process death** —
+   a payment result, a finished wizard — written through `SavedStateHandle` and cleared by the event
+   the Route sends once it has acted. For any other effect the field buys nothing and costs a consume
+   call the Route must never forget: forget it and the effect fires again on the next return.
+3. **Collect effects lifecycle-aware** — `viewModel.effects.flowWithLifecycle(lifecycle)`, not a bare
    `LaunchedEffect(Unit) { effects.collect { } }`, or a backgrounded screen navigates under the one
    the user is looking at.
-3. **Never make a persistent error an effect.** A message dismissed by rotation is a bug the state
+4. **Never make a persistent error an effect.** A message dismissed by rotation is a bug the state
    shape would have prevented.
-4. **One `sealed interface OrdersEffect` per screen**, so the Route's `when` stays exhaustive.
+5. **One `sealed interface OrdersEffect` per screen**, so the Route's `when` stays exhaustive.
 
 ## Binding
 
@@ -205,18 +222,8 @@ val state: StateFlow<OrdersUiState> = repository.orders()
 
 ## Navigation Boundary
 
-The ViewModel never holds a `NavController`. Two legal shapes:
-
-- **Lambdas from the graph — the default.** The `NavHost` entry passes
-  `onOpenOrder: (OrderId) -> Unit` into the Route, which hands it to the Screen. The ViewModel is not
-  involved, because the destination is already known at the call site.
-- **An effect, when the ViewModel decides the destination.** Save succeeded, so go back; the session
-  expired, so go to sign-in. The ViewModel emits `OrdersEffect.OpenOrder(id)` and the Route turns it
-  into the lambda call.
-
-The Route is the only place an effect becomes navigation. Everything about the graph itself — typed
-routes, nested graphs, results, back handling — is `nav-compose`; URLs entering it are
-`nav-deeplinks`.
+What a ViewModel may do about navigation is `nav-compose` → "The Boundary"; its side of it is one
+more member of the screen's effect type, carried as One-shot Effects above describes.
 
 ## Testing ViewModel
 
@@ -302,9 +309,7 @@ different problems, and adding both at once fixes neither.
    `.asStateFlow()`.
 4. **`GlobalScope.launch`** — work that outlives the screen, ignores cancellation and leaks the
    ViewModel with it. `viewModelScope` is cancelled in `onCleared()`; nothing else is.
-5. **Navigating from the ViewModel through a `NavController` reference** — an Activity-scoped object
-   held by a component that outlives configuration change: a leak, then a crash on the first rotation
-   after a navigation. Emit an intent and let the Route navigate.
+5. **Navigating from the ViewModel through a `NavController` reference** — `nav-compose` → "The Boundary".
 6. **`LiveData` in new code** — Android-only, no operators worth the name, and untestable outside
    instrumentation without an extra rule. `StateFlow` works on all three targets; convert `LiveData`
    as you touch it (`reactive-flow`).

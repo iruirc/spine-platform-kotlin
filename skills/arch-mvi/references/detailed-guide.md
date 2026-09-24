@@ -167,9 +167,9 @@ Two decisions worth naming:
 
 ## Hand-rolled — Store
 
-The store is a `ViewModel`: it owns the state, runs the reducer, and holds the executor that turns a
-`SubmitClicked` into a `ResultsLoaded`. On Compose Desktop the same class drops the `ViewModel`
-supertype and takes a window-scoped `CoroutineScope` instead.
+The store is a `ViewModel`, on Compose Desktop too (`arch-mvvm` → "ViewModel on Every Target"): it
+owns the state, runs the reducer, and holds the executor that turns a `SubmitClicked` into a
+`ResultsLoaded`.
 
 ```kotlin
 @HiltViewModel

@@ -136,7 +136,7 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `net-http-clients` — Ktor `MockEngine` in `commonTest`, the one HTTP fake every target compiles
 - `persistence-room-sqldelight` — the in-memory SQLDelight driver per target, and in-memory Room where the target has it
 - `compose-state` — what `runComposeUiTest` can observe from outside a Compose Multiplatform screen
-- `nav-multiplatform` — asserting the navigation call at the state-holder boundary instead of driving the graph on every target
+- `nav-multiplatform` — asserting the navigation effect a shared ViewModel emits instead of driving the graph on every target
 - `error-architecture` — golden tables for the mapper from a domain error to the shared error state
 - `test-frameworks` — the declaration, assertions, hooks, parameterization and failure output of each value of the `tests` axis, and the surfaces that force one
 

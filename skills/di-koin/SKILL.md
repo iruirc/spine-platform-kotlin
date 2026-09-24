@@ -17,7 +17,7 @@ modules once Koin is the answer.
 > - `di-hilt` — the Android alternative, and the comparison table this skill's last section agrees with
 > - `di-spring` — the same role filled by a container you do not declare, on a Spring server
 > - `arch-mvvm` — ViewModel design and `UiState`; this skill only covers how one is built and retrieved
-> - `nav-multiplatform` — the `Navigator` a platform module binds, and the back stack `koinViewModel` scopes to
+> - `nav-multiplatform` — the back stack `koinViewModel` scopes to, and why no `Navigator` is bound here
 > - `pkg-kmp-source-sets` — where `expect val platformModule` and its `actual`s live in the source-set tree
 > - `architecture-choice` — the decision that put Koin in `## Stack` rather than Hilt or Spring
 
@@ -98,8 +98,8 @@ included from two places without a duplicate-definition error. That is what make
 safe to reference from both the app and its own instrumentation test.
 
 On KMP the layout gains one seam. Shared modules live in `commonMain`; everything a platform must
-supply — the SQLDelight driver, the Android `Context`, the platform HTTP engine, the `Navigator`
-implementation (`nav-multiplatform`) — goes behind one `expect` declaration:
+supply — the SQLDelight driver, the Android `Context`, the platform HTTP engine — goes behind one
+`expect` declaration:
 
 ```kotlin
 // commonMain

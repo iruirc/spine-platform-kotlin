@@ -83,8 +83,8 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 - **Activity-scoped** (Android only) — for state that must survive Fragment transactions within the same Activity.
 - **Fragment-scoped** (Android only) — for state bound to a single screen's lifecycle.
-- **Navigation graph-scoped** (Android only) — for state shared across multiple screens in a navigation flow (e.g., multi-step forms, checkout flows).
-- **Window-scoped or application-scoped** (Desktop only) — there is no Activity to survive; bind screen state to the window that owns it, or to the application when several windows share it.
+- **Navigation graph-scoped** — for state shared across multiple screens in a navigation flow (e.g., multi-step forms, checkout flows).
+- **Window-scoped** (Desktop) — `arch-mvvm` → "ViewModel on Every Target".
 - Choose the scope based on the data lifecycle requirements, not convenience.
 
 ### Repository Pattern

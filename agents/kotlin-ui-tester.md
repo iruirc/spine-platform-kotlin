@@ -242,7 +242,7 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 - `compose-state` — where state lives in a Compose UI: what a test can observe from the outside, and what only a recomposition trace shows
 - `arch-mvvm` — the ViewModel contract under test: `StateFlow` of `UiState`, events in, one-shot effects out
 - `arch-mvi` — reducers are pure functions: Intent → State asserted without a dispatcher, side effects on a channel
-- `nav-compose` — asserting the navigation call at the ViewModel boundary instead of driving the whole graph
+- `nav-compose` — asserting the navigation effect or the Screen's lambda instead of driving the whole graph
 - `di-hilt` — test components, `@HiltAndroidTest` and `@TestInstallIn` for swapping a binding
 - `di-koin` — `koinApplication` per test, module overrides, verifying the graph
 - `concurrency-coroutines` — dispatcher injection and `viewModelScope` under a test scheduler, cancellation discipline

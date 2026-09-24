@@ -14,10 +14,10 @@ the one boundary that keeps the choice reversible. An Android-only or Desktop-on
 > **Related skills:**
 > - `nav-compose` — the single-target graph, and the Navigation Compose API the JetBrains port mirrors
 > - `nav-deeplinks` — the URL half, and the typed Route it hands to whichever library below you picked
-> - `arch-mvvm` — the layer that emits a route and must never call a navigation library itself
+> - `arch-mvvm` — the effect a shared ViewModel emits where it would otherwise navigate
 > - `compose-state` — `rememberSaveable` and `SaveableStateHolder`, and what each of them survives
 > - `pkg-kmp-source-sets` — where the `Navigator` interface and its per-host implementations sit
-> - `di-koin` — binding one `Navigator` implementation per platform module, which is the swap point
+> - `di-koin` — `koinViewModel()` for the shared ViewModels, and the back-stack entry it scopes them to
 > - `architecture-choice` — the compass that names this skill as soon as `target` resolves to KMP
 
 ## When to Use
@@ -151,8 +151,9 @@ class OrderDetailComponent(context: ComponentContext, id: String) : ComponentCon
 
 The shared code names destinations and asks to move. It never learns which library moves it.
 
+<!-- compile: kmp -->
 ```kotlin
-// commonMain — the vocabulary, and the only navigation type shared business code sees
+// commonMain — the vocabulary every target shares
 @Serializable
 sealed interface Route {
     @Serializable data object Home : Route
@@ -166,25 +167,40 @@ interface Navigator {
 }
 ```
 
+<!-- compile: kmp -->
 ```kotlin
-// the UI host's source set — one implementation per library, bound once
+// the graph file — the one file that imports the library; the controller is born and dies here
 class NavHostNavigator(private val controller: NavHostController) : Navigator {
     override fun navigate(route: Route) { controller.navigate(route) }
     override fun back() { controller.popBackStack() }
 }
+
+@Composable
+fun AppNavHost() {
+    val navController = rememberNavController()
+    val navigator = remember(navController) { NavHostNavigator(navController) }
+    NavHost(navController, startDestination = Route.Home) {
+        composable<Route.Home> { HomeRoute(onOpenOrder = { navigator.navigate(Route.OrderDetail(it)) }) }
+        composable<Route.OrderDetail> { entry ->
+            OrderDetailRoute(id = entry.toRoute<Route.OrderDetail>().id, onBack = navigator::back)
+        }
+    }
+}
 ```
 
-1. **A ViewModel or use case in `commonMain` depends on `Navigator`, never on a library.** It either
-   calls `navigator.navigate(Route.OrderDetail(id))` or emits the `Route` as an effect the UI turns
-   into that call — the effect channel's shape is `arch-mvvm`'s, and the choice between the two is
-   the same one `nav-compose` states for a single target.
+1. **A ViewModel or use case in `commonMain` depends on no navigation type** — not the library's,
+   not `Navigator`. It emits an effect and the Route turns it into one of the lambdas above:
+   `nav-compose` → "The Boundary", which holds for every library in this file.
 2. **`Route` is the shared vocabulary**, and it is the type `nav-deeplinks` produces from a URL. One
    sealed hierarchy, one place a new screen is added, one thing a test constructs.
-3. **The implementation belongs to the UI host, not to `commonMain`.** With Compose Multiplatform
-   everywhere it can sit in `commonMain` too; a Decompose one wraps `StackNavigation<Config>`, and a
-   host that draws its own screens gets its own. `pkg-kmp-source-sets` decides which source set.
-4. **Bind it once per platform module** — one `single<Navigator>` in `di-koin` terms. That binding
-   is the swap point everything in the comparison table above was chosen against.
+3. **The graph file is the swap point.** It alone imports the library, owns the controller and
+   hands each Route its lambdas, so replacing the library rewrites this file and no screen. Under
+   Decompose the parent component is this file: a child takes `onOpenOrder` in its constructor and
+   the parent pushes. A host that draws its own screens gets its own graph file;
+   `pkg-kmp-source-sets` decides which source set holds each.
+4. **`Navigator` lives exactly as long as the controller it wraps** — `remember`ed beside it and
+   handed to what moves the user from outside a screen: the deep-link router, a sign-out at the
+   root. It is never a DI binding, for the reason `nav-compose` → "The Boundary" gives.
 5. **Voyager also has a type called `Navigator`.** Import-alias the library's one inside its
    implementation file; do not rename the interface. Its name is the app's vocabulary and it is the
    same word on every target.
@@ -196,7 +212,7 @@ class NavHostNavigator(private val controller: NavHostController) : Navigator {
 
 1. **A library type in `commonMain` business code** — a ViewModel holding a `NavHostController`, a
    `ComponentContext`, or Voyager's `Navigator`. The shared module now compiles only where that
-   library does, and swapping it means editing every ViewModel: exactly the cost the interface above
+   library does, and swapping it means editing every ViewModel: exactly the cost the graph file above
    exists to buy off.
 2. **Two navigation libraries in one app**, usually because a feature was ported with its own. They
    share no stack, so back reaches one of them and the other's screens strand the user.
