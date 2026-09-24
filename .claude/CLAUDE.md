@@ -35,6 +35,8 @@ en
   and one version, which `spine-ops: scripts/release.sh` moves in both
 - `AGENTS.md` — Codex repository guidance that points back to this shared development guide
 - `tests/foundation/` — bats suites; `tests/foundation/helpers/shape.bash` holds the structural checks
+- `tests/snippets/` — the Gradle sandbox marked Kotlin blocks compile in: six modules, a default-imports
+  list per marker, and `gradle/libs.versions.toml`, the one source of the versions skills name
 - `scripts/` plus `conventions/i18n.md` — six **adapted forks** of core's files, each recording the
   core path it came from and that file's sha256. They are not copies — do not "restore" them to
   match core. CI goes red when core's original moves, and a human decides whether the change
@@ -55,3 +57,6 @@ this repo deliberately keeps no second copy, because a copy of a contract drifts
 - Adding a knowledge skill: a `## Topics` row and a `@test` in `tests/foundation/lib/skills.test.bats`.
 - Changing `skills/manifest/SKILL.md`: run `scripts/lint-manifest.sh .` before pushing.
 - Core skills are written `spine-toolkit:<skill>` everywhere; `scripts/lint-core-refs.sh` checks it.
+- A Kotlin block that must compile carries `<!-- compile: <module> -->` above its fence (`-test` for the
+  module's tests; `catalog` above a TOML block), and `scripts/compile-snippets.sh` builds it — with an
+  OpenJDK, never GraalVM. A skill teaches the catalog's major; the previous one only under "Migrating from X".

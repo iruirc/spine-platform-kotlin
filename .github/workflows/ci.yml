@@ -9,6 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: brew install bats-core
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: clone core with its tags, for the floor check and the fork hashes
         # Blobless, not shallow: lint-core-refs resolves the declared floor by tag,
         # and a --depth 1 clone carries no tags to resolve.
@@ -31,3 +35,13 @@ jobs:
           scripts/lint-locales.sh
       - name: manifest contract, checked by core's own lint
         run: /tmp/upstream/scripts/lint-manifest.sh .
+      - name: Android platform 37, which the sandbox compiles against
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" > /dev/null
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: snippets-${{ hashFiles('tests/snippets/**/*.gradle.kts', 'tests/snippets/gradle/**') }}
+      - name: snippets
+        run: scripts/test-foundation.sh snippets
