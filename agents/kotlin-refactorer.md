@@ -145,20 +145,13 @@ Replace Java-style patterns with Kotlin equivalents:
 
 ## 4. File Structure & Size Constraints
 
-### 4.1 One Type Per File
+### 4.1 Types per File
 
-- **Every `data class` must be in its own file.**
-- **Every `interface` must be in its own file.**
-- **Every `sealed class` / `sealed interface` must be in its own file** (subtypes can be in the same file if they are small, or separate files if complex).
-- **Every `enum class` with methods/logic must be in its own file.** Simple enums without logic can coexist with related code.
-
-If multiple types exist in a single file — split into separate files with matching names.
+Which types share a file, and how packages are cut: `arch-clean` → "Packages and Files". Split a file by that rule, not into one file per type.
 
 ### 4.2 File Placement
 
 - Files must be placed near the call site. If there are several call sites, place near semantically similar classes.
-- Create separate packages for models (acceptable names: `/models`, `/domain`, `/api`, `/dto`, `/data`).
-- Group by feature/domain first, then by layer within the feature.
 
 ### 4.3 Large File Refactoring (> 800 lines)
 
@@ -234,11 +227,7 @@ If mixed — split. God-services are the most common violation: split by domain 
 
 Behavior should be extendable without modifying base classes.
 
-Use abstractions/strategies only when:
-- A real variation exists (multiple implementations), AND
-- It simplifies adding new behavior.
-
-**Avoid meaningless interface-per-class patterns.** An interface with one implementation that's never mocked is noise.
+An abstraction is added for a variation that exists, not one that might: `arch-clean` → "Interfaces and Concrete Classes".
 
 ### 6.3 LSP — Liskov Substitution
 
@@ -250,7 +239,7 @@ No "god interfaces" with dozens of methods. Split into small, capability-based i
 
 ### 6.5 DIP — Dependency Inversion
 
-High-level logic must not depend on low-level details. Services depend on abstractions (interfaces), not concrete implementations.
+High-level logic must not depend on low-level details: it reaches a database, a network or another module through a port. Which types are ports is `arch-clean` → "Interfaces and Concrete Classes".
 
 **Always use constructor injection.** No field injection, no `lateinit var` for dependencies, no `object` singletons for stateful services.
 
@@ -302,7 +291,7 @@ Regardless of framework:
 ## 9. Common Refactoring Tasks
 
 ### Extract Interface
-When a concrete class is used directly and blocks testability:
+When `arch-clean` → "Interfaces and Concrete Classes" calls for an interface the code lacks:
 - Define interface with only the methods consumers need.
 - Make existing class implement the interface.
 - Update DI to bind interface → implementation.

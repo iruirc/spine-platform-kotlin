@@ -115,7 +115,7 @@ Evaluate the code against each category below. Skip categories that don't apply.
 - **Layer violations**: business logic in controllers/routes, persistence in services, HTTP concerns in domain.
 - **Dependency direction**: reverse dependencies (repository importing controller types, domain depending on framework).
 - **God classes**: classes with too many responsibilities — should be split.
-- **Tight coupling**: concrete class dependencies instead of interfaces, making testing difficult.
+- **Interfaces**: one missing or one needless, judged by `arch-clean` → "Interfaces and Concrete Classes".
 - **DI violations**: `new` in business logic, field injection, service locator pattern.
 - **Circular dependencies**: packages or classes depending on each other.
 
@@ -169,7 +169,7 @@ neighbouring skills, a finding here may block.
 ### KMP (Kotlin Multiplatform)
 
 - Shared logic in `commonMain`, platform-specific code only where necessary.
-- `expect` / `actual` for platform abstractions — no `#ifdef`-style branching.
+- A platform seam takes the shape `pkg-kmp-source-sets` → "expect and actual" gives it — never `#ifdef`-style branching on a platform check.
 - Platform types don't leak into shared interfaces.
 
 ### Compose Desktop
@@ -217,7 +217,7 @@ Consult these skills when reviewing code against architectural / framework expec
 - `arch-clean` — the Clean Architecture dependency rule: the domain imports no framework, use cases own the orchestration, DTO mapping stays in the data layer
 - `arch-layered` — layering on a server or CLI: entry point → service → repository → domain, with the transaction boundary on the service
 - `arch-hexagonal` — ports and adapters: a framework-free core, every outbound call through a port the core itself declares
-- `compose-state` — PR red flags: `mutableStateOf` without `remember` (reset on every recomposition); `remember` where state must survive process death (`rememberSaveable` or the ViewModel); `LaunchedEffect(Unit)` where the key should be the value that changes (the effect never restarts); an unstable parameter type or a lambda allocated per recomposition, which defeats skipping
+- `compose-state` — PR red flags: `mutableStateOf` without `remember` (reset on every recomposition); `remember` where state must survive process death (`rememberSaveable` or the ViewModel); `LaunchedEffect(Unit)` where the key should be the value that changes (the effect never restarts); a list or state object rebuilt as a new instance on every emission, which defeats skipping (`compose-state` → "Stability")
 - `nav-compose` — Navigation Compose: type-safe `@Serializable` routes, nested graphs, results passed back explicitly; where navigation may live is `nav-compose` → "The Boundary"
 - `nav-multiplatform` — KMP navigation: one library for the whole project (navigation-compose, Decompose or Voyager), back handling and state preservation per platform
 - `nav-deeplinks` — URL to typed Route: every entry point parsed by the same parser, cold start buffered behind auth, no route parsing inlined in an Activity
@@ -236,7 +236,7 @@ Consult these skills when reviewing code against architectural / framework expec
 - `reactive-flow` — Flow vs StateFlow vs SharedFlow, the `stateIn`/`shareIn` started policy, and a cold flow collected twice where it should have been shared
 - `error-architecture` — per-layer error mapping, a sealed hierarchy instead of stringly-typed failures, problem details on the server, `UiState.Error` on the client, no PII in logs; PR red flag: `runCatching` or a bare `catch` around a suspending call, `error-architecture` → "The runCatching Rule"
 - `pkg-gradle-modules` — module boundaries: `api` vs `implementation`, the version catalog, convention plugins, no cycle in the module graph
-- `pkg-kmp-source-sets` — source-set layout: `expect`/`actual` only for what genuinely differs, no platform-only dependency in `commonMain`
+- `pkg-kmp-source-sets` — source-set layout: the shape of each platform seam, no platform-only dependency in `commonMain`
 - `release-ops` — versioning, CI lanes, crash reporting, feature flags and kill switches, Compose Desktop distribution and signing
 - `release-ops-android` — the Play review calendar buffer, App Bundles and signing, R8 keep rules, push tokens, runtime permissions, accessibility
 - `release-ops-server` — container images, health probes, twelve-factor configuration, graceful shutdown, migrations on deploy, rollout strategy

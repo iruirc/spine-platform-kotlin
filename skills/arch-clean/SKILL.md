@@ -115,14 +115,22 @@ settings.gradle.kts
    it, not because the diagram in the article had them (`pkg-gradle-modules`).
 2. **`:app` is the only module that sees everything**, because it is where the graph is assembled:
    it binds `OrderRepositoryImpl` to `OrderRepository` and nothing else knows both names.
-3. **Package by feature inside a module, not by kind.** `com.acme.domain.orders` holds the entity,
-   the port and the use cases together. A `model/` `usecase/` `repository/` trio inside `:domain`
-   re-derives the layering the modules already gave you and hides which files change together.
-4. **Split `:data` per source only when two teams own the sources.** `:data:remote` and `:data:local`
+3. **Split `:data` per source only when two teams own the sources.** `:data:remote` and `:data:local`
    are two more build files and one more `api` decision to get wrong; the repository implementation
    was already the seam.
-5. **No `:core`.** See Mistake 4 — the module everything depends on has no dependency rule left to
+4. **No `:core`.** See Mistake 4 — the module everything depends on has no dependency rule left to
    enforce.
+
+## Packages and Files
+
+1. **Package by feature inside a layer, not by kind.** `com.acme.domain.orders` holds the entity,
+   the port and the use cases together. A `model/` `usecase/` `repository/` trio inside `:domain`
+   re-derives the layering the modules already gave you and hides which files change together.
+2. **In one module, a top-level package per layer stands in for the module** — `domain`, `data`,
+   `ui`, or a server's `api`, `service`, `repository` — and the features sit inside each as above.
+3. **Small types that change together share a file**: a sealed hierarchy with its subtypes, a
+   screen's state and event types, a command with its result. The file is named after the main type;
+   a type moves to a file of its own when it grows behaviour or a caller outside the feature.
 
 ## Use Cases
 
@@ -195,6 +203,27 @@ interface OrderRepository {
 6. **Ports are narrow.** A repository with fourteen methods is usually two aggregates, and every
    fake in every test pays for all fourteen.
 
+## Interfaces and Concrete Classes
+
+A type gets an interface for one of two reasons:
+
+1. **It is a port** — a seam in front of I/O or across a module the caller may not import: a
+   repository, a remote or local data source, a gateway to an external system, a clock. A test's
+   fake goes here and nowhere else.
+2. **It has two implementations now** — two storage engines, one per KMP target, a strategy picked
+   at runtime. A test fake does not count as the second: a class that does no I/O runs in a unit
+   test as itself.
+
+Everything else is a concrete class that its consumers name and the container constructs:
+
+- **A use case is concrete.** A ViewModel test builds the real use case over a fake port, one layer
+  down, where the interface already is. On Hexagonal the use case is an inbound port and carries its
+  `fun interface` by the first reason (`arch-hexagonal` → "Port Design").
+- **Services, mappers, validators and formatters are concrete**, or a function type when each caller
+  supplies its own.
+- **An interface is extracted when a reason arrives, not in advance.** With one implementation it is
+  a file, a binding and a detour on every read, and it buys nothing.
+
 ## Mapping
 
 Three model families, one per concern that can change independently:
@@ -260,12 +289,9 @@ codebase gets you two names per file and no extra guarantee.
 - **`commonMain` of `:domain` gets `kotlinx-coroutines-core` and optionally `kotlinx-datetime`.**
   Nothing else. A rule that needs a platform API is not a rule yet — express the need as an outbound
   port and let `:data` satisfy it per target.
-- **`expect`/`actual` only in `:data`, and only for a driver**: the database driver, the HTTP engine,
-  secure storage, a file location. `expect class GetOrders` means the rule differs per platform,
-  which is the one thing the shared module exists to prevent.
-- **Prefer an interface plus per-target implementations over `expect`/`actual` wherever DI already
-  exists.** `expect`/`actual` is a compile-time hard link: a fake needs a whole extra target, while
-  an interface needs a class (`di-koin`).
+- **The platform seam lives in `:data`, never in `:domain`.** `expect class GetOrders` means the
+  rule differs per platform, which is the one thing the shared module exists to prevent. Whether the
+  seam is an interface or `expect`/`actual` is `pkg-kmp-source-sets` → "expect and actual".
 
 ## Testing
 
@@ -283,9 +309,9 @@ with the actual database image; on the client it is `Room.inMemoryDatabaseBuilde
 takes a `Context` and therefore runs as an instrumented test (Room 2.7's multiplatform builder takes
 none and runs on the JVM). HTTP goes through Ktor's `MockEngine` or OkHttp's `MockWebServer`.
 
-**Presentation** — the ViewModel test constructs it with **fake use cases**, which is why a use case
-has exactly one function: the fake is three lines. Dispatchers, Turbine and the rest of the setup:
-`arch-mvvm` → "Testing ViewModel"
+**Presentation** — the ViewModel test constructs it with the **real use cases over fake ports**, so
+it exercises the rule the screen depends on (Interfaces and Concrete Classes above). Dispatchers,
+Turbine and the rest of the setup are `arch-mvvm` → "Testing ViewModel".
 
 1. **Fake the port, not the framework.** A fake `OrderRepository` is the seam the interface exists
    for; mocking Retrofit to test a business rule tests the mock.

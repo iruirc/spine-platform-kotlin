@@ -38,8 +38,7 @@ design each module by its own target and put the boundary between them in
 4. Is navigation involved? → Design the route graph and typed arguments first; see
    `nav-compose` (single platform) or `nav-multiplatform` (KMP).
 5. Is it a KMP module? → Decide what goes in `commonMain` (logic, contracts, models) and what
-   stays platform-specific; `expect`/`actual` only for what genuinely differs. See
-   `pkg-kmp-source-sets`.
+   stays platform-specific; the seam between them is `pkg-kmp-source-sets` → "expect and actual".
 6. DI scope? → Hilt on Android-only, Koin on KMP; `- DI:` says which. Scope by component
    lifecycle (Singleton, ViewModel, Activity), never by convenience. See `di-hilt`, `di-koin`.
 
@@ -68,8 +67,8 @@ design each module by its own target and put the boundary between them in
 
 ### Decision Framework for Services (every target)
 
-1. Define the interface first — this is the contract. Consumers depend on it, never on the
-   implementation.
+1. Define the contract first — the signatures consumers call. It is an interface only where
+   `arch-clean` → "Interfaces and Concrete Classes" calls for one.
 2. Choose the DI scope deliberately: singleton for stateless services, scoped for request- or
    lifecycle-bound ones.
 3. Never allow direct instantiation — constructor injection through the project's DI.
@@ -82,7 +81,7 @@ design each module by its own target and put the boundary between them in
 
 1. Analyze requirements: scope, data flow, integration points, edge cases, cross-cutting concerns.
 2. Design module structure following the project's chosen architecture and layer conventions.
-3. Define service interfaces and their DI registrations with explicit scope justification.
+3. Define the new services and ports, and their DI registrations with explicit scope justification.
 4. Identify which existing services to reuse and what new ones are needed.
 5. Specify Gradle module boundaries — what is shared, what is platform-specific, what is
    feature-internal. See `pkg-gradle-modules`.
@@ -92,7 +91,8 @@ design each module by its own target and put the boundary between them in
 1. Verify the chosen pattern is applied consistently.
 2. Check dependency direction — inward only (entry point → service → repository → domain;
    UI → ViewModel → domain → data). No reverse edges.
-3. Confirm interface-based contracts enable testing without complex mocking.
+3. Confirm the design declares the interfaces `arch-clean` → "Interfaces and Concrete Classes"
+   calls for, and no others.
 4. Validate separation of concerns — no business logic in controllers or composables, no
    persistence in services, no transport concerns in the domain.
 5. Assess coupling between modules — flag unnecessary `api` dependencies, cycles, leaky
@@ -110,7 +110,7 @@ design each module by its own target and put the boundary between them in
 When proposing architecture, always provide:
 - Component relationship description (or a mermaid diagram of layers and modules)
 - File/folder structure with package organization
-- Interface definitions for new service contracts
+- Interface definitions for new ports
 - DI registration code with scope justification
 - Integration points with existing modules
 - Tradeoffs and alternatives considered

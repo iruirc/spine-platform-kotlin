@@ -138,8 +138,8 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
    `reduce`, or an actor. Orbit does not do it for you: every `intent { }` runs as a coroutine of its
    own, and only each `reduce { }` is one atomic `update`.
 5. **`State` must be a `data class` with equality that means something.** `distinctUntilChanged` in
-   `StateFlow` is what stops the screen recomposing on every keystroke that changed nothing, and a
-   `List` field also costs Compose skipping (`compose-state`).
+   `StateFlow` is what stops the screen recomposing on every keystroke that changed nothing; what a
+   rebuilt `List` field costs is `compose-state` → "Stability".
 6. **The store is a `ViewModel` on every target**, Compose Desktop included:
    `arch-mvvm` → "ViewModel on Every Target".
 

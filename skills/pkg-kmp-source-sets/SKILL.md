@@ -125,10 +125,12 @@ actual fun currentTimeZoneId(): String = NSTimeZone.localTimeZone.name
 1. **`expect fun` and `expect val` before `expect class`.** An `expect class` forces every target to
    mirror the entire API — every constructor, every member, forever — and each new member is a
    compile error on every platform at once.
-2. **An interface in `commonMain` plus a platform implementation injected by DI beats both.** The
-   common code depends on the interface, each platform binds its own implementation, and the seam is
-   testable with a fake — that is what `di-koin`'s `expect val platformModule` exists for, and it
-   makes exactly one `expect` carry every platform binding in the module.
+2. **Where the module already has DI, the seam is an interface in `commonMain` with an
+   implementation per platform, not `expect`/`actual`.** The common code depends on the interface,
+   each platform binds its own implementation, and a test binds a fake without an extra target —
+   that is what `di-koin`'s `expect val platformModule` exists for, and it makes exactly one `expect`
+   carry every platform binding in the module. `expect`/`actual` is for a platform primitive no DI
+   reaches: a function, a value, a type (rule 5).
 3. **`expect`/`actual` classes are still Beta.** The compiler warns, and silencing it takes the
    `-Xexpect-actual-classes` compiler argument. That warning is a design signal, not noise.
 4. **An `actual` must live in a source set covering exactly the targets its `expect` compiles for.**

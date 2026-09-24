@@ -41,14 +41,14 @@ This step is not optional and not satisfied by "I followed the project style" in
 5. **Wire navigation.** Register the screen in the `NavHost`, handle route arguments with type-safe definitions, and manage back-stack behavior.
 6. **Register services and ViewModel in DI.** `- DI:` says Hilt, Koin, Dagger or Manual — follow it. Ensure correct scoping (ViewModel-scoped, Activity-scoped, or Singleton).
 7. **Verify with `@Preview` composables.** Create preview functions for all reusable components with representative sample data covering key states.
-8. **Design for testability.** Use interface-based dependencies in ViewModel. All external interactions go through injected interfaces so the ViewModel can be tested in isolation.
+8. **Design for testability.** The ViewModel takes its dependencies through the constructor, so its test constructs it; which of them are interfaces is `arch-clean` → "Interfaces and Concrete Classes".
 
 ### Updating Existing Features
 
 1. **Analyze the current implementation before changing anything.** Read the existing composables, ViewModel, state model, and navigation setup. Understand the data flow end to end.
 2. **Maintain existing code style and conventions.** Match naming patterns, Compose structure, state management approach, and DI conventions already used in the project.
 3. **Refactor incrementally.** Avoid sweeping changes. Each change must leave the build green and the screen functional.
-4. **Identify recomposition impacts of state changes.** When modifying state, verify that only the intended composables recompose. Avoid passing unstable types that trigger unnecessary recomposition.
+4. **Identify recomposition impacts of state changes.** When modifying state, verify that only the intended composables recompose (`compose-state` → "Stability").
 5. **Update related tests to reflect changes.** When you change behavior, update the tests that cover it. When you add behavior, add tests for it.
 
 ### Fixing Bugs
@@ -119,7 +119,7 @@ fun UserCard(
    - `SideEffect` — for non-suspend effects that run after every successful composition.
    - `DisposableEffect` — for effects that require cleanup (listeners, observers, callbacks).
 
-7. **Stable types for parameters to avoid unnecessary recomposition.** Use `@Stable` or `@Immutable` annotations when the Compose compiler cannot infer stability. Prefer `data class`, `List`, and primitive types which are stable by default.
+7. **Parameters that let a composable skip.** Which types are stable, what a `List` parameter costs and when `@Immutable` is honest: `compose-state` → "Stability". Read the compiler report before annotating anything.
 
 8. **Slot-based API for flexible composition.** Use content lambdas (`content: @Composable () -> Unit`) to allow callers to inject custom content into reusable containers.
 

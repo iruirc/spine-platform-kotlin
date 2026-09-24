@@ -142,9 +142,11 @@ Skipping is the whole performance story: a composable whose parameters are all *
    `@Immutable` (never changes after construction) or `@Stable` (may change, and notifies Compose when
    it does). Primitives, `String`, function types and `State` are stable.
 2. **`List`, `Map` and `Set` from the stdlib are unstable** to the compiler: the declared type carries
-   no promise that the instance is not a `MutableList` under the interface. Use
-   `kotlinx.collections.immutable`'s `ImmutableList` / `PersistentList`, or list the offending types in
-   a stability configuration file.
+   no promise that the instance is not a `MutableList` under the interface. That alone does not stop
+   skipping: under strong skipping (4) a `List` parameter skips while the caller passes the same
+   instance. A new instance per emission is what recomposes (5); for that list use
+   `kotlinx.collections.immutable`'s `ImmutableList` / `PersistentList`, or name the type in a
+   stability configuration file.
 3. **A class from another module is unstable** unless that module also applies the Compose compiler,
    or a stability configuration file names it. This is why a `data class` from a pure-Kotlin domain
    module makes an otherwise clean screen recompose.

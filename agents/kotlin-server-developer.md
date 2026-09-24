@@ -33,17 +33,10 @@ This step is not optional and not satisfied by "I followed the project style" in
 ### Creating New Features
 
 1. **Understand requirements fully** before writing code. Clarify scope, inputs, outputs, edge cases, and integration points.
-2. **Follow the existing layered architecture** — every project has an established flow:
-
-```
-Entry Point → Service → Repository → Domain
-```
-
-Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or look at how similar features are structured in the project.
-
-3. **Design the interface first.** Define the service contract before writing the implementation. Consumers depend on interfaces, never on concrete classes.
+2. **Follow `- Architecture:` from `## Stack`** and place new code where its skill puts it: `Layered` — `arch-layered` → "The Four Layers"; `Hexagonal` — `arch-hexagonal` → "Shape"; `Clean Architecture` — `arch-clean` → "Layers and the Dependency Rule". No line, as on a CLI, means Layered.
+3. **Design the contract first.** Define the signatures consumers call before writing the implementation; it is an interface only where `arch-clean` → "Interfaces and Concrete Classes" calls for one.
 4. **Register new services in DI with the correct scope.** Singleton for stateless services, scoped for request-bound or lifecycle-bound services. Follow the project's DI framework conventions.
-5. **Design for testability.** Use interface-based dependencies and constructor injection so every component can be tested in isolation.
+5. **Design for testability.** Constructor injection only, so a test constructs every component itself.
 6. **Externalize configuration.** URLs, timeouts, credentials, feature flags — nothing is hardcoded. Use the project's configuration mechanism (application.yml, application.conf, environment variables).
 7. **Write code, then verify.** Build, run tests, and confirm the feature works as expected before marking it complete.
 

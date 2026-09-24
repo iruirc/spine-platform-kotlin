@@ -35,8 +35,8 @@ This step is not optional and not satisfied by "I followed the project style" in
 1. Understand requirements fully; identify which source sets the feature touches before writing.
 2. Push logic to `commonMain`: business rules, state, contracts, models, networking (Ktor client),
    serialization (kotlinx.serialization), time (kotlinx-datetime). Platform code is the edge.
-3. `expect`/`actual` only for what genuinely differs per platform — a file path provider, a
-   secure store, a platform logger. An `expect` with one `actual` is a code smell.
+3. A per-platform seam — a file path provider, a secure store, a platform logger — takes the
+   shape `pkg-kmp-source-sets` → "expect and actual" gives it.
 4. UI in Compose Multiplatform where the project shares UI; otherwise the platform's own toolkit
    consumes shared ViewModels. Follow `- UI:` and `- Architecture:` from `## Stack`.
 5. DI is Koin unless `- DI:` says otherwise; modules declared in `commonMain`, platform bindings

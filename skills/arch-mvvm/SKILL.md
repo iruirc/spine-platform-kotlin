@@ -60,7 +60,7 @@ feature/orders/
 
 On KMP all four live in `commonMain`: `androidx.lifecycle.ViewModel` and `viewModelScope` are
 multiplatform since Lifecycle 2.8, so no expect/actual is needed. For a small screen the state and
-event types may share a file with the screen — the boundary is the discipline, not the file count.
+event types may share a file with the screen: `arch-clean` → "Packages and Files".
 
 ## ViewModel on Every Target
 
@@ -121,8 +121,8 @@ Rules:
    combinations the type was meant to forbid, and the composable now renders two arrival orders.
 2. **`UiState` holds rendered values, not domain objects** — `total: String`, already formatted, not
    `Long` plus a formatter call in the composable.
-3. **Every field must be stable for Compose.** A `List` parameter defeats skipping; prefer an
-   immutable collection or `@Immutable` on the state (`compose-state`).
+3. **Skipping is decided where the ViewModel builds the state.** A list it rebuilds on every
+   emission is what `compose-state` → "Stability" fixes, not the `List` type itself.
 4. **Give a data-class shape defaults**, so a preview and a test can build it with `OrdersUiState()`.
 
 ## Events
