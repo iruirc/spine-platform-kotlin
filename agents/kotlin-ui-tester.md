@@ -38,7 +38,8 @@ Which kind of double to use, and whether a collaborator may be replaced at all, 
 boundaries a Kotlin project actually has.
 
 - Network → the HTTP client, or WireMock where an integration test needs a real socket
-- Persistence → an in-memory database (H2), or a fake repository behind the interface the code uses
+- Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
+  a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
 - Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
   2.3+, fixed for the test

@@ -182,6 +182,9 @@ SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
 
 ## Transactions
 
+Which layer opens one is `persistence-architecture` → "Transaction Boundary"; this section is how
+each engine spells it.
+
 1. **A transaction is what makes two writes one write.** Insert an order and its lines, mark a row
    synced and delete its outbox entry, replace a page of a list — each is one unit whose partial
    application is a corrupt state your UI will render.
@@ -213,9 +216,10 @@ SELECT * FROM orderRecord WHERE customerId = ? ORDER BY placedAt DESC;
 2. **DAOs and queries are tested against a real in-memory database.** They are worth testing —
    an `@Query` that compiles can still return the wrong rows — and a fake DAO tests nothing about
    the SQL.
-3. **Room: `Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)`.** It needs a `Context`,
-   so on the JVM that means Robolectric (`ApplicationProvider.getApplicationContext()`); an
-   instrumented test on a device or emulator is the other option and is slower per assertion.
+3. **Room: `Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)`, on the JVM under
+   Robolectric** (`ApplicationProvider.getApplicationContext()` supplies the `Context`). That is the
+   default for a DAO test; an instrumented one adds an emulator for nothing the JVM cannot check,
+   and is kept for a test that depends on the device's own SQLite build.
 4. **`allowMainThreadQueries()` belongs to tests and only to tests.** In a test it removes the need
    for a dispatcher dance around a synchronous assertion. In production it disables the one guard
    that turns a main-thread query into a crash instead of an ANR.

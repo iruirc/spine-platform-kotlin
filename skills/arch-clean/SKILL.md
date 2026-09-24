@@ -304,10 +304,9 @@ A domain test that needs any of those is reporting a dependency the module shoul
 
 **`:data`** — where the integration tests live. Mappers are pure-function tests over a captured
 payload. Repository implementations get fakes for their sources plus assertions on the *policy*:
-cache hit, refresh path, failure mapping. Against a real engine, on the server that is Testcontainers
-with the actual database image; on the client it is `Room.inMemoryDatabaseBuilder`, which on Android
-takes a `Context` and therefore runs as an instrumented test (Room 2.7's multiplatform builder takes
-none and runs on the JVM). HTTP goes through Ktor's `MockEngine` or OkHttp's `MockWebServer`.
+cache hit, refresh path, failure mapping. Which real engine the source tests run on is
+`persistence-room-sqldelight` → "Testing" on a client and `persistence-jvm-orm` → "Testing" on a
+server. HTTP goes through Ktor's `MockEngine` or OkHttp's `MockWebServer`.
 
 **Presentation** — the ViewModel test constructs it with the **real use cases over fake ports**, so
 it exercises the rule the screen depends on (Interfaces and Concrete Classes above). Dispatchers,

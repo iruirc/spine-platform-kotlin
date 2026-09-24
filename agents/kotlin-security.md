@@ -28,7 +28,7 @@ Audit source code, build scripts (build.gradle.kts, libs.versions.toml, gradle.p
 
 ## OWASP Mobile Top-10 (2024) — Android and Desktop
 
-- **M1 — Improper Credential Usage**: tokens in `SharedPreferences`/`DataStore` instead of `EncryptedSharedPreferences` or the Keystore; API keys in `BuildConfig` or `local.properties` committed; secrets in git history.
+- **M1 — Improper Credential Usage**: tokens in any preference store instead of the Keystore-backed one `persistence-architecture` → "Small Data" names; API keys in `BuildConfig` or `local.properties` committed; secrets in git history.
 - **M2 — Inadequate Supply Chain Security**: dependencies without a version catalog pin, `+` ranges, unverified Maven repositories, no dependency verification metadata; see Supply Chain below.
 - **M3 — Insecure Authentication/Authorization**: JWT validation done client-side, biometric prompt without `CryptoObject`, session tokens with no expiry handling.
 - **M4 — Insufficient Input/Output Validation**: deep link and intent extras used unchecked, WebView with `addJavascriptInterface` or `setAllowFileAccess`, SQL built by concatenation in Room `@RawQuery`.

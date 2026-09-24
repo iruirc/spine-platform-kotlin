@@ -250,7 +250,8 @@ HikariCP is the pool Spring Boot configures by default and the one to use on Kto
 
 1. **Test against the database you deploy on.** H2 in Postgres compatibility mode has different
    types, different `ON CONFLICT` behaviour, different casing rules and no extensions; the bugs it
-   hides are exactly the ones that only appear in production.
+   hides are exactly the ones that only appear in production. Where Docker is missing, the suite
+   is skipped (`@Testcontainers(disabledWithoutDocker = true)`), not moved to H2.
 2. **`@DataJpaTest` + Testcontainers is the standard slice.** Disable the embedded-database
    replacement, and let `@ServiceConnection` (Boot 3.1+) wire the URL, user and password — no
    `@DynamicPropertySource` any more:

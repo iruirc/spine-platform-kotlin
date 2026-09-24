@@ -619,13 +619,19 @@ class OrderTableTest {
     @Container val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
     // Flyway/Liquibase runs against it in @BeforeEach — persistence-migrations.
 }
+```
 
-// Android client: the real Room, no file on disk. This one belongs to an Android-library :data —
-// inMemoryDatabaseBuilder takes a Context there, so it runs instrumented. On the multiplatform
-// layout, Room 2.7's KMP builder takes none and the same test runs on the JVM.
-private val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-    .allowMainThreadQueries()
-    .build()
+<!-- compile: android-test -->
+```kotlin
+// Android client: the real Room, no file on disk, on the JVM — Robolectric supplies the Context.
+@RunWith(RobolectricTestRunner::class)
+class OrderDaoTest {
+    private val db = Room.inMemoryDatabaseBuilder(
+        ApplicationProvider.getApplicationContext<Context>(), AppDatabase::class.java,
+    ).allowMainThreadQueries().build()
+
+    @After fun tearDown() = db.close()
+}
 ```
 
 **Presentation — fake use cases.** `GetOrders` is a final class, so the cheapest "fake" is the real
@@ -680,8 +686,7 @@ dependencies {
 
 ```kotlin
 // :data/build.gradle.kts — every framework in the project lands here. kotlin("jvm") is the server
-// and KMP-JVM shape; a :data that owns Room on Android applies the Android library plugin instead,
-// which is what makes the in-memory Room test above an instrumented one.
+// and KMP-JVM shape; a :data that owns Room on Android applies the Android library plugin instead.
 plugins {
     kotlin("jvm")
     alias(libs.plugins.ksp)

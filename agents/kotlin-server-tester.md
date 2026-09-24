@@ -38,7 +38,8 @@ Which kind of double to use, and whether a collaborator may be replaced at all, 
 boundaries a Kotlin project actually has.
 
 - Network → the HTTP client, or WireMock where an integration test needs a real socket
-- Persistence → an in-memory database (H2), or a fake repository behind the interface the code uses
+- Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
+  a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
 - Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
   2.3+, fixed for the test
@@ -110,7 +111,8 @@ deviation is named in `## Notes`.
 
 - `@SpringBootTest` for full integration tests — loads the entire application context.
 - `@WebMvcTest(Controller::class)` for controller-only tests — loads only the web layer.
-- `@DataJpaTest` for repository-only tests — loads JPA components with an embedded database.
+- `@DataJpaTest` for repository-only tests — loads JPA components only, on the database
+  `persistence-jvm-orm` → "Testing" names.
 - `MockMvc` / `WebTestClient` for HTTP endpoint testing — send requests and assert responses.
 - `@MockkBean` (SpringMockK) or `@MockitoBean` for replacing a bean in the Spring context with a double; `@MockBean` is deprecated from Spring Boot 3.4.
 
@@ -295,7 +297,7 @@ carry, because it is Kotlin's:
 
 - Modify production code.
 - Use `@SpringBootTest` where `@WebMvcTest` would do.
-- Use H2 as a stand-in for the production database when Testcontainers is available.
+- Run a repository test on another engine than the one `persistence-jvm-orm` → "Testing" names.
 - Assert on log output instead of behaviour.
 
 ## Output Language

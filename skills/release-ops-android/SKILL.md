@@ -202,10 +202,9 @@ density and language on Play's side.
 
 ## Secure storage & transport
 
-- **Secrets go in a Keystore-backed store** — see `persistence-architecture` → "Small Data" and
-  `persistence-architecture` → "Encryption", which own the choice and the reason `EncryptedSharedPreferences` is not it any
-  more. What release adds is only the check: the release build must use the same store as debug,
-  because a debug-only fallback that writes plaintext is a fallback that ships.
+- **Secrets go in the store `persistence-architecture` → "Small Data" names.** What release adds is
+  only the check: the release build must use the same store as debug, because a debug-only
+  fallback that writes plaintext is a fallback that ships.
 - **`network_security_config.xml` with cleartext off**, and user-added CAs trusted in
   `debug-overrides` only — so a developer's proxy works and a user's does not.
 
@@ -264,8 +263,8 @@ density and language on Play's side.
    never fires again, and that install stops receiving push forever.
 3. **Requesting permissions at launch.** Two reflex denials later the system dialog is gone for good
    and the feature can only be recovered through a settings deep link nobody built.
-4. **A preferences store for a token.** Plain files in the app's data directory; and
-   `EncryptedSharedPreferences` is not the fix — it is deprecated (`persistence-architecture`).
+4. **A preferences store for a token**, `EncryptedSharedPreferences` included —
+   `persistence-architecture` → "Small Data".
 5. **A certificate pin with no backup pin.** Certificate renewal day becomes an outage that only a
    store release can end.
 6. **An icon button with no content description.** TalkBack announces "button", the pre-launch report

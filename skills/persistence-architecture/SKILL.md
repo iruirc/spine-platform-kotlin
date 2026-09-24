@@ -9,7 +9,8 @@ Where a project's data actually lives, which copy is allowed to be believed when
 disagree, and how little of the storage the rest of the app is permitted to see. That is one
 boundary — the repository — plus one source-of-truth policy per aggregate, chosen by a single
 question about offline. Which engine sits under the boundary is `persistence-room-sqldelight` on a
-client and `persistence-jvm-orm` on a server; every rule below is the same on both answers.
+client and `persistence-jvm-orm` on a server; every rule below holds on both, except who opens a
+transaction (Transaction Boundary, below).
 
 > **Related skills:**
 > - `persistence-room-sqldelight` — the client engine decision, and the entity/DAO or `.sq` shapes this boundary hides
@@ -170,9 +171,9 @@ internal class OfflineFirstOrderRepository(
 4. **Never a secret in either.** `SharedPreferences` and DataStore are plain files in the app's data
    directory: readable on a rooted device, in a backup, and in whatever the OEM's cloud sync
    captured.
-5. **`EncryptedSharedPreferences` is not the answer any more.** Jetpack Security's crypto library
-   was deprecated in 2024 and stalled at `1.1.0-alpha`; do not add it to a new build and do not
-   treat it as maintained in an old one.
+5. **`EncryptedSharedPreferences` is not the answer any more.** Jetpack Security's `security-crypto`
+   deprecated every API in April 2025, and its last release, `1.1.0` (July 2025), ships them
+   deprecated; do not add it to a new build and do not treat it as maintained in an old one.
 6. **What replaces it is a Keystore-backed key plus an AEAD cipher — yours or a maintained
    wrapper's.** Generate an AES key in the Android Keystore (`AndroidKeyStore`, hardware-backed
    where the device offers it), encrypt with AES-GCM, store the ciphertext and IV in the ordinary
@@ -232,11 +233,29 @@ key that has to live somewhere safer than the database, and a version matrix tha
    boundary keep the schema queryable and cost no native library; you lose the ability to index or
    search those two fields, which is usually acceptable and always worth stating.
 
+## Transaction Boundary
+
+A transaction makes the writes of one unit of work land together, so it opens in the layer that
+knows the unit — and that layer differs between the two sides:
+
+| Side | Opens it | Because |
+|---|---|---|
+| client — Room, SQLDelight | the repository, inside one of its methods | the unit is one aggregate in one local database, and the port hides that storage exists |
+| server — JPA, Exposed, jOOQ, Spring Data JDBC | the service method, never the repository | the unit spans repositories — an order and its stock reservation — and only the service sees them all |
+
+1. **On a client, the port has no transaction in its vocabulary.** Writes that must land together
+   are one repository method; a use case never wraps two port calls in `withTransaction`. The
+   spelling per engine is `persistence-room-sqldelight` → "Transactions".
+2. **On a server, a repository runs inside its caller's transaction and opens none.** The placement
+   per framework is `arch-layered` → "Transaction Boundary"; what the engine adds on top is
+   `persistence-jvm-orm` → "Transaction Boundary".
+
 ## On the Server
 
-The boundary is identical and the mechanics are not: a repository over JPA, Exposed, jOOQ or Spring
-Data JDBC, with the transaction — not the query — as the unit that matters, and the schema owned by
-a migration tool rather than by the code that reads it.
+The repository boundary is identical and the mechanics are not: a repository over JPA, Exposed, jOOQ
+or Spring Data JDBC, with the transaction — not the query — as the unit that matters, opened by the
+service (Transaction Boundary, above), and the schema owned by a migration tool rather than by the
+code that reads it.
 
 - Engine choice, Kotlin-with-JPA pitfalls, N+1, connection pools and Testcontainers:
   `persistence-jvm-orm`.
