@@ -31,8 +31,9 @@ data class Page<T>(val items: List<T>, val nextCursor: String? = null)
 ```
 
 The middleware order each configuration follows — logging outside auth, auth outside retry, timeout
-innermost — is `net-architecture`'s, and so is the `TokenStore` the auth pieces call: one
-single-flight store exposing `current: Token` and `suspend fun refresh(seen: Token): Token`.
+innermost — is `net-architecture`'s, and so is the `TokenStore` the OkHttp `AuthInterceptor` calls:
+one single-flight store exposing `current: Token` and `suspend fun refresh(seen: Token): Token`. The
+Ktor client keeps none; its bearer provider is the store.
 Dependencies are written as version-catalog aliases.
 
 ## Retrofit + OkHttp
@@ -120,7 +121,7 @@ val service: OrdersService = retrofit.create()
   `Thread.interrupted()` before sleeping if the client is also used from cancellable callers.
 - A `suspend` method returning `Page<OrderDto>` throws `retrofit2.HttpException` on a non-2xx;
   declare `Response<Page<OrderDto>>` when the status or a header is part of the answer (a 304, a
-  `Location`). Either way the mapping to a domain error happens here (`error-architecture`).
+  `Location`). Either way the service maps nothing: `net-architecture` → "Core Shape".
 - `baseUrl` must end in `/` and a `@GET` path must not begin with one, or resolution drops a segment.
   Retrofit instances are cheap; share one `OkHttpClient` and use `newBuilder()` for variants.
 
@@ -178,10 +179,23 @@ class OrdersServiceTest {
 `libs.ktor.client.core`, one engine per target (`libs.ktor.client.okhttp`, `.darwin`, `.cio`, `.js`),
 plus `content.negotiation`, `serialization.kotlinx.json`, `auth` and `logging`.
 
+<!-- compile: ktor -->
 ```kotlin
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.auth.*
+import io.ktor.client.plugins.auth.providers.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import java.io.IOException
+import kotlinx.serialization.json.Json
+
 val appJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
-fun ordersHttpClient(engine: HttpClientEngine, tokens: TokenStore, isDebug: Boolean) =
+fun ordersHttpClient(engine: HttpClientEngine, session: SessionStorage, isDebug: Boolean) =
     HttpClient(engine) {
         expectSuccess = true
         defaultRequest {
@@ -198,18 +212,27 @@ fun ordersHttpClient(engine: HttpClientEngine, tokens: TokenStore, isDebug: Bool
         // token is what the retries below it carry.
         install(Auth) {
             bearer {
-                loadTokens { tokens.current.let { BearerTokens(it.access, it.refreshToken) } }
+                loadTokens { session.load() }
                 refreshTokens {
-                    tokens.refresh(tokens.current).let { BearerTokens(it.access, it.refreshToken) }
+                    val refresh = oldTokens?.refreshToken ?: return@refreshTokens null
+                    val response = client.post("auth/refresh") {
+                        markAsRefreshTokenRequest()
+                        expectSuccess = false
+                        setBody(RefreshRequest(refresh))
+                    }
+                    if (!response.status.isSuccess()) return@refreshTokens null
+                    response.body<TokenPair>().let { BearerTokens(it.access, it.refresh) }
+                        .also { session.save(it) }
                 }
-                sendWithoutRequest { true }
+                sendWithoutRequest { request -> request.url.host == "api.example.com" }
             }
         }
         install(HttpRequestRetry) {
             val idempotent = setOf(HttpMethod.Get, HttpMethod.Put, HttpMethod.Delete, HttpMethod.Head)
+            val retryable = setOf(408, 429, 502, 503, 504)
             maxRetries = 3
             retryIf { request, response ->
-                request.method in idempotent && response.status.value in 500..599
+                request.method in idempotent && response.status.value in retryable
             }
             retryOnExceptionIf { request, cause ->
                 request.method in idempotent && cause is IOException
@@ -227,6 +250,8 @@ class KtorOrdersApi(private val http: HttpClient) : OrdersApi {
     override suspend fun orders(cursor: String?): Page<OrderDto> =
         http.get("orders") { cursor?.let { parameter("cursor", it) } }.body()
 
+    override suspend fun order(id: String): OrderDto = http.get("orders/$id").body()
+
     override suspend fun place(draft: OrderDraftDto, idempotencyKey: String): OrderDto =
         http.post("orders") {
             header("Idempotency-Key", idempotencyKey)
@@ -235,19 +260,21 @@ class KtorOrdersApi(private val http: HttpClient) : OrdersApi {
 }
 ```
 
-- `refreshTokens` is already single-flight — the bearer provider guards it and parks parallel callers
-  on one result. Do not add a `Mutex`: that is the hand-rolled store `net-architecture` describes for
-  clients with no such plugin.
+- The bearer block follows `net-architecture` → "Auth Refresh". `expectSuccess = false` on the
+  refresh call turns a rejected refresh into `null`, so the caller sees the original 401 rather than
+  an exception thrown from inside the plugin.
 - **`HttpRequestRetry` is method-blind.** `retryOnServerErrors()` on its own repeats every request,
-  `place()` included — `net-architecture`'s first mistake, installed by default. Both predicates are
-  therefore guarded on the method. `place()` carries an `Idempotency-Key` so that a repeat *is* safe
-  once the server honours it; widen the predicate to include that header only after it does.
-- `sendWithoutRequest { true }` sends the bearer header up front; without it the client waits for a
-  401 challenge on the first request to each host, doubling the round trips.
-- `expectSuccess = true` turns a non-2xx into `ClientRequestException` / `ServerResponseException`;
-  without it `body()` parses the error page and the failure names the serializer, not the status.
-- `HttpTimeout` bounds one request execution and `HttpRequestRetry` re-executes, so each attempt gets
-  its own budget; per-call overrides go in the request builder's `timeout { }` block.
+  `place()` included, on every 5xx — `net-architecture`'s first mistake, installed by default. Both
+  predicates are therefore guarded on the method, and the statuses are `net-architecture` → "Retry".
+  `place()` carries an `Idempotency-Key` so that a repeat *is* safe once the server honours it; widen
+  the predicate to include that header only after it does.
+- `sendWithoutRequest` defaults to `true`: the bearer header goes up front on every request, to every
+  host the client calls. The predicate keeps the token on the API's own host.
+- `expectSuccess = true` turns a non-2xx into `ClientRequestException` / `ServerResponseException`,
+  which `KtorOrdersApi` lets out for the repository to map; without it `body()` parses the error page
+  and the failure names the serializer, not the status.
+- Installed after `HttpRequestRetry`, `HttpTimeout` bounds each attempt; installed before it, one
+  budget covers them all. Per-call overrides go in the request builder's `timeout { }` block.
 - One `HttpClient` per process, `close()`d at shutdown; the engine is its only per-target argument,
   which is why `ordersHttpClient` takes it (`pkg-kmp-source-sets`).
 
@@ -386,7 +413,17 @@ class DownloadTest {
 `org.springframework:spring-web` (Spring Framework 6.1+, Boot 3.2+). Blocking, and on virtual threads
 that is no longer a reason to reach for the reactive stack.
 
+<!-- compile: spring -->
 ```kotlin
+import java.time.Duration
+import java.util.Optional
+import org.springframework.core.ParameterizedTypeReference
+import org.springframework.http.client.ClientHttpRequestFactory
+import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.web.client.RestClient
+
+private val RETRYABLE = setOf(408, 429, 502, 503, 504)
+
 // The one place the client is configured. The test calls it too, with `factory = null`, so what
 // it asserts is the interceptor production installs and not a second, simpler client.
 fun configuredOrdersClient(
@@ -404,7 +441,7 @@ fun configuredOrdersClient(
             request.headers.setBearerAuth(props.token)
             execution.execute(request, body)
         }
-        .defaultStatusHandler(HttpStatusCode::is5xxServerError) { _, response ->
+        .defaultStatusHandler({ it.value() in RETRYABLE }) { _, response ->
             throw RetryableHttpException(response.statusCode.value())
         }
         .build()
@@ -431,9 +468,10 @@ class OrdersClient(private val rest: RestClient) {
   applied its customizers, the observation registry and the message converters to it.
 - One `RestClient` per remote service, each with its own base URL and timeouts; a shared one with
   absolute URLs at call sites has nowhere left to set a per-service budget.
-- `defaultStatusHandler` is where a status becomes an exception the retry layer can classify — the
-  default throws `RestClientResponseException` for everything (`error-architecture`). And this
-  blocks: call it in `withContext(Dispatchers.IO)`, or run on virtual threads.
+- `defaultStatusHandler` is where a retryable status (`net-architecture` → "Retry") becomes the
+  exception the retry layer reads; every other non-2xx keeps the default `RestClientResponseException`,
+  and both leave `OrdersClient` for the repository to map. And this blocks: call it in
+  `withContext(Dispatchers.IO)`, or run on virtual threads.
 
 ## Spring RestClient — Test Double
 

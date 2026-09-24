@@ -193,9 +193,10 @@ fun `placing an order matches the spec`() {
 3. **Test the response the spec does not describe.** The two that actually arrive are an enum value
    the spec does not list — `kotlinx.serialization` throws unless the property has a default and the
    `Json` is configured with `coerceInputValues = true` — and a field the spec marks required that
-   comes back missing or null, which is a `MissingFieldException` out of the generated model. Both
-   are serialization failures, not HTTP ones, and the adapter maps them like any other failure
-   (`error-architecture`); a suite that only ever replays the spec's own examples sees neither.
+   comes back missing (`MissingFieldException`) or null (a `JsonDecodingException`) out of the
+   generated model. Both are serialization failures, not HTTP ones: the adapter lets them out like
+   any transport failure and the repository maps them (`net-architecture` → "Core Shape"). A suite
+   that only ever replays the spec's own examples sees neither.
 4. **Both sides must name the same spec version.** A client generated from a tag and tested against
    the branch's spec proves nothing about what ships.
 5. **Breaking-change detection is the producer's job and fails the producer's build.** `openapi-diff`

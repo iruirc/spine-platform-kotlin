@@ -46,6 +46,7 @@ dependencies {
     implementation(libs.orbit.viewmodel)
     implementation(libs.orbit.compose)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.paging.common)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(platform(libs.androidx.compose.bom))

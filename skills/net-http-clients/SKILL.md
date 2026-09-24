@@ -41,7 +41,7 @@ Not for the layer above the client — the API interface, retry, refresh, paging
 
 | Need | Reference sections |
 |---|---|
-| The shared payload, middleware order and `TokenStore` every client below assumes | `Shared Setup` |
+| The shared payload and middleware order every client below assumes, and the OkHttp stack's `TokenStore` | `Shared Setup` |
 | Retrofit over a configured OkHttp, with the interceptor stack | `Retrofit + OkHttp` |
 | A Ktor client with timeouts, negotiation, redacting logs, retry and bearer refresh | `Ktor Client` |
 | OkHttp used directly, with no typed layer over it | `OkHttp Alone` |
@@ -127,8 +127,20 @@ retry. `net-architecture` owns that rule; the reference has both interceptors in
 
 The same chain on a Ktor client, where the layers are plugins rather than builder calls:
 
+<!-- compile: ktor -->
 ```kotlin
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
+import io.ktor.client.plugins.auth.*
+import io.ktor.client.plugins.auth.providers.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import java.io.IOException
+
 private val idempotent = setOf(HttpMethod.Get, HttpMethod.Put, HttpMethod.Delete, HttpMethod.Head)
+private val retryable = setOf(408, 429, 502, 503, 504)
 
 val http = HttpClient(OkHttp) {
     install(Logging) {
@@ -137,15 +149,21 @@ val http = HttpClient(OkHttp) {
     }
     install(Auth) {
         bearer {
-            loadTokens { tokens.current.let { BearerTokens(it.access, it.refreshToken) } }
+            loadTokens { session.load() }
             refreshTokens {
-                tokens.refresh(tokens.current).let { BearerTokens(it.access, it.refreshToken) }
+                val refresh = oldTokens?.refreshToken ?: return@refreshTokens null
+                val response = client.post("auth/refresh") {
+                    markAsRefreshTokenRequest()
+                    setBody(RefreshRequest(refresh))
+                }
+                if (!response.status.isSuccess()) return@refreshTokens null
+                response.body<TokenPair>().let { BearerTokens(it.access, it.refresh) }.also { session.save(it) }
             }
         }
     }
     install(HttpRequestRetry) {
         maxRetries = 3
-        retryIf { req, res -> req.method in idempotent && res.status.value in 500..599 }
+        retryIf { req, res -> req.method in idempotent && res.status.value in retryable }
         retryOnExceptionIf { req, cause -> req.method in idempotent && cause is IOException }
         exponentialDelay()
     }
@@ -156,8 +174,9 @@ val http = HttpClient(OkHttp) {
 ```
 
 `HttpRequestRetry` is method-blind, so both predicates are guarded: `retryOnServerErrors()` on its
-own repeats every POST. `ContentNegotiation`, `defaultRequest` and the engine argument are left out
-for length — see the reference for the full plugin set.
+own repeats every POST, and on every 5xx — the status set is `net-architecture` → "Retry". The
+bearer block follows `net-architecture` → "Auth Refresh". `ContentNegotiation`, `defaultRequest`
+and the engine argument are left out for length — see the reference for the full plugin set.
 
 1. **Set the timeouts; the defaults are not a policy.** OkHttp ships 10 seconds each for connect, read
    and write and *no* call timeout, so a slow drip of bytes holds a request open forever — add

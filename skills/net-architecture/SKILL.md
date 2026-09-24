@@ -45,7 +45,7 @@ ViewModel / use case      domain types only, no HTTP vocabulary
         |
 Repository                DTO -> domain, freshness policy, failure mapping
         |
-OrdersApi (interface)     suspend functions, one per endpoint, DTOs out
+OrdersApi (interface)     suspend functions, one per endpoint, DTOs out, transport errors thrown
         |
 implementation            the only file that names Retrofit, Ktor or RestClient
         |
@@ -78,8 +78,11 @@ data class Page<T>(val items: List<T>, val nextCursor: String?)
    that offers only those is adapted inside the implementation (`concurrency-coroutines`).
 5. **On a server the same interface is an outbound port** (`arch-hexagonal`) — the core declares it,
    an adapter implements it over the HTTP client, and the core cannot tell it from a database.
-6. **Failure mapping happens where the DTOs do.** A status code, a socket failure and a malformed
-   body become one domain error type at this boundary, not in the ViewModel (`error-architecture`).
+6. **The API throws; the repository maps.** The implementation returns DTOs and lets transport
+   failures out as the client raised them — an `IOException`, the client's status exception, a
+   `SerializationException`, or the `RetryableHttpException` the retry layer reads — and never
+   builds a domain error. The repository, where the DTOs stop, maps each one into the domain's error
+   type (`error-architecture`), so neither the API nor the ViewModel holds a failure mapping.
 
 ## Middleware Order
 
@@ -163,9 +166,13 @@ class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
 6. **Clear the cached `Deferred` on the failure path too.** A refresh that threw and stayed cached
    replays its exception to every caller that arrives afterwards, and the session is dead until the
    process restarts — hence the `finally`.
-7. **On Ktor, do not hand-roll any of this.** `Auth`'s `bearer { refreshTokens { } }` is already
-   single-flight — it guards the refresh internally and parks parallel callers on its result. A
-   hand-rolled store beside it produces two refreshes for one 401.
+7. **On Ktor, the bearer provider is the store.** `Auth`'s `bearer { }` caches what `loadTokens`
+   returned, runs one `refreshTokens` at a time, and records which token each request carried: a 401
+   on a request sent with an older token is replayed with the current one and refreshes nothing.
+   `refreshTokens` receives the cached pair as `oldTokens`, calls the refresh endpoint marked with
+   `markAsRefreshTokenRequest()` so it skips the auth layer, persists the new pair and returns it.
+   `TokenStore` above is for a client with no such plugin; beside `bearer` it is a second copy of the
+   token that the plugin, having cached its own, never reads again.
 
 ## Retry
 
@@ -219,19 +226,25 @@ is retryable* lives in one place and this loop stays a loop (`error-architecture
 4. **Offset paging is correct for a stable archive** — an ordered, append-only, rarely-edited list —
    and it is the only option some APIs offer. Say which one the project is on, once.
 5. **On Android, `Paging 3` is the consumer of this interface, not a replacement for it**: a
-   `PagingSource` whose `load` calls `OrdersApi.orders(cursor)` and maps before returning, with
+   `PagingSource` whose `load` calls `OrdersApi.orders(cursor)` and maps the page and the failure
+   before returning, as a repository would, with
    `RemoteMediator` for the case where a local database is the source of truth
    (`persistence-architecture`).
 6. **On a server, paging is the query's business** — a keyset predicate and a limit, decided in the
    layer that owns the query (`arch-layered`), not bolted on after the rows are in memory.
 
+<!-- compile: android -->
 ```kotlin
+import androidx.paging.PagingSource
+import androidx.paging.PagingState
+
 class OrdersPagingSource(private val api: OrdersApi) : PagingSource<String, Order>() {
     override suspend fun load(params: LoadParams<String>): LoadResult<String, Order> = try {
         val page = api.orders(cursor = params.key)
         LoadResult.Page(page.items.map { it.toDomain() }, prevKey = null, nextKey = page.nextCursor)
-    } catch (e: IOException) {
-        LoadResult.Error(e)
+    } catch (e: Exception) {
+        currentCoroutineContext().ensureActive()
+        LoadResult.Error(e.toDataError().toOrderError())
     }
 
     override fun getRefreshKey(state: PagingState<String, Order>): String? = null
