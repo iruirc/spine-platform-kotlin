@@ -38,7 +38,7 @@ Ask neutrally; do not attach "(recommended)" to an option unless a spine-platfor
 | 3 | `ui` | the `ui` values; KMP adds "no UI", passed to setup as `ui` = `none` |
 | 4 | `framework` | Server: `Spring Boot`, `Ktor`, `Micronaut`, `Quarkus`, `http4k`; CLI: `Clikt` |
 | 5 | `di` | the `di` values; on Spring Boot not asked (`Spring`), on Micronaut and Quarkus not asked (no line) |
-| 6 | `architecture` | the `architecture` values; if the user is unsure, run `architecture-choice` and answer with its Stack Lines row |
+| 6 | `architecture` | the `architecture` values; if the user is unsure, run `architecture-choice` and answer with its Stack Lines row — only the row's `architecture` value is taken, `di` was answered at row 5 |
 | 7 | `async` | the `async` values (`kotlinx.coroutines` unless the framework is Reactor-native and the user says so) |
 | 8 | `baseline` | Android and KMP: `API 23+`, `API 24+`, `API 26+` (`API 26+` default); Desktop, Server, CLI: `JVM 17`, `JVM 21`, `JVM 25` (`JVM 21` default) |
 | 9 | `tests` | offer the values `## Axes` lists for `tests` (`JUnit5` default) |
