@@ -356,11 +356,11 @@ The executor is a different test with a different seam — it asserts which **in
 produced, never the state:
 
 ```kotlin
+@ExtendWith(MainDispatcherExtension::class)
 class SearchExecutorTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()   // Dispatchers.setMain
-
     @Test
-    fun `a failed search comes back as LoadFailed`() = runTest {
+    @DisplayName("a failed search comes back as LoadFailed")
+    fun dispatch_searchFails_endsInFailedStatus() = runTest {
         val repository = FakeSearchRepository().apply { failWith(IOException()) }
         val viewModel = SearchViewModel(repository)
 
@@ -489,12 +489,12 @@ way to reach a `reduce { }` block: unlike the hand-rolled half, that block is no
 can call.
 
 ```kotlin
+// `orbit-viewmodel` builds the container on viewModelScope, and search() launches into it.
+@ExtendWith(MainDispatcherExtension::class)
 class SearchViewModelTest {
-    // `orbit-viewmodel` builds the container on viewModelScope, and search() launches into it.
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()
-
     @Test
-    fun `a submit searches and shows the rows`() = runTest {
+    @DisplayName("a submit searches and shows the rows")
+    fun dispatch_submitClicked_searchesAndShowsRows() = runTest {
         val repository = FakeSearchRepository().apply { succeedWith(listOf(hit)) }
 
         SearchViewModel(repository).test(this) {
@@ -509,7 +509,8 @@ class SearchViewModelTest {
     }
 
     @Test
-    fun `a result click posts the open effect and does not move the state`() = runTest {
+    @DisplayName("a result click posts the open effect and does not move the state")
+    fun dispatch_resultClicked_postsOpenEffectOnly() = runTest {
         SearchViewModel(FakeSearchRepository()).test(this) {
             expectInitialState()
             containerHost.dispatch(SearchIntent.ResultClicked(ResultId("1")))
@@ -540,7 +541,7 @@ Test-only dependencies, by what is being tested:
 |---|---|
 | `SearchReducerTest` (the table) | `kotlin-test` or JUnit — nothing else |
 | `SearchExecutorTest` (hand-rolled store) | `org.jetbrains.kotlinx:kotlinx-coroutines-test`, `app.cash.turbine:turbine` |
-| `SearchViewModelTest` (Orbit) | `org.orbit-mvi:orbit-test`, `kotlinx-coroutines-test` — plus the `MainDispatcherRule` below |
+| `SearchViewModelTest` (Orbit) | `org.orbit-mvi:orbit-test`, `kotlinx-coroutines-test` — plus the `Main` replacement below |
 
 Production side: `org.orbit-mvi:orbit-viewmodel` (container bound to `viewModelScope` and
 `SavedStateHandle`), `org.orbit-mvi:orbit-compose` (`collectAsState`, `collectSideEffect`), or
@@ -550,26 +551,14 @@ The reducer test is the one that costs nothing to place: with no dispatcher and 
 straight into `commonTest` and runs on every KMP target (`pkg-kmp-source-sets`). Put it there first,
 before deciding where the store's test lives.
 
-```kotlin
-// Android and any JVM source set with JUnit 4 — both store tests need a Main dispatcher,
-// because viewModelScope runs on Dispatchers.Main.immediate and takes no parameter.
-class MainDispatcherRule(
-    val dispatcher: TestDispatcher = StandardTestDispatcher(),
-) : TestWatcher() {
-    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
-    override fun finished(description: Description) = Dispatchers.resetMain()
-}
-```
+Both store tests replace `Dispatchers.Main`, because `viewModelScope` runs on
+`Dispatchers.Main.immediate` and takes no parameter; the samples above use the JUnit5 extension:
+`test-frameworks` → "Main Dispatcher in Tests"
 
-In `commonTest` there are no JUnit rules; use `@BeforeTest`/`@AfterTest` with `Dispatchers.setMain`
-instead. `arch-mvvm`'s `Test Setup` carries the rest of the coroutine-test guidance — dispatcher
-choice, Turbine's scheduler behaviour, injected dispatchers — and none of it changes here.
+Dispatcher choice, Turbine and injected dispatchers do not change here — an `UnconfinedTestDispatcher`
+would run the search eagerly and hide the `Status.Loading` this screen exists for:
+`arch-mvvm` → "Testing ViewModel"
 
-Two rules specific to testing this pattern:
-
-1. **Never reach for `UnconfinedTestDispatcher` to "make the store test pass".** It runs the search
-   eagerly, so the intermediate `Status.Loading` never appears and the test stops covering the
-   transition the screen exists for.
-2. **Assert the whole state, and let the table grow.** Adding an intent means adding a row; a
-   reducer test that only checks one field per case will pass on the `copy` that silently cleared
-   `results`, which is the most common way a reducer regresses.
+One rule is specific to this pattern: **assert the whole state, and let the table grow.** Adding an
+intent means adding a row; a reducer test that only checks one field per case will pass on the `copy`
+that silently cleared `results`, which is the most common way a reducer regresses.

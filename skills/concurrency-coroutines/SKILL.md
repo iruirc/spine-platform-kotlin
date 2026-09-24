@@ -325,10 +325,11 @@ needs a **wider owner**.
    other scheduler is one `advanceUntilIdle()` never reaches, and the test hangs or flakes.
 3. **`StandardTestDispatcher` queues; `UnconfinedTestDispatcher` runs eagerly.** Default to the
    first: ordering is explicit, and `advanceUntilIdle()` / `runCurrent()` say when work may proceed.
-   Reach for the second only when the intermediate states do not matter (`arch-mvvm`).
-4. **On Android, `Dispatchers.setMain` is the only seam for `viewModelScope`.** Install it through a
-   JUnit rule and reset it after; `arch-mvvm`'s reference carries the rule body, and it is not
-   repeated here.
+   A ViewModel's test never takes the second to pass:
+   `arch-mvvm` → "Testing ViewModel"
+4. **`Dispatchers.setMain` is the only seam for `viewModelScope`**, and each test framework installs
+   it through its own hook:
+   `test-frameworks` → "Main Dispatcher in Tests"
 5. **A collector that never ends goes on `backgroundScope`.** `runTest` waits for its own children,
    so `launch { flow.collect { } }` in the test body hangs forever.
 6. **Test cancellation explicitly.** Cancel the `Job`, then assert the effect — request aborted,

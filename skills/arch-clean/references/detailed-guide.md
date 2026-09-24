@@ -656,7 +656,8 @@ When you do need to stub the outcome directly — a use case that reaches four r
 whose own rule already has a long test of its own — declare it in `:domain` as a `fun interface` with
 the class as its only implementation. The fake is then one lambda,
 `GetOrders { Result.failure(OrderError.Offline) }`, and nothing else about the design changes.
-`Dispatchers.setMain`, Turbine and the rest of the harness are `arch-mvvm`, section Test Setup.
+The `Main` replacement, Turbine and the rest of the harness:
+`arch-mvvm` → "Testing ViewModel"
 
 ## Gradle Wiring
 

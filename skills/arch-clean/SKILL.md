@@ -284,8 +284,8 @@ takes a `Context` and therefore runs as an instrumented test (Room 2.7's multipl
 none and runs on the JVM). HTTP goes through Ktor's `MockEngine` or OkHttp's `MockWebServer`.
 
 **Presentation** — the ViewModel test constructs it with **fake use cases**, which is why a use case
-has exactly one function: the fake is three lines. Dispatchers, Turbine and the rest of the setup are
-`arch-mvvm`, section Test Setup.
+has exactly one function: the fake is three lines. Dispatchers, Turbine and the rest of the setup:
+`arch-mvvm` → "Testing ViewModel"
 
 1. **Fake the port, not the framework.** A fake `OrderRepository` is the seam the interface exists
    for; mocking Retrofit to test a business rule tests the mock.

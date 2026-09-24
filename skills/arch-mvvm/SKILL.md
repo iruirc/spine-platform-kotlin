@@ -87,6 +87,7 @@ a stateless `Screen(state, onEvent)`. The stateless half is what previews and sc
 | `data class UiState(isLoading, items, error)` | content persists across loading/error (pull-to-refresh, inline error) | invalid combinations must be prevented in the ViewModel |
 | Both: `data class` with a `sealed` field for the mutually exclusive part | most real screens | one more type |
 
+<!-- compile: jvm -->
 ```kotlin
 data class OrdersUiState(
     val content: Content = Content.Loading,
@@ -219,41 +220,48 @@ routes, nested graphs, results, back handling — is `nav-compose`; URLs enterin
 
 ## Testing ViewModel
 
+<!-- compile: jvm-test -->
 ```kotlin
+@ExtendWith(MainDispatcherExtension::class)
 class OrdersViewModelTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()  // Dispatchers.setMain(StandardTestDispatcher())
-
     @Test
-    fun `retry after a failure loads the orders`() = runTest {
+    @DisplayName("retry after a failure loads the orders")
+    fun onEvent_retryAfterFailure_loadsOrders() = runTest {
         val repository = FakeOrderRepository().apply { failWith(IOException()) }
         val viewModel = OrdersViewModel(repository, money)
 
         viewModel.state.test {
-            assertEquals(OrdersUiState.Loading, awaitItem())
+            assertEquals(OrdersUiState(), awaitItem())
             viewModel.onEvent(OrdersUiEvent.Appeared)
-            assertEquals(OrdersUiState.Error(UiMessage.Offline), awaitItem())
+            assertEquals(OrdersUiState.Content.Failed(UiMessage.Offline), awaitItem().content)
 
-            repository.succeedWith(listOf(order))
+            repository.succeedWith(listOf(beans))
             viewModel.onEvent(OrdersUiEvent.RetryClicked)
-            assertEquals(OrdersUiState.Loading, awaitItem())
-            assertEquals(1, (awaitItem() as OrdersUiState.Content).orders.size)
+            assertEquals(OrdersUiState.Content.Loading, awaitItem().content)
+            assertEquals(1, (awaitItem().content as OrdersUiState.Content.Loaded).orders.size)
             cancelAndIgnoreRemainingEvents()
         }
     }
 }
 ```
 
-1. **`StandardTestDispatcher`, not `UnconfinedTestDispatcher`.** Queued coroutines make the
-   intermediate `Loading` observable; the unconfined one runs eagerly and the test never sees it.
-2. **On Android, install it as `Dispatchers.setMain` through a JUnit rule.** `viewModelScope` runs on
-   `Dispatchers.Main.immediate` and offers no other seam.
-3. **Turbine (`.test { }`) for transitions**, a plain `assertEquals` on `state.value` only when a
+1. **`StandardTestDispatcher` as `Main`, and `UnconfinedTestDispatcher` never to turn a test green.**
+   Queued coroutines make the intermediate `Loading` observable; the unconfined one runs eagerly, the
+   test never sees it, and it passes by covering less.
+2. **Replace `Dispatchers.Main` with the hook of the file's framework.** `viewModelScope` runs on
+   `Dispatchers.Main.immediate` and offers no other seam; the sample is JUnit5:
+   `test-frameworks` → "Main Dispatcher in Tests"
+3. **A `stateIn(WhileSubscribed)` state gets a collector, not another dispatcher.** With no
+   subscriber the sharing coroutine never collects upstream, on any dispatcher, and `state.value`
+   stays initial. Turbine's `test { }` is a collector; a test that asserts `state.value` starts
+   `backgroundScope.launch { viewModel.state.collect() }` and then calls `advanceUntilIdle()`.
+4. **Turbine (`.test { }`) for transitions**, a plain `assertEquals` on `state.value` only when a
    single settled value is the whole assertion.
-4. **Fakes over mocks.** A fake repository with a settable result reads better than four stubbing
+5. **Fakes over mocks.** A fake repository with a settable result reads better than four stubbing
    lines and does not pin the test to a call order the ViewModel is free to change.
-5. **Assert effects too** — `viewModel.effects.test { … }`. An unasserted `Channel` is where a
+6. **Assert effects too** — `viewModel.effects.test { … }`. An unasserted `Channel` is where a
    navigation bug hides.
-6. **If the ViewModel takes a dispatcher, inject `StandardTestDispatcher()` from the same
+7. **If the ViewModel takes a dispatcher, inject `StandardTestDispatcher()` from the same
    `runTest` scheduler**, or `advanceUntilIdle()` will not reach the work.
 
 ## When Appropriate

@@ -1,6 +1,6 @@
 ---
 name: test-frameworks
-description: "Use when writing a Kotlin test or reading a failing one — one section per value of the manifest's `tests` axis (JUnit5, JUnit4, Kotest): how a test is declared so the runner collects it, how it asserts, its lifecycle hooks, parameterization, asynchronous tests, how its failure reads in the report, and what the build needs to run it. Plus the surfaces that force a framework whatever the axis says. Which value a given file takes is `spine-toolkit:test-authoring`'s decision, not this skill's."
+description: "Use when writing a Kotlin test or reading a failing one — one section per value of the manifest's `tests` axis (JUnit5, JUnit4, Kotest): how a test is declared so the runner collects it, how it asserts, its lifecycle hooks, parameterization, asynchronous tests, how its failure reads in the report, and what the build needs to run it. Plus the surfaces that force a framework whatever the axis says, and how each value replaces `Dispatchers.Main`. Which value a given file takes is `spine-toolkit:test-authoring`'s decision, not this skill's."
 ---
 
 # Test Frameworks
@@ -22,6 +22,8 @@ that pick means in code. Read the one section named after the value, not all thr
 - A build needs the dependency and the `Test` task wiring that makes the chosen value run at all
 - The surface under test (a Compose rule, Robolectric, a device, `commonTest`) may be forcing a
   framework the axis did not choose
+- The code under test launches on `Dispatchers.Main` — a ViewModel's `viewModelScope` — and the test
+  has to replace it
 
 Not for deciding which value applies — that is `spine-toolkit:test-authoring`. Not for what a good
 test is (structure, naming, what may be replaced by a double) — that is the tester agent.
@@ -98,9 +100,8 @@ reports one failure for the whole set.
 ### Async
 
 A test body that suspends is wrapped in `runTest { }` from `kotlinx-coroutines-test`; JUnit 5 does
-not call a `suspend fun` test method itself. `@Timeout(5)` bounds a test that may hang. Replacing
-`Dispatchers.Main` is an extension here (`@ExtendWith`), not a rule — a `MainDispatcherRule` copied
-from a JUnit4 project does nothing under JUnit 5.
+not call a `suspend fun` test method itself. `@Timeout(5)` bounds a test that may hang. `Dispatchers.Main`
+is replaced by an extension — Main Dispatcher in Tests, below.
 
 ### Failure output
 
@@ -173,9 +174,8 @@ it cannot be combined with Robolectric's — that combination is `ParameterizedR
 
 ### Async
 
-`runTest { }`, as in JUnit5. Replacing `Dispatchers.Main` is a rule here — a `TestWatcher` subclass
-calling `Dispatchers.setMain` in `starting()` and `resetMain()` in `finished()`. `@Test(timeout = …)`
-bounds a test that may hang.
+`runTest { }`, as in JUnit5. `@Test(timeout = …)` bounds a test that may hang. `Dispatchers.Main` is
+replaced by a rule — Main Dispatcher in Tests, below.
 
 ### Failure output
 
@@ -240,7 +240,8 @@ from `kotest-property` for property tests, only where the invariant is genuinely
 A test body is already a suspending function: `delay` and `await` work with no wrapper. `runTest` is
 still what installs the virtual clock of `kotlinx-coroutines-test` when time has to be advanced.
 `eventually(5.seconds) { }` from `kotest-assertions-core` polls until a condition holds instead of
-sleeping once. A per-test timeout is `test("…").config(timeout = 5.seconds) { }`.
+sleeping once. A per-test timeout is `test("…").config(timeout = 5.seconds) { }`. `Dispatchers.Main`
+is replaced by a listener — Main Dispatcher in Tests, below.
 
 ### Failure output
 
@@ -259,6 +260,67 @@ separate artifacts (`kotest-assertions-core`, `kotest-property`). In a KMP modul
 Gradle plugin with `com.google.devtools.ksp`, and `kotest-framework-engine` in `commonTest`. On
 Android: `useJUnitPlatform()` in `testOptions` for unit tests, and for an instrumented test
 `kotest-runner-junit4` with `@RunWith(KotestTestRunner::class)`.
+
+## Main Dispatcher in Tests
+
+`viewModelScope`, and anything else that launches on `Dispatchers.Main`, takes no dispatcher
+parameter, so the test replaces `Main` itself: `Dispatchers.setMain(StandardTestDispatcher())` before
+each test, `Dispatchers.resetMain()` after it. `runTest` then takes its scheduler from that `Main`, so
+`advanceUntilIdle()` reaches the ViewModel's work. The call goes into the framework's own hook, and a
+hook of another framework compiles and never runs — a JUnit4 rule in a JUnit5 class replaces nothing.
+
+| Value | Mechanism | Applied by |
+|---|---|---|
+| JUnit5 | an extension | `@ExtendWith(MainDispatcherExtension::class)` on the class; `@JvmField @RegisterExtension val main = MainDispatcherExtension()` when the test needs `main.dispatcher` |
+| JUnit4 | a rule | `@get:Rule val main = MainDispatcherRule()` |
+| Kotest | a listener | `extension(MainDispatcherListener())` in the spec body |
+| `kotlin.test` in `commonTest` | the hooks | `@BeforeTest` / `@AfterTest` calling `Dispatchers.setMain` / `resetMain`, which are multiplatform |
+
+<!-- compile: jvm-test -->
+```kotlin
+import org.junit.jupiter.api.extension.AfterEachCallback
+import org.junit.jupiter.api.extension.BeforeEachCallback
+import org.junit.jupiter.api.extension.ExtensionContext
+
+class MainDispatcherExtension(
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
+) : BeforeEachCallback, AfterEachCallback {
+    override fun beforeEach(context: ExtensionContext) = Dispatchers.setMain(dispatcher)
+    override fun afterEach(context: ExtensionContext) = Dispatchers.resetMain()
+}
+```
+
+<!-- compile: jvm-test -->
+```kotlin
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
+
+class MainDispatcherRule(
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
+) : TestWatcher() {
+    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
+    override fun finished(description: Description) = Dispatchers.resetMain()
+}
+```
+
+<!-- compile: jvm-test -->
+```kotlin
+import io.kotest.core.listeners.AfterTestListener
+import io.kotest.core.listeners.BeforeTestListener
+import io.kotest.core.test.TestCase
+import io.kotest.engine.test.TestResult
+
+class MainDispatcherListener(
+    val dispatcher: TestDispatcher = StandardTestDispatcher(),
+) : BeforeTestListener, AfterTestListener {
+    override suspend fun beforeTest(testCase: TestCase) = Dispatchers.setMain(dispatcher)
+    override suspend fun afterTest(testCase: TestCase, result: TestResult) = Dispatchers.resetMain()
+}
+
+class OrdersViewModelSpec : FunSpec({
+    extension(MainDispatcherListener())
+})
+```
 
 ## Common Mistakes
 

@@ -285,11 +285,8 @@ fun `emits loading then content`() = runTest {
    actually happen.
 4. **A `stateIn(WhileSubscribed)` flow does nothing until someone collects it.** Under `runTest`, a
    test that only reads `state.value` sees the initial value forever and reports a ViewModel that
-   works as one that never loads. Either collect it — Turbine's `test { }` does, so does
-   `backgroundScope.launch { state.collect { } }` — or build the subject on an
-   `UnconfinedTestDispatcher` so the sharing coroutine starts eagerly. The dispatcher setup itself is
-   `concurrency-coroutines` → "Testing"; the `MainDispatcherRule` body and the
-   standard-versus-unconfined rule are in `arch-mvvm`'s reference, section `Test Setup`.
+   works as one that never loads. What such a test does instead — a dispatcher will not start it:
+   `arch-mvvm` → "Testing ViewModel"
 5. **Time-based operators run on virtual time like everything else.** `debounce` and `sample`
    complete instantly under `runTest`, and `awaitItem()` drives the scheduler on its own — reach for
    an explicit `advanceTimeBy` only when the assertion is about something other than an emission.

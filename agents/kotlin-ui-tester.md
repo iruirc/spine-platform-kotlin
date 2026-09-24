@@ -142,7 +142,7 @@ fun loginScreen_validInput_callsOnLogin() {
 ### ViewModel Testing
 
 - Use **Turbine** library for `Flow` testing — `flow.test { }` provides a structured way to collect and assert emissions.
-- `StandardTestDispatcher` / `UnconfinedTestDispatcher` for controlling coroutine execution in ViewModel tests.
+- Which test dispatcher runs the ViewModel: `arch-mvvm` → "Testing ViewModel". How `Dispatchers.Main` is replaced: `test-frameworks` → "Main Dispatcher in Tests".
 - Test state transitions by sending events and asserting state changes.
 
 ```kotlin
@@ -150,7 +150,7 @@ fun loginScreen_validInput_callsOnLogin() {
 fun loadUsers_success_emitsLoadedState() = runTest {
     // Arrange
     val fakeRepository = FakeUserRepository(users = listOf(User("Alice")))
-    val viewModel = UserListViewModel(fakeRepository, UnconfinedTestDispatcher(testScheduler))
+    val viewModel = UserListViewModel(fakeRepository, StandardTestDispatcher(testScheduler))
 
     // Act & Assert
     viewModel.uiState.test {
@@ -164,7 +164,7 @@ fun loadUsers_success_emitsLoadedState() = runTest {
 
 ### Robolectric
 
-For Android-specific logic without a device — test code that depends on `Context`, `SharedPreferences`, `Resources`, and other Android framework classes. `RobolectricTestRunner` is a JUnit4 runner — see `## Forced by surface` — so a Robolectric class keeps JUnit4 hooks even in a JUnit5 module.
+For Android-specific logic without a device — test code that depends on `Context`, `SharedPreferences`, `Resources`, and other Android framework classes. `RobolectricTestRunner` is a JUnit4 runner — `test-frameworks` → "Forced by surface" — so a Robolectric class keeps JUnit4 hooks even in a JUnit5 module.
 
 ```kotlin
 @RunWith(RobolectricTestRunner::class)

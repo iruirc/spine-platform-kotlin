@@ -35,11 +35,11 @@ h2s() {
 }
 
 @test "every framework section of the skill is a value of the tests axis" {
-  # Skeleton B's own sections are not framework sections; everything else must be a value,
-  # so a framework dropped from the axis cannot leave a section behind.
+  # Skeleton B's own sections and the two that span every value are not framework sections;
+  # everything else must be a value, so a framework dropped from the axis cannot leave a section behind.
   values="$(axis_values tests)"
   while IFS= read -r h; do
-    case "$h" in "When to Use"|"Common Mistakes"|"Forced by surface") continue ;; esac
+    case "$h" in "When to Use"|"Common Mistakes"|"Forced by surface"|"Main Dispatcher in Tests") continue ;; esac
     grep -qxF -- "$h" <<<"$values" || { echo "'## $h' is no value of the tests axis"; return 1; }
   done < <(h2s "$SKILL")
 }
@@ -60,6 +60,15 @@ h2s() {
   for surface in 'createComposeRule()' 'Robolectric' 'androidInstrumentedTest' 'commonTest'; do
     grep -qF "$surface" <<<"$body" || { echo "the $surface surface is not named"; return 1; }
   done
+}
+
+@test "the skill replaces Dispatchers.Main once per value, and no other skill defines a replacement" {
+  body="$(awk '$0=="## Main Dispatcher in Tests"{f=1;next} f&&/^## /{exit} f' "$SKILL")"
+  for m in MainDispatcherExtension MainDispatcherRule MainDispatcherListener; do
+    grep -qF "class $m(" <<<"$body" || { echo "no $m in ## Main Dispatcher in Tests"; return 1; }
+  done
+  hits="$(grep -rlE 'class MainDispatcher(Rule|Extension|Listener)[(]' "$ROOT/skills" | grep -v '/test-frameworks/' || true)"
+  [ -z "$hits" ] || { echo "a second copy of the replacement: $hits"; return 1; }
 }
 
 @test "the manifest answers the testing topic with this skill" {

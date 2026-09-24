@@ -1,6 +1,7 @@
 # JUnit 5 by default; a JUnit 4 block imports org.junit.Test itself, and an explicit import wins.
 # Kotest specs by name: io.kotest.core.spec.style.* carries a Test typealias that clashes with JUnit 5's.
 org.junit.jupiter.api.*
+org.junit.jupiter.api.extension.ExtendWith
 kotlin.test.assertEquals
 kotlin.test.assertFailsWith
 kotlin.test.assertFalse

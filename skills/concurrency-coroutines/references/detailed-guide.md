@@ -439,10 +439,9 @@ states assertable.
 ## Testing — Injected Dispatchers and setMain
 
 ```kotlin
+@ExtendWith(MainDispatcherExtension::class)
 class OrdersViewModelTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()
-
-    @Test fun `loads orders`() = runTest {
+    @Test fun onOpen_userWithOrders_showsThem() = runTest {
         val source = SqlDelightOrderSource(queries, io = StandardTestDispatcher(testScheduler))
         val vm = OrdersViewModel(LoadOrders(FakeRepository(source)))
 
@@ -455,12 +454,13 @@ class OrdersViewModelTest {
 ```
 
 Two seams, sharing one scheduler. `viewModelScope` runs on `Dispatchers.Main.immediate` and takes no
-parameter, so `Dispatchers.setMain` through a JUnit rule is the only way in — `arch-mvvm`'s reference
-carries the rule body. Every *other* dispatcher is a constructor parameter, and what goes in must be
-`StandardTestDispatcher(testScheduler)` from `runTest`'s own scheduler
-(`mainDispatcherRule.dispatcher` is the same one). A dispatcher on any other scheduler is one
-`advanceUntilIdle()` never reaches: the test hangs, times out, or passes because the assertion ran
-before the work did.
+parameter, so replacing `Main` is the only way in; the test above is JUnit5 and uses the extension:
+`test-frameworks` → "Main Dispatcher in Tests"
+
+Every *other* dispatcher is a constructor parameter, and what goes in must be
+`StandardTestDispatcher(testScheduler)` from `runTest`'s own scheduler (the `dispatcher` of the `Main`
+replacement is the same one). A dispatcher on any other scheduler is one `advanceUntilIdle()` never
+reaches: the test hangs, times out, or passes because the assertion ran before the work did.
 
 ## Testing — backgroundScope for Endless Collectors
 

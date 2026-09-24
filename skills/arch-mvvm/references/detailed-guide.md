@@ -209,14 +209,14 @@ no repository to render, which is also why a screenshot test can drive it direct
 ## Sealed UiState — Test
 
 ```kotlin
+@ExtendWith(MainDispatcherExtension::class)
 class SealedOrdersViewModelTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()
-
     private val repository = FakeOrderRepository()
     private fun viewModel() = OrdersViewModel(repository, money)
 
     @Test
-    fun `appearing loads the orders`() = runTest {
+    @DisplayName("appearing loads the orders")
+    fun onEvent_appeared_loadsOrders() = runTest {
         repository.succeedWith(listOf(beans))
         val viewModel = viewModel()
 
@@ -229,7 +229,8 @@ class SealedOrdersViewModelTest {
     }
 
     @Test
-    fun `retry after a network failure loads`() = runTest {
+    @DisplayName("retry after a network failure loads")
+    fun onEvent_retryAfterNetworkFailure_loadsOrders() = runTest {
         repository.failWith(IOException())
         val viewModel = viewModel()
 
@@ -248,7 +249,8 @@ class SealedOrdersViewModelTest {
     }
 
     @Test
-    fun `appearing twice does not load twice`() = runTest {
+    @DisplayName("appearing twice does not load twice")
+    fun onEvent_appearedTwice_loadsOnce() = runTest {
         repository.succeedWith(listOf(beans))
         val viewModel = viewModel()
 
@@ -260,7 +262,8 @@ class SealedOrdersViewModelTest {
     }
 
     @Test
-    fun `clicking an order emits the navigation effect`() = runTest {
+    @DisplayName("clicking an order emits the navigation effect")
+    fun onEvent_orderClicked_emitsOpenOrderEffect() = runTest {
         val viewModel = viewModel()
 
         viewModel.effects.test {
@@ -409,14 +412,14 @@ the project needs it, the sealed shape is the cheaper one.
 ## Data-class UiState — Test
 
 ```kotlin
+@ExtendWith(MainDispatcherExtension::class)
 class DataClassOrdersViewModelTest {
-    @get:Rule val mainDispatcherRule = MainDispatcherRule()
-
     private val repository = FakeOrderRepository()
     private fun viewModel() = OrdersViewModel(repository, money)
 
     @Test
-    fun `a refresh keeps the rows on screen`() = runTest {
+    @DisplayName("a refresh keeps the rows on screen")
+    fun onEvent_pullRefreshed_keepsRows() = runTest {
         repository.succeedWith(listOf(beans))
         val viewModel = viewModel()
 
@@ -438,7 +441,8 @@ class DataClassOrdersViewModelTest {
     }
 
     @Test
-    fun `a failed refresh shows the banner over the old rows`() = runTest {
+    @DisplayName("a failed refresh shows the banner over the old rows")
+    fun onEvent_refreshFails_showsErrorOverOldRows() = runTest {
         repository.succeedWith(listOf(beans))
         val viewModel = viewModel()
         viewModel.onEvent(OrdersUiEvent.Appeared)
@@ -457,7 +461,8 @@ class DataClassOrdersViewModelTest {
     }
 
     @Test
-    fun `no state has both a spinner and an error`() = runTest {
+    @DisplayName("no state has both a spinner and an error")
+    fun onEvent_loadFails_neverShowsSpinnerWithError() = runTest {
         repository.failWith(IOException())
         val viewModel = viewModel()
 
@@ -641,39 +646,18 @@ class CheckoutViewModel(private val handle: SavedStateHandle) : ViewModel() {
 Dependencies: `org.jetbrains.kotlinx:kotlinx-coroutines-test` and `app.cash.turbine:turbine`, both
 test-only.
 
-```kotlin
-// Android and any JVM source set with JUnit 4
-class MainDispatcherRule(
-    val dispatcher: TestDispatcher = StandardTestDispatcher(),
-) : TestWatcher() {
-    override fun starting(description: Description) = Dispatchers.setMain(dispatcher)
-    override fun finished(description: Description) = Dispatchers.resetMain()
-}
-```
-
-`viewModelScope` runs on `Dispatchers.Main.immediate` and takes no constructor parameter, so
-`Dispatchers.setMain` is the only seam a ViewModel test has. Without it every test fails at
-construction with "Module with the Main dispatcher had failed to initialize".
-
-`commonTest` has no JUnit rules, so use the multiplatform annotations:
-
-```kotlin
-class OrdersViewModelTest {
-    private val dispatcher = StandardTestDispatcher()
-
-    @BeforeTest fun setUp() = Dispatchers.setMain(dispatcher)
-    @AfterTest fun tearDown() = Dispatchers.resetMain()
-}
-```
+`viewModelScope` runs on `Dispatchers.Main.immediate` and takes no constructor parameter, so replacing
+`Main` is the only seam a ViewModel test has. The tests above are JUnit5 and use the extension; a
+JUnit4 file takes the rule, a Kotest spec the listener, `commonTest` the `kotlin.test` hooks:
+`test-frameworks` → "Main Dispatcher in Tests"
 
 Guidance that applies to every test above:
 
-1. `StandardTestDispatcher` queues; `UnconfinedTestDispatcher` runs eagerly and hides the
-   intermediate `Loading`. Reach for the unconfined one only when a test genuinely does not care
-   about intermediate states.
+1. Which test dispatcher runs the ViewModel, and what a `stateIn` state needs in a test:
+   `arch-mvvm` → "Testing ViewModel"
 2. Inject a dispatcher rather than calling `withContext(Dispatchers.IO)` inside the ViewModel where
    you can; when it is injected, pass `StandardTestDispatcher(testScheduler)` from inside `runTest`,
-   or `mainDispatcherRule.dispatcher`, which is the same scheduler. A dispatcher built on any other
+   or the `dispatcher` of the `Main` replacement, which is the same scheduler. A dispatcher built on any other
    scheduler is one `advanceUntilIdle()` never reaches. Layer-wide dispatcher placement is
    `concurrency-coroutines`.
 3. Turbine's `awaitItem()` drives the scheduler, so most tests need no explicit `advanceUntilIdle()`;
