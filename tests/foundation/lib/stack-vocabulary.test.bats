@@ -150,6 +150,19 @@ axes() {
   [ "$n" -eq 2 ]
 }
 
+@test "a KMP module's no-UI answer travels from kotlin-init to kotlin-setup as ui = none" {
+  grep -qF '`ui` = `none`' "$INIT" || { echo "kotlin-init does not name ui = none"; return 1; }
+  line="$(grep -F '`ui` = `none`' "$SETUP")"
+  [ -n "$line" ] || { echo "kotlin-setup does not name ui = none"; return 1; }
+  grep -qF 'KMP' <<<"$line" || { echo "kotlin-setup's ui = none sentence does not name KMP: $line"; return 1; }
+}
+
+@test "the manifest's commonMain path row does not flag ui unconditionally" {
+  row="$(sed -n '/^## Heuristics/,/^## Topics/p' "$M" | grep -F 'commonMain/')"
+  [ -n "$row" ] || { echo "no commonMain/ path row"; return 1; }
+  grep -qF '+ ui if' <<<"$row" || { echo "row: $row"; return 1; }
+}
+
 @test "kotlin-init's DI check allows the use-site annotations the framework requires" {
   grep -qF 'Graph declarations' "$INIT" || { echo "the check still bans every DI import"; return 1; }
   for a in '@HiltViewModel' '@AndroidEntryPoint' '`@Inject` constructors' '`koinViewModel()`'; do

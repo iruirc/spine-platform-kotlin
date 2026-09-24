@@ -35,7 +35,7 @@ Ask neutrally; do not attach "(recommended)" to an option unless a spine-platfor
 |---|---|---|
 | 1 | `target` | the five modes above |
 | 2 | `build` | not asked: always `Gradle KTS` — this agent makes one Gradle KTS build; a Groovy or Maven project is attached with `/setup` |
-| 3 | `ui` | the `ui` values; KMP adds "no UI" |
+| 3 | `ui` | the `ui` values; KMP adds "no UI", passed to setup as `ui` = `none` |
 | 4 | `framework` | Server: `Spring Boot`, `Ktor`, `Micronaut`, `Quarkus`, `http4k`; CLI: `Clikt` |
 | 5 | `di` | the `di` values; on Spring Boot not asked (`Spring`), on Micronaut and Quarkus not asked (no line) |
 | 6 | `architecture` | the `architecture` values; if the user is unsure, run `architecture-choice` and answer with its Stack Lines row |
@@ -69,7 +69,7 @@ Every choice below comes from the dialog's answers, not from config lines — th
 - **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test in the same value
 - **KMP**: `commonMain` with one public function and its `commonTest`, which `## Forced by surface` narrows to `kotlin.test`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
 
-Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with `platform` = `spine-platform-kotlin` and `stack` — the answers this dialog collected, including `Gradle KTS` for `build` and `Spring` for `di` on Spring Boot — so it renders them from its own templates without re-asking. `lang` and `mode` are not passed: this agent never asked them, and setup asks them itself. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
+Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with `platform` = `spine-platform-kotlin` and `stack` — the answers this dialog collected, including `Gradle KTS` for `build` and `Spring` for `di` on Spring Boot — so it renders them from its own templates without re-asking. `lang` and `mode` are not passed: this agent never asked them, and setup asks them itself. On a KMP module whose `ui` answer is "no UI", pass `ui` = `none` in `stack` — the one value outside `## Axes` this agent passes, and only for KMP. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
 
 ## Tooling
 

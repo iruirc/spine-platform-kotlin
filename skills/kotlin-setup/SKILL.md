@@ -84,7 +84,9 @@ axis lines, and the file answers that directly.
    wins wherever it holds an answered line. Take an input value only if this manifest's ## Axes
    lists it for that axis; one it does not list is ignored and its axis stays unresolved, because
    the caller spelled it in its own vocabulary and one re-asked question is cheaper than a ##
-   Stack line spine-toolkit:stack-detect will never match.
+   Stack line spine-toolkit:stack-detect will never match — except `ui` = `none` on a KMP target:
+   that means the module has no UI, the axis is answered, not asked, and step 4 writes no
+   `- UI:` line.
 
 3. Ask `target` first if it is still unresolved (label `auq_axis_target_label`, options from
    ## Axes). Then ask, for every axis still without a value, ONLY the axes the resolved target
@@ -136,7 +138,7 @@ Which axes step 3 asks, per resolved `target`. `target` itself is always first.
 or shared module gives, and the heuristics pin it from the first `suspend fun`. A project that
 really runs RxJava on Android has the line detected, never asked. `framework` means nothing to a
 KMP shared module, and its `ui` question offers "no UI" beside the catalog values — that answer
-writes no `- UI:` line.
+writes no `- UI:` line. On a KMP target the same answer arrives from `/kotlin-init` as `ui` = `none`.
 
 On a Server, the framework decides DI.
 When `framework` is `Spring Boot`, `di` is not asked and the line is `- DI: Spring`.

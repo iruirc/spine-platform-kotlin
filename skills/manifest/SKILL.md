@@ -128,7 +128,7 @@ path: `*Controller.kt`, `*Resource.kt`, `routes/`, `api/`                       
 path: `*Repository.kt`, `*Dao.kt`, `data/`, `migration/`                          → async, tests
 path: `*Client.kt`, `*Service.kt`, `network/`                                     → async (+ di if container-registered)
 path: `build.gradle.kts`, `settings.gradle.kts`, `gradle/libs.versions.toml`      → build, baseline, target
-path: `commonMain/`, `androidMain/`, `jvmMain/`, `iosMain/`                       → target, ui
+path: `commonMain/`, `androidMain/`, `jvmMain/`, `iosMain/`                       → target (+ ui if a Compose import is present)
 path: `src/test/`, `src/androidTest/`, `*Test.kt`, `*Spec.kt`                     → tests
 
 Coroutines win over Reactor on purpose: a Spring WebFlux project on Kotlin carries both, the
