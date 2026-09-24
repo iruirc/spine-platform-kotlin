@@ -96,7 +96,7 @@ Evaluate the code against each category below. Skip categories that don't apply.
 
 - **N+1 queries**: database call inside a loop — should be a batch query.
 - **Unnecessary allocations**: creating objects in hot loops, excessive `copy()` in tight paths.
-- **Blocking the main thread**: network/database calls without `withContext(Dispatchers.IO)` on Android.
+- **Blocking the main thread**: a blocking call reached from `Dispatchers.Main`; where the switch belongs is `concurrency-coroutines` → "Per-Layer Dispatchers".
 - **Missing pagination**: loading all records when only a subset is needed.
 - **Expensive operations in wrong places**: heavy computation in composable functions, repeated calculations without caching.
 - **Memory leaks**: uncancelled coroutines, unclosed resources (`Closeable`), retained references to Activity/Context.
@@ -175,7 +175,7 @@ neighbouring skills, a finding here may block.
 ### Compose Desktop
 
 - Window state (`rememberWindowState`) owned by the `application { }` scope, not recreated per recomposition.
-- No `Dispatchers.Main` assumptions in shared code: on the desktop target it is Swing's EDT.
+- `Dispatchers.Main` on the desktop target: `concurrency-coroutines` → "Per-Layer Dispatchers".
 - Long work off the UI thread — a blocking call inside a composable freezes the window with no ANR to tell you.
 
 ### Quarkus / http4k
@@ -232,7 +232,7 @@ Consult these skills when reviewing code against architectural / framework expec
 - `di-hilt` — PR red flags: `@Inject lateinit var` field injection where constructor injection is available; a `SingletonComponent` binding holding an Activity- or Context-derived object; `@HiltViewModel` paired with a hand-written `ViewModelProvider.Factory`; a screen-scoped dependency installed in the singleton component
 - `di-koin` — PR red flags: `KoinComponent` / `by inject()` reached from domain code (Service Locator); `single { }` for a per-screen stateful object; a module changed with no `verify()` or `checkModules()` test; platform bindings declared in `commonMain` rather than a platform module
 - `di-spring` — PR red flags: `@Autowired lateinit var` field injection instead of a constructor `val`; `@Value` scattered where `@ConfigurationProperties` belongs; `@Transactional` on a private or `final` method (no proxy, so silently no transaction); a bean taking `ApplicationContext` to look other beans up
-- `concurrency-coroutines` — PR red flags: `GlobalScope.launch` anywhere in production code; `runBlocking` outside `main()` or a test; a dispatcher chosen at the call site instead of by the layer that owns the work (`withContext` in the ViewModel for what the repository should place)
+- `concurrency-coroutines` — PR red flags: `GlobalScope.launch` anywhere in production code; `runBlocking` outside `main()` or a test; a `withContext` where `concurrency-coroutines` → "Per-Layer Dispatchers" puts none
 - `reactive-flow` — Flow vs StateFlow vs SharedFlow, the `stateIn`/`shareIn` started policy, and a cold flow collected twice where it should have been shared
 - `error-architecture` — per-layer error mapping, a sealed hierarchy instead of stringly-typed failures, problem details on the server, `UiState.Error` on the client, no PII in logs; PR red flag: `runCatching` or a bare `catch` around a suspending call, `error-architecture` → "The runCatching Rule"
 - `pkg-gradle-modules` — module boundaries: `api` vs `implementation`, the version catalog, convention plugins, no cycle in the module graph

@@ -142,9 +142,8 @@ class GetOrders(private val repo: OrderRepository) {
    `SavedStateHandle`, no field injection, no service locator inside the body.
 3. **Stateless.** A use case must be safe to construct per call. A `var` in one is shared state with
    no owner: two screens read it and neither invalidates it.
-4. **No dispatcher.** `withContext(Dispatchers.IO)` belongs where the blocking call actually is — the
-   repository implementation in `:data`. A use case that names a dispatcher has an opinion about a
-   collaborator's cost (`concurrency-coroutines`).
+4. **No dispatcher.** A use case that names one has an opinion about a collaborator's cost; where the
+   switch goes instead is `concurrency-coroutines` → "Per-Layer Dispatchers".
 5. **No framework import, and no framework annotation either.** `@Service`, `@Singleton`,
    `@Inject` and `@HiltViewModel` all put a container on `:domain`'s classpath. Constructor
    parameters are enough; the binding happens in `:app` (`di-hilt`, `di-koin`, `di-spring`).
@@ -349,8 +348,8 @@ Two properties of the adoption itself:
    orders. Now every caller and every fake knows how the API paginates, and the day it changes they
    all change.
 7. **`withContext(Dispatchers.IO)` inside a use case** — the rule declares that its collaborator
-   blocks, which is a fact about an implementation the domain is not supposed to know. Move it to the
-   repository implementation, where the blocking call actually is (`concurrency-coroutines`).
+   blocks, which is a fact about an implementation the domain is not supposed to know. Delete it;
+   the switch belongs to `concurrency-coroutines` → "Per-Layer Dispatchers".
 8. **Mapping in the ViewModel** — presentation importing `OrderDto` or `OrderEntity` "because the
    repository already had it". The dependency graph either permits this, in which case the layering
    is decorative, or it does not, in which case someone added `implementation(project(":data"))` to

@@ -17,7 +17,7 @@ flow's **lifecycle**: which scope collects it and what cancels the collection.
 > - `arch-clean` — why a use case names no dispatcher, and the layer that composes two repositories
 > - `arch-layered` — the service method that is the transaction boundary a suspending call runs inside
 > - `net-architecture` — the request that dies with its scope, and single-flight refresh behind a `Mutex`
-> - `persistence-architecture` — `Dispatchers.IO` as a `:data` word, Room's executor vs SQLDelight's caller thread
+> - `persistence-room-sqldelight` — Room's query executor against SQLDelight's caller thread, engine by engine
 > - `error-architecture` — the `catching` helper, the `runCatching` trap, and what a cancellation must never be mapped to
 > - `compose-state` — `LaunchedEffect` and `rememberCoroutineScope()`, the two composition-scoped starters
 > - `di-composition-root` — the app scope this skill hands work to, and why bootstrap never blocks
@@ -82,19 +82,23 @@ belongs to whatever owns the lifetime, and cancellation is never caught — only
 | ViewModel | `Dispatchers.Main.immediate`, which is what `viewModelScope` is built from | the framework; the ViewModel adds nothing |
 | Use case | the caller's context; it names no dispatcher at all | `arch-clean` |
 | Repository | the caller's context; it composes sources and maps, it does not switch | `persistence-architecture` |
-| Data source, network | the client's own machinery — Retrofit and Ktor suspend without holding a thread | `net-http-clients` |
-| Data source, local database or files | `withContext(Dispatchers.IO)` around the blocking part | **this is the one place the switch belongs** |
+| Data source, network | nothing to switch — Retrofit and the Ktor client suspend without holding a thread | `net-http-clients` |
+| Data source, Room | nothing to switch — a `suspend` DAO call and a `Flow` DAO query run on Room's executor | `persistence-room-sqldelight` |
+| Data source, SQLDelight on a synchronous driver, files, a blocking SDK | `withContext(Dispatchers.IO)` around the blocking call; a SQLDelight `Flow` takes it as `mapToList(io)` | **this is the one place the switch belongs** |
 | Heavy mapping, parsing, crypto | `withContext(Dispatchers.Default)` where the work is | the source doing the work |
 | Server route or controller | the engine's dispatcher — Ktor's, or Reactor's under WebFlux | the framework |
 | Server service | the caller's context; it owns the transaction boundary, not the dispatcher | `arch-layered` |
 | Server repository over blocking JDBC | `Dispatchers.IO.limitedParallelism(n)` sized to the pool, or virtual threads | `## On the Server` |
 | App-scoped background service | its own scope's dispatcher, usually `Dispatchers.Default` | `di-composition-root` |
 
-1. **`withContext` goes where the blocking actually happens, and nowhere above it.** Main-safety is
-   the data layer's contract: a `suspend` function is safe to call from any dispatcher, and making
-   that true is the callee's job. `arch-clean` bars the use case from naming a dispatcher and
-   `persistence-architecture` bars the ViewModel from wrapping a repository call; both hold for one
-   reason, which is that neither layer can see what the call beneath it actually costs.
+1. **`withContext` wraps the blocking call, at its source, and nothing above it.** A `suspend` API
+   that does its own threading — Retrofit, the Ktor client, a Room `suspend` or `Flow` DAO function,
+   SQLDelight on an async driver — is not switched at all. A blocking one — SQLDelight's
+   `executeAsList()` and `transaction { }` on the Android, JDBC and native drivers, `File`, JDBC, a
+   vendor SDK — gets `withContext` around that call alone, not around the method, so the `try` and
+   the mapping stay on the caller's context. Main-safety is the data layer's contract: a `suspend`
+   function is safe to call from any dispatcher, and making that true is the callee's job. A
+   ViewModel or a use case that names a dispatcher is guessing at a cost it cannot see.
 2. **Three dispatchers, three jobs.** `Dispatchers.Default` for CPU — a pool sized to the core
    count. `Dispatchers.IO` for calls that block a thread — elastic, limited to 64 threads or the
    processor count, whichever is larger, and sharing its threads with `Default`, so switching
@@ -108,6 +112,12 @@ belongs to whatever owns the lifetime, and cancellation is never caught — only
 5. **Never `withContext(Dispatchers.Main)` to publish state.** The ViewModel is already there —
    `viewModelScope` runs on `Dispatchers.Main.immediate`, and a `StateFlow` is safe to write from
    anywhere anyway. The wrapper is a leftover from a callback API.
+6. **`Dispatchers.Main` is the UI thread a platform artifact installs.** Android's main looper comes
+   with `kotlinx-coroutines-android`; on Compose Desktop or Swing it is the Swing EDT, and only when
+   `kotlinx-coroutines-swing` is declared in the desktop source set — without it `viewModelScope`
+   falls back to `Dispatchers.Default`, off the EDT, with no error. A server or a CLI has none:
+   `Dispatchers.Main` there throws `IllegalStateException` on first use, so code shared with one
+   takes its dispatcher as a parameter.
 
 ## Scope Ownership
 
@@ -328,8 +338,8 @@ needs a **wider owner**.
 ## Common Mistakes
 
 1. **`withContext(Dispatchers.IO)` in a ViewModel or a use case.** It moves a decision about where
-   blocking happens up into a layer that cannot know. The repository call is already main-safe or it
-   is a bug in the repository (`arch-clean`, `persistence-architecture`).
+   blocking happens up into a layer that cannot know. The call beneath is already main-safe or it is
+   a bug in the data source that makes it.
 2. **`runCatching` around a suspending call.** A cancelled coroutine reports a failure to the user
    and keeps running:
    `error-architecture` → "The runCatching Rule".

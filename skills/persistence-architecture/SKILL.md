@@ -118,16 +118,14 @@ One policy per aggregate, written down, chosen by one question: **must this work
 internal class OfflineFirstOrderRepository(
     private val dao: OrderDao,
     private val api: OrdersApi,
-    private val io: CoroutineDispatcher,
 ) : OrderRepository {
 
     override fun observe(customer: CustomerId): Flow<List<Order>> =
         dao.observeByCustomer(customer.value).map { rows -> rows.map(OrderEntity::toDomain) }
 
-    override suspend fun refresh(customer: CustomerId): Result<Unit> = withContext(io) {
+    override suspend fun refresh(customer: CustomerId): Result<Unit> =
         catching { dao.upsertAll(api.orders(customer.value).items.map(OrderDto::toEntity)) }
             .mapFailure { it.toDataError().toOrderError() }   // the domain never sees DataError
-    }
 }
 ```
 
@@ -135,29 +133,17 @@ internal class OfflineFirstOrderRepository(
 
 1. **The storage API is `suspend` and `Flow`, and nothing else crosses the boundary.** Room and
    SQLDelight both offer that shape; a blocking call above `:data` is a choice, not a constraint.
-2. **`Dispatchers.IO` is a `:data` word.** The `withContext(Dispatchers.IO)` goes in the repository
-   or its local source — never in a use case (`arch-clean` → "Use Cases") and never in
-   `commonMain` domain code. A ViewModel may *hold* an injected dispatcher, which is how
-   `arch-mvvm` makes its own coroutines testable; what it must not do is wrap a repository call in
-   a `withContext`, because that is it being told which layer blocks (`concurrency-coroutines`).
-3. **Inject the dispatcher, do not name it.** A constructor parameter defaulting to `Dispatchers.IO`
-   is replaced by a test dispatcher in one line; a hard-coded `Dispatchers.IO` inside the method
-   makes every repository test depend on real thread scheduling.
-4. **Room already moved off your thread.** A `suspend` DAO function runs on Room's own query
-   executor and a `Flow` DAO function emits on it, so wrapping a DAO call in `withContext` buys
-   nothing. The switch is for what *surrounds* it — file work, serialization, a JSON parse, the
-   mapping of ten thousand rows.
-5. **SQLDelight runs where you call it.** The generated `executeAsList()` is blocking and runs on
-   the caller's thread; `asFlow().mapToList(context)` takes the dispatcher as an argument. On
-   SQLDelight the `withContext` is not optional, and on `Dispatchers.Main` it is an ANR.
-6. **Never block to read.** `runBlocking` around a query on the main thread is the same freeze
+2. **Where the dispatcher switch goes is `concurrency-coroutines` → "Per-Layer Dispatchers".**
+   Behind this boundary: a repository over Room and Retrofit names no dispatcher, and one over
+   SQLDelight's synchronous driver wraps each query in `withContext(io)` where it runs.
+3. **Never block to read.** `runBlocking` around a query on the main thread is the same freeze
    whichever engine is under it, and it is the fix people reach for when a port leaked a
    non-suspending signature.
-7. **One `Flow` per query, collected once per screen.** Two collectors on the same repository `Flow`
+4. **One `Flow` per query, collected once per screen.** Two collectors on the same repository `Flow`
    run the query twice unless something shares it; `stateIn` with an explicit `started` policy is
    `reactive-flow`'s subject, and the choice matters most exactly here, where the upstream is a
    database cursor that stays open.
-8. **On a JVM server the layer is the same and the dispatcher question differs** — a blocking JDBC
+5. **On a JVM server the layer is the same and the dispatcher question differs** — a blocking JDBC
    call under virtual threads is no longer the problem it was, and `persistence-jvm-orm` owns the
    transaction boundary that comes with it.
 

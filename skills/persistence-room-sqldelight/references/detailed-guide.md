@@ -20,6 +20,7 @@
 The domain side is the same in both halves and belongs to no engine: an `Order` with an `Instant`,
 an `OrderStatus` and a list of `OrderLine`, behind one port.
 
+<!-- compile: android -->
 ```kotlin
 // :domain — nothing below this block appears in it.
 interface OrderRepository {
@@ -33,6 +34,7 @@ Dependencies are version-catalog aliases, each artifact named where it is first 
 
 ## Room — Entity and DAO
 
+<!-- compile: android -->
 ```kotlin
 @Entity(
     tableName = "orders",
@@ -65,6 +67,7 @@ data class OrderLineEntity(
 
 The parent-and-children read is one declared shape, `@Transaction` because Room runs two statements:
 
+<!-- compile: android -->
 ```kotlin
 data class OrderWithLines(
     @Embedded val order: OrderEntity,
@@ -99,6 +102,7 @@ interface OrderDao {
 
 ## Room — Database and Wiring
 
+<!-- compile: android -->
 ```kotlin
 @Database(
     entities = [OrderEntity::class, OrderLineEntity::class],
@@ -155,34 +159,28 @@ internal fun OrderWithLines.toDomain() = Order(
 )
 ```
 
+<!-- compile: android -->
 ```kotlin
 internal class RoomOrderRepository(
     private val db: AppDatabase,
     private val dao: OrderDao,
-    private val io: CoroutineDispatcher,
 ) : OrderRepository {
 
     override fun observe(customer: CustomerId): Flow<List<Order>> =
-        dao.observeByCustomer(customer.value)
-            .map { rows -> rows.map(OrderWithLines::toDomain) }
-            .flowOn(io)
+        dao.observeByCustomer(customer.value).map { rows -> rows.map(OrderWithLines::toDomain) }
 
-    override suspend fun byId(id: OrderId): Order? = withContext(io) {
-        dao.byId(id.value)?.toDomain()
-    }
+    override suspend fun byId(id: OrderId): Order? = dao.byId(id.value)?.toDomain()
 
-    override suspend fun replace(order: Order) = withContext(io) {
-        db.withTransaction {
-            dao.upsertOrder(order.toEntity(syncState = "PENDING"))
-            dao.deleteLines(order.id.value)
-            dao.upsertLines(order.lines.map { it.toEntity(order.id) })
-        }
+    override suspend fun replace(order: Order) = db.withTransaction {
+        dao.upsertOrder(order.toEntity(syncState = "PENDING"))
+        dao.deleteLines(order.id.value)
+        dao.upsertLines(order.lines.map { it.toEntity(order.id) })
     }
 }
 ```
 
-- The DAO's `Flow` already emits on Room's query executor; `flowOn(io)` is there for the *mapping*,
-  which would otherwise occupy that executor while a list of rows is turned into domain objects.
+- No dispatcher: Room is on the "nothing to switch" row of
+  `concurrency-coroutines` → "Per-Layer Dispatchers".
 
 ## Room — Transactions
 

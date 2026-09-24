@@ -88,8 +88,8 @@ class SqlDelightOrderSource(
 Cancellation reaches the socket: the `viewModelScope` job dies in `onCleared()`, the `await` chain
 unwinds, Retrofit cancels the underlying `Call`. Every layer above `:data` is testable with a plain
 fake and no dispatcher. Where Room replaces SQLDelight the `withContext` disappears — a `suspend` DAO
-runs on Room's executor already — and returns only for what *surrounds* the call: a parse, a file
-write, ten thousand rows (`persistence-architecture`).
+runs on Room's executor already — and returns only for what *surrounds* the call and blocks, such as
+a file write.
 
 ## Cancellation — ensureActive in a Loop
 

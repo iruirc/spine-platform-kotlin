@@ -164,7 +164,7 @@ Place new code in the correct layer. If unsure, check CLAUDE-spine-toolkit.md or
 
 7. **Structured concurrency — no `GlobalScope`.** Every coroutine belongs to a defined scope. Use `coroutineScope { }` for parallel decomposition within suspend functions.
 
-8. **`suspend` for I/O, `withContext` at dispatcher boundaries.** Functions that perform I/O must be `suspend`. Use `withContext(Dispatchers.IO)` at the boundary between CPU-bound and I/O-bound work.
+8. **`suspend` for I/O.** Functions that perform I/O must be `suspend`; where a `withContext` goes, and where none does, is `concurrency-coroutines` → "Per-Layer Dispatchers".
 
 9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
 

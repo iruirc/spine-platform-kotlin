@@ -32,7 +32,7 @@ You always run phases 1-4 without asking for confirmation between them. You stop
 Read the files involved. Look for:
 - `!!`, `as` without `is`, platform types from Java interop used as non-null
 - `GlobalScope`, a `CoroutineScope` created without a `Job` to cancel, `launch` without a stored handle where the owner dies
-- `runBlocking` inside a coroutine or on the main thread, `Dispatchers.IO` for CPU work, `withContext` missing at an I/O boundary
+- `runBlocking` inside a coroutine or on the main thread, `Dispatchers.IO` for CPU work, a blocking call with no `withContext` around it
 - Shared mutable state across coroutines without `Mutex`/`AtomicReference`/confinement
 - Flow misuse: `collectAsState` without lifecycle (Android), `SharedFlow` with replay 0 consumed late, `stateIn` with `Eagerly` where `WhileSubscribed` was meant
 - Compose: side effects in composition, unstable parameters, `remember` keyed on nothing, `LaunchedEffect(Unit)` that should key on an id

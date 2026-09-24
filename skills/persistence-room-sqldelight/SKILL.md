@@ -8,9 +8,8 @@ description: "Use when choosing and implementing the local database in a Kotlin 
 Two ways to put SQLite behind a repository: Room, which generates SQL access from annotated Kotlin,
 and SQLDelight, which generates Kotlin from SQL you wrote. The decision, then the shape each one
 imposes on the layer — entities and DAOs against `.sq` files, `Flow` queries, transactions, and the
-in-memory database each is tested on. What sits above the database — the boundary, the
-source-of-truth policy, where `Dispatchers.IO` belongs — is `persistence-architecture`, and it does
-not change with the answer here.
+in-memory database each is tested on. What sits above the database — the boundary and the
+source-of-truth policy — is `persistence-architecture`, and it does not change with the answer here.
 
 > **Related skills:**
 > - `persistence-architecture` — the repository boundary this database hides behind, and the policy that decides what it holds

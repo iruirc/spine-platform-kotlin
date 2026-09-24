@@ -47,6 +47,7 @@ inline fun <T> Result<T>.mapFailure(transform: (Throwable) -> Throwable): Result
 travels in `kotlin.Result`, whose failure slot is a `Throwable` (`persistence-architecture`) — and
 sealed all the same, so the mapper's `when` stays exhaustive.
 
+<!-- compile: net -->
 ```kotlin
 // :data — com/acme/data/orders/DataError.kt
 internal sealed class DataError(message: String? = null, cause: Throwable? = null) :
@@ -69,6 +70,7 @@ The one function that speaks Retrofit's vocabulary; swapping the client changes 
 it (`net-http-clients`). Ktor throws `ClientRequestException` under `expectSuccess`, and Retrofit's
 `Response<T>` variant never throws at all — there `isSuccessful` is the branch.
 
+<!-- compile: net -->
 ```kotlin
 // :data — com/acme/data/orders/DataErrorMapping.kt
 internal fun Throwable.toDataError(): DataError = when (this) {
@@ -79,16 +81,18 @@ internal fun Throwable.toDataError(): DataError = when (this) {
     else -> DataError.Malformed(this)
 }
 
-internal class OrdersRemoteSource(private val api: OrdersApi, private val io: CoroutineDispatcher) {
-    suspend fun order(id: String): Result<OrderDto> = withContext(io) {
+internal class OrdersRemoteSource(private val api: OrdersApi) {
+    suspend fun order(id: String): Result<OrderDto> =
         catching { api.order(id) }.mapFailure(Throwable::toDataError)
-    }
 }
 ```
 
 `HttpException` is tested before `IOException` because a client can make one a subtype of the other
 and the first matching arm wins. `else` is `Malformed` rather than a fifth case: an exception this
 mapper does not recognise is a bug in the data layer, and is treated as one above.
+
+No `withContext` around the call: Retrofit is on the "nothing to switch" row of
+`concurrency-coroutines` → "Per-Layer Dispatchers".
 
 ## Client — DataError to Domain
 

@@ -434,12 +434,11 @@ class OrderRepositoryImpl internal constructor(
   it, because building it means naming `OrderApi` and `OrderDao`. The binding —
   `single<OrderRepository> { OrderRepositoryImpl(get(), get()) }` or its Hilt or Spring equivalent —
   is a factory function in `:data` or a module in `:app` (`di-koin`, `di-hilt`, `di-spring`).
-- **No dispatcher, on purpose.** Room's and Retrofit's `suspend` functions already move off the
-  caller's thread, so a `withContext(Dispatchers.IO)` wrapped around them buys a context switch and
-  nothing else.
+- **No dispatcher, on purpose:** Room and Retrofit are on the "nothing to switch" rows of
+  `concurrency-coroutines` → "Per-Layer Dispatchers".
 
-Where a source genuinely blocks — JDBC through Exposed or jOOQ, a file, a blocking vendor SDK — the
-dispatcher is named here, at the blocking call, and still nowhere above it:
+On a server the repository itself makes the blocking JDBC call, so the switch sits here, around that
+call and nothing else:
 
 ```kotlin
 // :data — com/acme/data/orders/JdbcOrderRepository.kt (server)
@@ -448,23 +447,21 @@ class JdbcOrderRepository(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : OrderRepository {
 
-    override suspend fun orders(customer: CustomerId): Result<List<Order>> = withContext(io) {
-        try {
-            Result.success(transaction(database) { OrderTable.selectFor(customer.value) })
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            Result.failure(e.toOrderError())
-        }
+    override suspend fun orders(customer: CustomerId): Result<List<Order>> = try {
+        val rows = withContext(io) { transaction(database) { OrderTable.selectFor(customer.value) } }
+        Result.success(rows)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Result.failure(e.toDataError().toOrderError())
     }
 
     // observeOrders, refresh, order, cancel elided — same shape.
 }
 ```
 
-Injecting the dispatcher rather than hard-coding `Dispatchers.IO` is what lets a test drive it from
-`runTest`'s scheduler; on a modern JVM, virtual threads change the answer to "which dispatcher"
-(`concurrency-coroutines`).
+Which dispatcher a JDBC pool gets, and what virtual threads change about it:
+`concurrency-coroutines` → "On the Server".
 
 ## Presentation — ViewModel
 

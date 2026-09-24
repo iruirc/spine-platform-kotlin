@@ -128,15 +128,11 @@ Replace Java-style patterns with Kotlin equivalents:
 
 ### 3.2 Dispatcher Discipline
 
-- `Dispatchers.IO` — for blocking I/O (DB, file, network).
-- `Dispatchers.Default` — for CPU-intensive work.
-- `Dispatchers.Main` — only if there's a UI (Android).
-- **Don't hardcode dispatchers** in business logic. Inject them or use `withContext` at the boundary.
+- Which dispatcher each layer runs on, where `withContext` goes, and what `Dispatchers.Main` is off Android: `concurrency-coroutines` → "Per-Layer Dispatchers". A `withContext` that table does not place is moved to the blocking call it guards, or deleted.
 
 ### 3.3 Suspend vs Blocking
 
 - If a function does I/O, make it `suspend`.
-- Don't mix `suspend` functions with blocking calls without `withContext(Dispatchers.IO)`.
 - Prefer `suspend` over callbacks/futures for async operations.
 
 ### 3.4 Flow

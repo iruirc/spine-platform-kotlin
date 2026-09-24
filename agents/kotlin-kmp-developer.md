@@ -80,7 +80,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 7. **Structured concurrency — no `GlobalScope`.** Every coroutine belongs to a defined scope. Use `coroutineScope { }` for parallel decomposition within suspend functions.
 
-8. **`suspend` for I/O, `withContext` at dispatcher boundaries.** Functions that perform I/O must be `suspend`. Switch dispatchers at the boundary between CPU-bound and I/O-bound work — in shared code against the injected `CoroutineDispatcher` (rule 13); `Dispatchers.IO` exists only on JVM and Android targets and does not resolve from `commonMain`.
+8. **`suspend` for I/O.** Functions that perform I/O must be `suspend`; where a `withContext` goes, and where none does, is `concurrency-coroutines` → "Per-Layer Dispatchers". In shared code the dispatcher is the injected `CoroutineDispatcher` (rule 13).
 
 9. **Constructor injection only — no field injection, no `lateinit var` for dependencies.** All dependencies are declared as `val` parameters in the primary constructor. The DI framework provides them.
 
