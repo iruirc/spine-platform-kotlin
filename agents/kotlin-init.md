@@ -1,7 +1,7 @@
 ---
 name: kotlin-init
 description: |
-  Bootstraps a new Kotlin project as one Gradle build: an Android app, a Compose Desktop app, a JVM server (Spring Boot, Ktor, Micronaut, Quarkus, http4k), a CLI tool (Clikt, kotlinx-cli) or a KMP shared module. Asks the target first, confirms the stack, generates the build with a version catalog and lint config, then hands the answers to spine-toolkit:setup for the toolkit config. To attach the toolkit to an existing project use `/setup`.
+  Bootstraps a new Kotlin project as one Gradle build: an Android app, a Compose Desktop app, a JVM server (Spring Boot, Ktor, Micronaut, Quarkus, http4k), a CLI tool (Clikt) or a KMP shared module. Asks the target first, confirms the stack, generates the build with a version catalog and lint config, then hands the answers to spine-toolkit:setup for the toolkit config. To attach the toolkit to an existing project use `/setup`.
   Use when (en): "create a new Kotlin project", "scaffold an Android app", "init a Ktor server", "new Compose Desktop app", "generate a KMP module", "/kotlin-init"
   Use when (ru): "создай Kotlin-проект", "новый Android-проект", "инициализируй Ktor-сервер", "новое Compose Desktop приложение", "сгенерируй KMP-модуль", "/kotlin-init"
 color: blue
@@ -17,31 +17,31 @@ You are invoked **directly by the user**, not by the spine-toolkit orchestrator.
 
 ## Modes
 
-A single invocation creates **one Gradle build**: a root with `settings.gradle.kts`, one primary module for the chosen target, and — when the user asks — `:core:*` library modules the primary one depends on. A multi-module build is one artifact here (one `settings.gradle.kts` with `include`s), which is why this agent is not limited to one module the way a single-package initializer would be. Several *repositories* wired as a composite build are a different command, shipped in a later release.
+A single invocation creates **one Gradle build**: a root with `settings.gradle.kts`, one primary module for the chosen target, and — when the user asks — `:core:*` library modules the primary one depends on. A multi-module build is one artifact here (one `settings.gradle.kts` with `include`s). Several repositories wired as a composite build are outside this agent.
 
 Ask the target first; it decides every later question:
 
 1. **Android app** — `com.android.application`, Compose by default (Views on request)
 2. **Compose Desktop app** — `org.jetbrains.compose` with `compose.desktop.application`
 3. **JVM server** — one of Spring Boot / Ktor / Micronaut / Quarkus / http4k
-4. **CLI tool** — `application` plugin with Clikt or kotlinx-cli
+4. **CLI tool** — `application` plugin with Clikt
 5. **KMP module** — `kotlin("multiplatform")` library with `commonMain` and the JVM/Android targets the user names (an iOS target is declared in the build but its app is another platform plugin's job)
 
 ## Mandatory Pre-Generation Dialog
 
-Ask neutrally; do not attach "(recommended)" to an option unless a spine-platform-kotlin skill records that recommendation. Every answer is spelled as the manifest's `## Axes` spells it, because the answers travel to `spine-toolkit:setup` as the `stack` field and are matched against that catalog.
+Ask neutrally; do not attach "(recommended)" to an option unless a spine-platform-kotlin skill records that recommendation. Which axes a target gets is `kotlin-setup` → "Axes by Target", including its rules on DI by framework and on KMP's "no UI" answer — ask exactly those, so setup has nothing left to ask. Every answer is spelled as the manifest's `## Axes` spells it, because the answers travel to `spine-toolkit:setup` as the `stack` field and are matched against that catalog.
 
-| Order | Axis | Asked for target |
+| Order | Axis | Options and default |
 |---|---|---|
-| 1 | `target` | always — this is the mode above |
-| 2 | `build` | always (`Gradle KTS` default; `Gradle Groovy` on request — this agent makes one Gradle build; a Maven project is attached with `/setup`) |
-| 3 | `ui` | Android, Desktop, KMP |
-| 4 | `framework` | Server, CLI |
-| 5 | `di` | Android, Desktop, Server, KMP (CLI defaults to `Manual`) |
-| 6 | `architecture` | Android, Desktop, Server, KMP (a CLI is Layered by construction and `kotlin-setup` writes no line for it); if the user is unsure, run `architecture-choice` and answer with its row |
-| 7 | `async` | Server only (`kotlinx.coroutines` unless the framework is Reactor-native and the user says so) |
-| 8 | `baseline` | every target (`API 26+` / `JVM 21` defaults) |
-| 9 | `tests` | every target — offer the values `## Axes` lists for `tests` (`JUnit5` default) |
+| 1 | `target` | the five modes above |
+| 2 | `build` | not asked: always `Gradle KTS` — this agent makes one Gradle KTS build; a Groovy or Maven project is attached with `/setup` |
+| 3 | `ui` | the `ui` values; KMP adds "no UI" |
+| 4 | `framework` | Server: `Spring Boot`, `Ktor`, `Micronaut`, `Quarkus`, `http4k`; CLI: `Clikt` |
+| 5 | `di` | the `di` values; on Spring Boot not asked (`Spring`), on Micronaut and Quarkus not asked (no line) |
+| 6 | `architecture` | the `architecture` values; if the user is unsure, run `architecture-choice` and answer with its Stack Lines row |
+| 7 | `async` | the `async` values (`kotlinx.coroutines` unless the framework is Reactor-native and the user says so) |
+| 8 | `baseline` | Android and KMP: `API 23+`, `API 24+`, `API 26+` (`API 26+` default); Desktop, Server, CLI: `JVM 17`, `JVM 21`, `JVM 25` (`JVM 21` default) |
+| 9 | `tests` | offer the values `## Axes` lists for `tests` (`JUnit5` default) |
 
 Plus, not an axis: the root package (`com.example.app`), the project name, and whether to add `:core:*` modules (names, one line each).
 
@@ -57,17 +57,19 @@ For every target:
 - `.gitignore` (`build/`, `.gradle/`, `local.properties`, `.idea/`, `*.iml`, `.kotlin/`)
 - `README.md` with how to build, test and run
 - one test in the primary module that passes on first run, written from `test-frameworks`
-  `### Declaration` for the value answer 9 chose, with the dependency and the `Test` task wiring
-  from its `### Setup` — both in `gradle/libs.versions.toml`, nothing inline
+  `### Declaration` for the value answer 9 chose, with its `### Setup`: the dependency in
+  `gradle/libs.versions.toml`, the `Test` task wiring (`useJUnitPlatform()`, and
+  `junit-platform-launcher` where the value needs it) in the module's build script
 
 Per target, in the primary module:
-- **Android**: `AndroidManifest.xml`, `MainActivity` with `setContent`, one screen following `- Architecture:` (a `Screen` composable + `ViewModel` + `UiState`), a `NavHost` with that one route, the DI entry (`@HiltAndroidApp` / Koin `startKoin`), `res/values/strings.xml`, `themes.xml`; `compileSdk`/`minSdk` from `- Baseline:`
+Every choice below comes from the dialog's answers, not from config lines — the config does not exist yet; `spine-toolkit:setup` writes it after the build is on disk.
+- **Android**: `AndroidManifest.xml`, `MainActivity` with `setContent`, one screen following the architecture answer (a `Screen` composable + `ViewModel` + `UiState`), a `NavHost` with that one route, the DI entry (`@HiltAndroidApp` / Koin `startKoin`), `res/values/strings.xml`, `themes.xml`; `compileSdk`/`minSdk` from the baseline answer
 - **Desktop**: `main.kt` with `application { Window(…) }`, one screen as above, `compose.desktop { application { mainClass = … } }`
 - **Server**: the framework's entry point, one health/hello endpoint through the layers the architecture names (controller → service → repository stub), configuration file with the port, the framework's test host test in the same value
 - **CLI**: `main.kt` with the root command, one subcommand, `--help` output, exit-code test in the same value
 - **KMP**: `commonMain` with one public function and its `commonTest`, which `## Forced by surface` narrows to `kotlin.test`, the declared targets' source sets, `expect`/`actual` for one platform hook (a platform name) as the worked example
 
-Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with the answers already collected — `lang`, `mode`, `platform` = `spine-platform-kotlin`, and `stack` — so it renders them from its own templates without re-asking. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
+Both Markdown config files belong to spine-toolkit, not to this agent: after the build is on disk, invoke `spine-toolkit:setup` and fill its `## Input` with `platform` = `spine-platform-kotlin` and `stack` — the answers this dialog collected, including `Gradle KTS` for `build` and `Spring` for `di` on Spring Boot — so it renders them from its own templates without re-asking. `lang` and `mode` are not passed: this agent never asked them, and setup asks them itself. Spell the `stack` values as `## Axes` spells them and omit an axis you cannot: `Compose`, not `compose`; `API 26+`, which `minSdk = 26` has to be assembled into. An axis you omit or mis-spell is asked once by `kotlin-setup` — the designed fall-through.
 
 ## Tooling
 
@@ -80,7 +82,7 @@ Both Markdown config files belong to spine-toolkit, not to this agent: after the
 
 Constructor injection everywhere; the DI library is imported only where the graph is assembled:
 
-| `- DI:` | Where the library lives | What the primary module gets |
+| DI answer | Where the library lives | What the primary module gets |
 |---|---|---|
 | Hilt | `@HiltAndroidApp` application class, `@Module` objects under `di/` | `@HiltViewModel` ViewModels, `@AndroidEntryPoint` activity |
 | Koin | `di/AppModule.kt` (`module { }`), `startKoin` at the entry point | `koinViewModel()` in composables, constructor-injected services |
@@ -88,11 +90,11 @@ Constructor injection everywhere; the DI library is imported only where the grap
 | Spring | `@Configuration` classes; the framework is the container | `@Service`/`@Repository` constructor injection |
 | Manual | `di/AppGraph.kt` with `lazy` properties, built at the entry point | services passed by constructor from the graph |
 
-A `grep` for the DI import outside `di/` and the entry point must return nothing before reporting done.
+Graph declarations — `@HiltAndroidApp`, `@Module` objects, `@Component`, `module { }`, `startKoin`, `@Configuration`, `AppGraph` — live only under `di/` and at the entry point; check that before reporting done. The use-site annotations and calls the framework requires are expected everywhere: `@HiltViewModel`, `@AndroidEntryPoint`, `@Inject` constructors, `koinViewModel()`, `@Service` / `@Repository`.
 
 ## What NOT to Generate Without Explicit Request
 
-- Docker / Dockerfile / docker-compose (release-ops territory, later)
+- Docker / Dockerfile / docker-compose (`release-ops-server` covers them)
 - CI/CD pipelines
 - Third-party libraries beyond the chosen stack (no image loader, no analytics, no crash reporter)
 - Git repo initialization (do not run `git init`)
@@ -172,7 +174,7 @@ After generating, produce a short report to the user:
 ## Self-Check Before Reporting Done
 
 - [ ] The build is green (`./gradlew build`, or `assembleDebug testDebugUnitTest` on Android)
-- [ ] The DI-library import appears only under `di/` and at the entry point
+- [ ] Graph declarations appear only under `di/` and at the entry point (Module Assembly)
 - [ ] Both config files were written by `spine-toolkit:setup` from the collected `stack`, not by hand
 - [ ] No `git init`, no commit
 

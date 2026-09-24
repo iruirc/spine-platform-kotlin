@@ -109,3 +109,46 @@ axes() {
   grep -qF 'An existing `- DI:` line with a different value is replaced only after the user confirms' "$CHOICE" \
     || { echo "DI is overwritten silently"; return 1; }
 }
+
+@test "kotlin-init asks the axes kotlin-setup's table names, and no other" {
+  grep -qF '`kotlin-setup` → "Axes by Target"' "$INIT" || { echo "init does not take its axes from setup"; return 1; }
+  init="$(table_rows '| Order | Axis | Options and default |' "$INIT" | cell 2 | ticks | sort -u)"
+  setup="$( { echo target; table_rows '| `target` | Asked (if still unresolved) |' "$SETUP" | cell 2 | ticks | tr ',' '\n'; } \
+    | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep . | sort -u)"
+  [ "$(grep -c . <<<"$setup")" -ge 9 ] || { echo "setup names $(grep -c . <<<"$setup") axes; the scan went vacuous"; return 1; }
+  [ "$init" = "$setup" ] || { printf 'init:\n%s\nsetup:\n%s\n' "$init" "$setup"; return 1; }
+}
+
+@test "kotlin-init offers no value kept only for detection" {
+  grep -qF '| Order | Axis | Options and default |' "$INIT" || { echo "the scan did not reach the dialog"; return 1; }
+  for gone in 'Gradle Groovy' 'kotlinx-cli' 'API 21+'; do
+    ! grep -qF -- "$gone" "$INIT" || { echo "init still offers $gone"; return 1; }
+    ! grep -qF -- "$gone" "$CMD" || { echo "the command still names $gone"; return 1; }
+  done
+}
+
+@test "kotlin-init generates from the dialog and hands setup only what it asked" {
+  for gone in '`- Architecture:`' '`- Baseline:`' '| `- DI:` |' '`lang`, `mode`'; do
+    ! grep -qF -- "$gone" "$INIT" || { echo "still there: $gone"; return 1; }
+  done
+  grep -qF '`lang` and `mode` are not passed' "$INIT" || { echo "the handoff does not say what it leaves out"; return 1; }
+  grep -qF 'from the dialog'"'"'s answers, not from config lines' "$INIT" || { echo "no rule on where generation reads"; return 1; }
+}
+
+@test "kotlin-init names no later release" {
+  n=0
+  for f in "$INIT" "$CMD"; do
+    [ -s "$f" ] || { echo "missing $f"; return 1; }
+    n=$((n + 1))
+    ! grep -qiE 'later release|territory, later|single-package initializer' "$f" || { echo "$f: $(grep -iE 'later release|territory, later|single-package initializer' "$f")"; return 1; }
+  done
+  [ "$n" -eq 2 ]
+}
+
+@test "kotlin-init's DI check allows the use-site annotations the framework requires" {
+  grep -qF 'Graph declarations' "$INIT" || { echo "the check still bans every DI import"; return 1; }
+  for a in '@HiltViewModel' '@AndroidEntryPoint' '`@Inject` constructors' '`koinViewModel()`'; do
+    grep -qF -- "$a" "$INIT" || { echo "the check does not name $a"; return 1; }
+  done
+  ! grep -qF 'A `grep` for the DI import outside `di/`' "$INIT" || { echo "the old check is still there"; return 1; }
+}
