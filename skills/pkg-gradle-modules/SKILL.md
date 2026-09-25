@@ -294,8 +294,6 @@ includeBuild("../shared-lib") {
    artifact, or the version everyone else resolves is never exercised.
 4. **The cost is one Gradle build per included build**, each with its own configuration phase. Two is
    comfortable; a composite of six is slower than publishing.
-5. **The wiring is scriptable**, and a later command automates it for a new workspace — this section
-   is the shape it produces, so a hand-written one matches.
 
 ## Common Mistakes
 

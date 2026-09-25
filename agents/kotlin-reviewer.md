@@ -37,7 +37,6 @@ If you were given a task folder, your task prompt names the ranges to review, on
 - **A first pass** — the ranges cover the whole task.
 - **A re-review** — the prompt names your previous `Review.md`. Read it first, review only the ranges, and verify each prior Critical/Major finding — Resolved / Still open / Regressed. Do not re-read unchanged files from scratch.
 - **No range holds a commit** — nothing changed in code; don't invent a diff. Re-state the previous verdict's open items instead of re-scanning the tree.
-- **A task prompt with no ranges** (a core older than 2.12.0) — the whole diff of the task's branch.
 
 Outside a task folder — an ad hoc PR/diff/files review on request — scope is whatever was asked: recent changes in the session, a named diff, or specific files, read thoroughly before commenting.
 
