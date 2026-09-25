@@ -22,6 +22,7 @@
 
 ## Shared Type
 
+<!-- compile: jvm -->
 ```kotlin
 data class Order(val id: String, val total: Long)
 ```
@@ -218,6 +219,7 @@ parent.
 One scope, created in the composition root, injected like anything else. On desktop and the server
 this is the whole answer for background work.
 
+<!-- compile: jvm -->
 ```kotlin
 // composition root (di-composition-root)
 val appScope = CoroutineScope(
@@ -240,16 +242,18 @@ class OutboxUploader(private val scope: CoroutineScope, private val api: OrderAp
 
 `SupervisorJob` is what makes the scope survive its first failure: on a plain `Job` one uncaught
 throw cancels the scope, and every later `launch` returns a job that never runs — a bug that presents
-as "uploads stopped working after some earlier error". The handler sits in the scope's context, the
-only place it takes effect. Most callers enqueue and are done; the returned `Job` is there for the
-rarer one that wants to stop what it started, without holding the scope. Shut the scope down with
-`appScope.cancel()` (`release-ops-server`).
+as "uploads stopped working after some earlier error". The handler sits in the scope's context, where
+it covers every `launch` on the scope; on a nested `launch` or an `async` it would be ignored. Most
+callers enqueue and are done; the returned `Job` is there for the rarer one that wants to stop what it
+started, without holding the scope. Shut the scope down with `appScope.cancel()`
+(`release-ops-server`).
 
 ## Android — WorkManager CoroutineWorker
 
 An app scope dies with the process, and Android kills backgrounded processes without asking. Work
 that must survive that is `WorkManager`'s.
 
+<!-- compile: android -->
 ```kotlin
 class SyncWorker(
     context: Context,
@@ -263,14 +267,19 @@ class SyncWorker(
     } catch (e: CancellationException) {
         throw e                                  // the framework stopped us; not a failure
     } catch (e: IOException) {
+        currentCoroutineContext().ensureActive()  // a client that swallowed our cancel is not a retry
         if (runAttemptCount < 3) Result.retry() else Result.failure()
     }
 }
 ```
 
-`doWork()` is `suspend` and runs on `Dispatchers.Default` unless the worker overrides
-`coroutineContext`; the framework cancels it when its constraints stop holding, which is why the
-`CancellationException` branch rethrows instead of returning `Result.failure()`. Injecting `sync`
+`doWork()` is `suspend` and runs on `Dispatchers.Default` unless the WorkManager `Configuration`
+sets a `workerCoroutineContext`; overriding the worker's `coroutineContext` is deprecated, and a
+worker that needs another dispatcher calls `withContext` inside `doWork()`. The framework cancels
+the work when its constraints stop holding, which is why the `CancellationException` branch rethrows
+instead of returning `Result.failure()`, and why the `IOException` arm checks first
+(`error-architecture` → "The runCatching Rule"). It calls `currentCoroutineContext()`: inside a
+`CoroutineWorker`, a bare `coroutineContext` is that deprecated property. Injecting `sync`
 needs a `WorkerFactory` binding (`di-hilt` covers `@HiltWorker`, `di-koin` the equivalent). The
 request built around it carries the constraints and the backoff — `NetworkType.CONNECTED`,
 `BackoffPolicy.EXPONENTIAL` — and goes in through `enqueueUniqueWork(name, KEEP, request)`, so a
@@ -319,22 +328,32 @@ with; the moment two atomics must agree, they are one state object behind a `Mut
 
 `Dispatchers.IO` is elastic, up to 64 threads or the processor count, whichever is larger. A
 connection pool of 10 is not, so dozens of coroutines calling JDBC means dozens of threads blocked
-inside `DataSource.getConnection()`, invisible to every pool metric.
+inside `DataSource.getConnection()`. The pool reports them — `hikaricp.connections.pending` climbs —
+but each one holds an `IO` thread the rest of the process was counting on.
 
+<!-- compile: jvm -->
 ```kotlin
 // one dispatcher per bounded resource, sized to it
 private val jdbc = Dispatchers.IO.limitedParallelism(10)   // == HikariCP maximumPoolSize
 
 class JdbcOrderRepository(private val ds: DataSource) : OrderRepository {
     override suspend fun byId(id: String): Order? = withContext(jdbc) {
-        ds.connection.use { c -> c.prepareStatement(SQL).use { /* … */ } }
+        ds.connection.use { c ->
+            c.prepareStatement("SELECT id, total FROM orders WHERE id = ?").use { st ->
+                st.setString(1, id)
+                st.executeQuery().use { rs ->
+                    if (rs.next()) Order(rs.getString(1), rs.getLong(2)) else null
+                }
+            }
+        }
     }
 }
 ```
 
 `limitedParallelism(n)` is a **view** of `Dispatchers.IO`, not a new pool: it borrows the same threads
 and caps how many this call site may hold at once. Create it once — a fresh view per call defeats the
-point. Under Exposed this is `newSuspendedTransaction(Dispatchers.IO) { }` (`persistence-jvm-orm`).
+point. Under Exposed this is `withContext(jdbc) { suspendTransaction { } }`: `suspendTransaction`
+takes no dispatcher of its own.
 
 ## Server — Ktor Handlers
 
@@ -358,9 +377,12 @@ routing {
 returns `null` for a missing row, so the handler cannot tell a slow database from an order that was
 never there. When the block can itself return `null`, take `withTimeout` and catch.
 
-The call's job is cancelled when the client disconnects, so the handler and everything it awaits stop
-— provided nothing swallowed the `CancellationException`. A `StatusPages` handler mapping every
-`Throwable` to a 500 is exactly that swallow; exclude cancellation explicitly.
+A client that disconnects cancels nothing by default: the handler runs to the end and finds out
+when its response write fails. `install(HttpRequestLifecycle) { cancelCallOnClose = true }` changes
+that on the Netty and CIO engines — not on Jetty or Tomcat — by cancelling the call's job, so the
+handler and everything it awaits stop at their next suspension point, provided nothing swallowed the
+`CancellationException`. A `StatusPages` handler mapping every `Throwable` to a 500 is exactly that
+swallow; exclude cancellation explicitly.
 
 ## Server — Spring WebFlux and Reactor Interop
 
@@ -398,6 +420,7 @@ Spring MVC also accepts `suspend` handler methods, through the same `kotlinx-cor
 bridge and only when it is on the classpath: the handler is adapted and the request handled
 asynchronously. It is not WebFlux — everything below the controller still blocks a thread.
 
+<!-- compile: jvm -->
 ```kotlin
 // spring.threads.virtual.enabled=true makes the servlet container's threads virtual;
 // this is the explicit dispatcher, for when the property is not enough
@@ -410,7 +433,7 @@ What Loom changes and what it does not:
   thread limit stops being the constraint and `limitedParallelism` is no longer needed *for thread
   economy*.
 - **Does not change:** anything with a real ceiling — a ten-connection pool is still ten
-  connections, and unbounded callers only move the wait somewhere with no metric on it.
+  connections, and unbounded callers only move the wait into the pool's own queue.
 - **Watch out:** before JDK 24 a virtual thread blocking inside `synchronized` pins its carrier,
   which is exactly where older JDBC drivers block. `ReentrantLock` does not pin.
 
@@ -460,13 +483,15 @@ parameter, so replacing `Main` is the only way in; the test above is JUnit5 and 
 Every *other* dispatcher is a constructor parameter, and what goes in must be
 `StandardTestDispatcher(testScheduler)` from `runTest`'s own scheduler (the `dispatcher` of the `Main`
 replacement is the same one). A dispatcher on any other scheduler is one `advanceUntilIdle()` never
-reaches: the test hangs, times out, or passes because the assertion ran before the work did.
+reaches: work sent there from `viewModelScope` never runs, so the assertion reads the state from
+before it, and from the test body `runTest` fails with "Detected use of different schedulers".
 
 ## Testing — backgroundScope for Endless Collectors
 
-`runTest` waits for the children of its own scope, so a collector that never completes hangs the
-test forever.
+`runTest` waits for the children of its own scope, so a collector that never completes in the test
+body fails it at `runTest`'s timeout — one minute by default — with `UncompletedCoroutinesError`.
 
+<!-- compile: jvm-test -->
 ```kotlin
 @Test fun stream_orderInserted_emitsNewList() = runTest {
     val seen = mutableListOf<List<Order>>()

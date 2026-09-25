@@ -57,9 +57,11 @@ Not for which scope collects, what cancels it, or which dispatcher a layer runs 
    Its own run of the upstream → a cold `Flow`.
 5. **"Every collector sees every emission" assumes the default `onBufferOverflow = SUSPEND`.** A
    `MutableSharedFlow(replay = 0)` has no buffer at all: `emit` suspends until every current
-   collector has taken the value, and `tryEmit` returns `false` rather than buffer it. That is why
-   `extraBufferCapacity = 1` appears wherever a non-suspending caller uses `tryEmit`, and why
-   `onBufferOverflow = DROP_OLDEST` is the opt-out for a producer allowed to outrun a slow collector.
+   collector has taken the value, and `tryEmit` returns `false` rather than buffer it. With no
+   collector at all, both drop the value at once and `tryEmit` returns `true` — success is not
+   delivery. That is why `extraBufferCapacity = 1` appears wherever a non-suspending caller uses
+   `tryEmit`, and why `onBufferOverflow = DROP_OLDEST` is the opt-out for a producer allowed to
+   outrun a slow collector.
 6. **The mutable one never leaves the class.** `private val _state = MutableStateFlow(...)` plus
    `val state = _state.asStateFlow()`; the same for `asSharedFlow()`. An exposed `MutableStateFlow`
    is a public setter with extra steps.
@@ -216,8 +218,9 @@ events actually wants.
 4. **A chain that ended in `distinctUntilChanged()` loses that call, not the behaviour** — provided
    the state is a `data class` with a real `equals`. A state holding a lambda or an array de-duplicates
    nothing, which is the same trap `arch-mvi` names for reducers.
-5. **`StateFlow.value` is readable from any thread**, where `LiveData.getValue()` was main-thread
-   only. Convenient in tests, and no longer a reason to keep a mirror field.
+5. **`StateFlow.value` reads the last write, from any thread.** `LiveData.getValue()` could be called
+   off the main thread too, but a `postValue` lands only when the main thread runs it, so a read in
+   between sees the older value. Convenient in tests, and no longer a reason to keep a mirror field.
 
 ## Reactor Interop
 

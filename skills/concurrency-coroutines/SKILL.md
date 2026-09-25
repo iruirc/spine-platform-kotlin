@@ -81,7 +81,7 @@ belongs to whatever owns the lifetime, and cancellation is never caught — only
 | Composable | the composition's context — `LaunchedEffect`, `rememberCoroutineScope()` | Compose (`compose-state`) |
 | ViewModel | `Dispatchers.Main.immediate`, which is what `viewModelScope` is built from | the framework; the ViewModel adds nothing |
 | Use case | the caller's context; it names no dispatcher at all | `arch-clean` |
-| Repository | the caller's context; it composes sources and maps, it does not switch | `persistence-architecture` |
+| Repository | the caller's context; it composes sources and maps, it does not switch — unless it is itself the blocking source, over JDBC or a file API, and then `withContext` wraps that call where it makes it | `persistence-architecture` |
 | Data source, network | nothing to switch — Retrofit and the Ktor client suspend without holding a thread | `net-http-clients` |
 | Data source, Room | nothing to switch — a `suspend` DAO call and a `Flow` DAO query run on Room's executor | `persistence-room-sqldelight` |
 | Data source, SQLDelight on a synchronous driver, files, a blocking SDK | `withContext(Dispatchers.IO)` around the blocking call; a SQLDelight `Flow` takes it as `mapToList(io)` | **this is the one place the switch belongs** |
@@ -130,7 +130,7 @@ this stop".
 | `lifecycleScope` + `repeatOnLifecycle(STARTED)` | the Android host, restarted per visibility | collecting a flow into a View or Fragment | `STOPPED`, then relaunched |
 | `rememberCoroutineScope()` | the composition | work started from a callback — a click, a swipe | leaving the composition |
 | application scope, held in the graph | the process | uploads, sync, the shared token refresh | shutdown, or nothing |
-| request scope (Ktor `call`, WebFlux request) | one request | everything a handler does | client disconnect, timeout |
+| request scope (Ktor `call`, WebFlux request) | one request | everything a handler does | the response completing; a client disconnect on WebFlux, and on Ktor only under `HttpRequestLifecycle` |
 | `GlobalScope` | the process, with no owner | **nothing** | never |
 
 1. **Pick the narrowest scope that outlives the result.** If the result is only ever rendered into a
@@ -141,15 +141,20 @@ this stop".
    dependency (`di-composition-root`).
 3. **An application scope is `SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler`.**
    `SupervisorJob` so one failed child does not cancel its siblings; the handler so an uncaught
-   throw is logged rather than silently swallowed by a scope nobody awaits.
-4. **A `CoroutineExceptionHandler` only works on a root scope.** Installed on a child `launch`, or
-   on an `async`, it is ignored — the exception goes to the parent. Put it in the scope's context,
-   once.
+   throw is logged where you choose rather than handed to the thread's uncaught-exception handler,
+   which on Android kills the process.
+4. **A `CoroutineExceptionHandler` only works on a coroutine launched directly on a scope.** In the
+   scope's context it covers every such `launch`; `scope.launch(handler)` covers that one. On a
+   `launch` nested in another coroutine it is ignored — the exception goes to the parent — and on an
+   `async` it is ignored too, because the exception waits for `await()`. Put it in the scope's
+   context, once.
 5. **Flow collection is scope-bound like anything else.** Collect in `repeatOnLifecycle(STARTED)`
    on Views, or with `collectAsStateWithLifecycle()` in Compose, so a backgrounded screen stops the
    upstream (`arch-mvvm`). What the upstream does meanwhile is a `stateIn` policy (`reactive-flow`).
-6. **`launch` versus `async`.** `launch` reports failure to its parent immediately; `async` produces
-   a value and holds its exception until `await()`, so one nobody awaits is a lost exception.
+6. **`launch` versus `async`.** Both fail their parent the moment they throw, so under
+   `coroutineScope` an `async` nobody awaits still cancels its siblings and the block; `async` also
+   keeps the exception for `await()`. Only under `supervisorScope` or a `SupervisorJob`, where the
+   parent ignores a child's failure, is an `async` nobody awaits a lost exception.
 
 ## Cancellation
 
@@ -273,8 +278,10 @@ needs a **wider owner**.
 
 1. **On Android, "must survive the process" means `WorkManager`.** An app-scoped `CoroutineScope`
    dies with the process, and the system kills backgrounded processes without asking.
-   `CoroutineWorker.doWork()` is `suspend`, runs on `Dispatchers.Default` unless `coroutineContext`
-   is overridden, and returns `Result.retry()` for the framework to reschedule.
+   `CoroutineWorker.doWork()` is `suspend`, runs on `Dispatchers.Default` unless the WorkManager
+   `Configuration` sets a `workerCoroutineContext`, and returns `Result.retry()` for the framework to
+   reschedule. Overriding the worker's `coroutineContext` is deprecated; `withContext` inside
+   `doWork()` replaces it.
 2. **On desktop and the server, the app-scoped service is the answer** — one
    `CoroutineScope(SupervisorJob() + Dispatchers.Default + handler)` created in the composition root
    and cancelled on shutdown (`di-composition-root`).
@@ -289,7 +296,8 @@ needs a **wider owner**.
 ## On the Server
 
 1. **A handler is `suspend` and runs on the framework's dispatcher.** Ktor routes are `suspend` on
-   the engine's dispatcher and carry the call's `Job`, so a disconnect cancels the handler. Spring
+   the engine's dispatcher and run in the call's coroutine, which rule 7 says when a disconnect
+   cancels. Spring
    WebFlux supports `suspend` controller methods and `Flow<T>` return types when
    `kotlinx-coroutines-reactor` is on the classpath — the flow is adapted to a reactive stream and
    streamed to the client.
@@ -299,7 +307,8 @@ needs a **wider owner**.
    stack below it is still blocking.
 3. **Blocking JDBC gets a bounded dispatcher.** `Dispatchers.IO.limitedParallelism(n)` with `n`
    matched to the connection pool: more coroutines than connections only queues them somewhere less
-   observable. Under Exposed, `newSuspendedTransaction(Dispatchers.IO)` (`persistence-jvm-orm`).
+   observable. Under Exposed, `withContext(jdbc) { suspendTransaction { } }` — `suspendTransaction`
+   takes no dispatcher.
 4. **Virtual threads change the cost, not the model.** With `spring.threads.virtual.enabled=true`,
    or a dispatcher built from `Executors.newVirtualThreadPerTaskExecutor().asCoroutineDispatcher()`,
    a blocking call parks a virtual thread instead of a platform one, so `Dispatchers.IO`'s thread
@@ -314,15 +323,19 @@ needs a **wider owner**.
 6. **`runBlocking` belongs in `main()`, in tests, and in a blocking callback you do not control** —
    an OkHttp `Interceptor` or `Authenticator` (`net-http-clients`). On a request thread it hands
    back the thread pooling the framework just gave you.
-7. **Cancellation on the server means a disconnect.** Ktor cancels the call's `Job` when the client
-   goes away — true only if nothing in the chain swallowed the `CancellationException`.
+7. **A disconnect cancels a Ktor handler only when asked to.** With
+   `install(HttpRequestLifecycle) { cancelCallOnClose = true }`, on the Netty and CIO engines, the
+   call's coroutine is cancelled when the client goes away — and stops only if nothing in the chain
+   swallowed the `CancellationException`. Without it, or on Jetty and Tomcat, the handler runs to the
+   end and learns of the disconnect when its response write fails.
 
 ## Testing
 
 1. **`runTest { }` is the entry point, and it runs on virtual time.** `delay(10.minutes)` completes
    instantly; a test that actually takes ten minutes is one that escaped the test scheduler.
 2. **Every dispatcher under test comes from the same `testScheduler`.** A dispatcher built on any
-   other scheduler is one `advanceUntilIdle()` never reaches, and the test hangs or flakes.
+   other scheduler is one `advanceUntilIdle()` never reaches: work sent there from `viewModelScope`
+   never runs, and from the test body `runTest` fails with "Detected use of different schedulers".
 3. **`StandardTestDispatcher` queues; `UnconfinedTestDispatcher` runs eagerly.** Default to the
    first: ordering is explicit, and `advanceUntilIdle()` / `runCurrent()` say when work may proceed.
    A ViewModel's test never takes the second to pass:
@@ -331,7 +344,8 @@ needs a **wider owner**.
    it through its own hook:
    `test-frameworks` → "Main Dispatcher in Tests"
 5. **A collector that never ends goes on `backgroundScope`.** `runTest` waits for its own children,
-   so `launch { flow.collect { } }` in the test body hangs forever.
+   so `launch { flow.collect { } }` in the test body fails the test at `runTest`'s timeout, one
+   minute by default, with `UncompletedCoroutinesError`.
 6. **Test cancellation explicitly.** Cancel the `Job`, then assert the effect — request aborted,
    cleanup ran, no state written. That bug is invisible in a test that runs to completion. Flow
    assertions themselves are Turbine's job, and `reactive-flow` owns that setup.
@@ -348,9 +362,10 @@ needs a **wider owner**.
    application-scoped `CoroutineScope` from the graph does the same job and can be stopped.
 4. **`value = value.copy(...)` on a `StateFlow` from two coroutines.** A read-modify-write that
    silently drops one update. `update { }` is the atomic form and is the same length.
-5. **A `CoroutineExceptionHandler` on a child coroutine.** Installed on a `launch` inside a scope, or
-   on any `async`, it does nothing — the exception propagates to the parent. It only takes effect in
-   a root scope's context.
+5. **A `CoroutineExceptionHandler` on a nested coroutine or an `async`.** On a `launch` inside
+   another coroutine it does nothing — the exception propagates to the parent; on an `async` it does
+   nothing either — the exception waits in the `Deferred`. It takes effect in a scope's context, or
+   on a `launch` started directly on the scope.
 6. **A shared scope built on a plain `Job`.** The first uncaught failure cancels the scope, and every
    later `launch` on it returns an already-cancelled `Job`. Shared scopes are `SupervisorJob`.
 7. **A CPU loop with no `ensureActive()`.** Cancellation is cooperative: a loop that never suspends
@@ -368,9 +383,10 @@ needs a **wider owner**.
 12. **Collecting a flow in `lifecycleScope.launch` without `repeatOnLifecycle`.** The collection
     survives backgrounding and holds the upstream — a cursor, a socket — open behind it
     (`arch-mvvm`).
-13. **A test dispatcher built on its own scheduler.** `StandardTestDispatcher()` passed in while
-    `runTest` drives a different one: `advanceUntilIdle()` never reaches it, and the test hangs,
-    times out, or passes for the wrong reason.
+13. **A test dispatcher built on its own scheduler.** `StandardTestDispatcher()` created with no
+    `Main` replacement installed gets a scheduler of its own: `advanceUntilIdle()` never reaches it,
+    so the work never runs and the assertion reads the state from before it — failing, or passing
+    for the wrong reason.
 
 ## Quick Reference
 
