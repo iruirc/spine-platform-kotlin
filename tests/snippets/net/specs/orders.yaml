@@ -50,7 +50,7 @@ components:
       required: [id, total, currency]
       properties:
         id: { type: string }
-        total: { type: string }
+        total: { type: integer, format: int64 }
         currency: { type: string }
     OrderDraft:
       type: object
