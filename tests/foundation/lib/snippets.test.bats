@@ -134,3 +134,13 @@ fake_jdk() {
   n="$(ls "$ROOT"/skills/*/SKILL.md "$ROOT"/skills/*/references/detailed-guide.md | wc -l | tr -d ' ')"
   grep -qE "^scanned $n files, " <<<"$output" || { echo "want $n files scanned: $output"; return 1; }
 }
+
+@test "the scan finds no fewer marked blocks than the floor" {
+  # Raise the floor when blocks are marked; lower it only with the reason in the commit.
+  floor=189
+  run "$SNIP" --emit-only "$OUT"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+  b="$(sed -nE 's/^scanned [0-9]+ files, [0-9]+ units, ([0-9]+) blocks, .*/\1/p' <<<"$output")"
+  [ -n "$b" ] || { echo "no summary line: $output"; return 1; }
+  [ "$b" -ge "$floor" ] || { echo "$b marked blocks, floor $floor: a marker was dropped or the scan stopped seeing it"; return 1; }
+}
