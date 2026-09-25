@@ -194,7 +194,7 @@ internal class OfflineFirstOrderRepository(
 
 | Need | Take |
 |---|---|
-| a relational database in `commonMain` | SQLDelight, or Room 2.7+ where its target list is enough (`persistence-room-sqldelight`) |
+| a relational database in `commonMain` | SQLDelight or Room — which one, on which targets, is `persistence-room-sqldelight` → "Decision" |
 | key-value settings | `com.russhwolf:multiplatform-settings`, over `NSUserDefaults`, `SharedPreferences`/DataStore and the JVM `Preferences` API per target |
 | files, streams, paths | Okio — `okio.FileSystem`, `okio.Path` — the mature option, with `kotlinx-io` as the newer Kotlin-native alternative |
 

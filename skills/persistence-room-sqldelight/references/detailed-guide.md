@@ -125,25 +125,29 @@ plugins {
 room { schemaDirectory("$projectDir/schemas") }
 
 dependencies {
-    implementation(libs.androidx.room.runtime)  // androidx.room:room-runtime
-    implementation(libs.androidx.room.ktx)      // androidx.room:room-ktx
+    implementation(libs.androidx.room.runtime)  // androidx.room:room-runtime, withTransaction included
     ksp(libs.androidx.room.compiler)            // androidx.room:room-compiler
 }
 ```
 
+<!-- compile: android -->
 ```kotlin
 // Composition root, one instance per process — a Hilt module here, a Koin `single` elsewhere.
-@Provides
-@Singleton
-fun database(@ApplicationContext context: Context): AppDatabase =
-    Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
-        .addMigrations(MIGRATION_1_2)
-        .build()
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+    @Provides
+    @Singleton
+    fun database(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
+            .addMigrations(MIGRATION_1_2)
+            .build()
+}
 ```
 
 - `exportSchema = true` plus `schemaDirectory` is what writes `schemas/<db>/1.json`. Commit it: an
   auto-migration is computed from the difference between two of those files.
-- No `fallbackToDestructiveMigration()` in this builder: it belongs to a debug variant or nowhere.
+- No `fallbackToDestructiveMigration(…)` in this builder: it belongs to a debug variant or nowhere.
 
 ## Room — Repository and Flow Queries
 
@@ -198,7 +202,7 @@ interface OrderDao {
 ```
 
 ```kotlin
-// Across DAOs, or with logic between the writes: withTransaction, from room-ktx.
+// Across DAOs, or with logic between the writes: withTransaction, from room-runtime.
 suspend fun drainOutbox(db: AppDatabase, api: OrdersApi) {
     for (entity in db.orderDao().bySyncState("PENDING")) {
         api.place(entity.toDto())                     // outside the transaction, on purpose
@@ -259,7 +263,8 @@ class OrderDaoTest {
 
 ```sql
 import com.example.orders.OrderStatus;
-import kotlinx.datetime.Instant;
+import kotlin.Int;
+import kotlin.time.Instant;
 
 CREATE TABLE orderRecord (
   id            TEXT    NOT NULL PRIMARY KEY,
@@ -305,12 +310,14 @@ INSERT INTO orderLineRecord VALUES ?;
 - Each label generates one function on `OrderQueries`, typed against the schema: `selectByCustomer`
   returns `Query<OrderRecord>`, `insertLine` takes a whole `OrderLineRecord` because its `VALUES ?`
   binds the row, and a `SELECT` of two columns would generate a data class for exactly those two.
-- `AS Instant` and `AS OrderStatus` declare a column's Kotlin type; SQLDelight then wants a
-  `ColumnAdapter` for each, supplied where the database is constructed — the one place a timestamp
-  or an enum is parsed.
+- `AS Instant`, `AS OrderStatus` and `AS Int` declare a column's Kotlin type; SQLDelight then wants
+  a `ColumnAdapter` for each, supplied where the database is constructed — the one place a timestamp
+  or an enum is parsed. `Int` is imported like any other type: without `import kotlin.Int;` the
+  generated code fails with "Unresolved reference 'Int'".
 - `ON CONFLICT … DO UPDATE` is the upsert; `INSERT OR REPLACE` would delete first and take the
   cascading lines with it — Room's `OnConflictStrategy.REPLACE` trap in SQL. The cascade itself needs
-  `PRAGMA foreign_keys = ON`, which SQLite leaves off by default and each driver below turns on.
+  `PRAGMA foreign_keys = ON`, which SQLite leaves off by default and no driver turns on for you:
+  each `actual` below does it.
 
 ## SQLDelight — Gradle and Drivers
 
@@ -331,6 +338,7 @@ kotlin.sourceSets {
     commonMain.dependencies {
         implementation(libs.sqldelight.runtime)      // app.cash.sqldelight:runtime
         implementation(libs.sqldelight.coroutines)   // app.cash.sqldelight:coroutines-extensions
+        implementation(libs.sqldelight.primitive.adapters) // app.cash.sqldelight:primitive-adapters
     }
     androidMain.dependencies { implementation(libs.sqldelight.android) }  // :android-driver
     iosMain.dependencies { implementation(libs.sqldelight.native) }       // :native-driver
@@ -338,16 +346,22 @@ kotlin.sourceSets {
 }
 ```
 
-The database is `commonMain`, only the driver per target; the two declared adapters are supplied once:
+The database is `commonMain`, only the driver per target; the declared adapters are supplied once:
 
 ```kotlin
 // commonMain
 expect class DriverFactory { fun create(): SqlDriver }
 
+val instantAdapter = object : ColumnAdapter<Instant, Long> {
+    override fun decode(databaseValue: Long) = Instant.fromEpochMilliseconds(databaseValue)
+    override fun encode(value: Instant) = value.toEpochMilliseconds()
+}
+
+// Named arguments: the generated adapter parameters are sorted by name, not in .sq order.
 fun appDatabase(factory: DriverFactory) = AppDatabase(
     driver = factory.create(),
-    // Long <-> Instant and TEXT <-> enum, written once
     orderRecordAdapter = OrderRecord.Adapter(instantAdapter, EnumColumnAdapter()),
+    orderLineRecordAdapter = OrderLineRecord.Adapter(IntColumnAdapter),
 )
 ```
 
@@ -365,13 +379,17 @@ actual class DriverFactory(private val context: Context) {
 
 // iosMain
 actual class DriverFactory {
-    actual fun create(): SqlDriver = NativeSqliteDriver(AppDatabase.Schema, "app.db")
+    actual fun create(): SqlDriver = NativeSqliteDriver(
+        schema = AppDatabase.Schema, name = "app.db",
+        onConfiguration = { it.copy(extendedConfig = DatabaseConfiguration.Extended(foreignKeyConstraints = true)) },
+    )
 }
 
 // jvmMain
 actual class DriverFactory(private val path: String) {
-    actual fun create(): SqlDriver =
-        JdbcSqliteDriver("jdbc:sqlite:$path", Properties(), AppDatabase.Schema)
+    actual fun create(): SqlDriver = JdbcSqliteDriver(
+        "jdbc:sqlite:$path", Properties().apply { put("foreign_keys", "true") }, AppDatabase.Schema,
+    )
 }
 ```
 
@@ -382,7 +400,7 @@ actual class DriverFactory(private val path: String) {
   30 ships 3.28, comfortably past upsert's 3.24, but a lower `minSdk` reaches devices whose SQLite
   is older, and those need a bundled SQLite distribution or an insert-then-update fallback.
 - A web target takes `WebWorkerDriver` from `app.cash.sqldelight:web-worker-driver`, pointed at a
-  worker script; it is the row Room has no answer for.
+  worker script; on Room it is Room 3's row of the Decision table in `SKILL.md`.
 
 ## SQLDelight — Repository and Flow Queries
 
@@ -449,16 +467,20 @@ class OrderQueriesTest {
     @BeforeTest fun setUp() {
         driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         AppDatabase.Schema.create(driver)
-        db = AppDatabase(driver, OrderRecord.Adapter(instantAdapter, EnumColumnAdapter()))
+        db = AppDatabase(
+            driver = driver,
+            orderRecordAdapter = OrderRecord.Adapter(instantAdapter, EnumColumnAdapter()),
+            orderLineRecordAdapter = OrderLineRecord.Adapter(IntColumnAdapter),
+        )
     }
 
     @AfterTest fun tearDown() = driver.close()
 
     @Test fun selectByCustomer_matchingOrderInserted_reEmits() = runTest {
-        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dispatcher = StandardTestDispatcher(testScheduler)
         db.orderQueries.selectByCustomer("c-1").asFlow().mapToList(dispatcher).test {
             assertEquals(0, awaitItem().size)
-            db.orderQueries.upsertOrder("o-1", "c-1", placedAt, OrderStatus.PLACED, "SYNCED")
+            db.orderQueries.upsertOrder("o-1", "c-1", Instant.fromEpochMilliseconds(0), OrderStatus.PLACED, "SYNCED")
             assertEquals(1, awaitItem().size)
             cancelAndIgnoreRemainingEvents()
         }
@@ -502,8 +524,8 @@ fun appDatabase(): AppDatabase =
 
 - The build applies the `androidx.room` plugin once and `ksp(libs.androidx.room.compiler)` per
   target; `androidx.sqlite:sqlite-bundled` is the driver everywhere except Android.
-- The target list is Android, iOS, JVM and native. There is no web target: a browser build is
-  SQLDelight's `WebWorkerDriver` or nothing.
+- Room 2.x's target list is Android, iOS, JVM and native. A browser build is SQLDelight's
+  `WebWorkerDriver`, or Room 3 (the Decision table in `SKILL.md`).
 - Exported schemas and `Migration` objects work as on Android, and `androidx.room:room-testing` is
   published for the KMP targets from 2.7, so `MigrationTestHelper` is reachable from a
   multiplatform test — it takes the schema directory, the file name and a driver. Verify that

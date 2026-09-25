@@ -7,3 +7,5 @@ data class Order(val id: OrderId, val customer: CustomerId, val status: OrderSta
 internal fun OrderWithLines.toDomain(): Order = TODO()
 internal fun Order.toEntity(syncState: String): OrderEntity = TODO()
 internal fun OrderLine.toEntity(orderId: OrderId): OrderLineEntity = TODO()
+
+val MIGRATION_1_2: androidx.room.migration.Migration = TODO()
