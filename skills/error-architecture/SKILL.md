@@ -233,7 +233,7 @@ sealed interface UiMessage {
    escapes by force-quitting.
 5. **`UiMessage` keeps `Context` and `R` out of the ViewModel** — the state stays comparable in a
    unit test with no device. `arch-mvvm` shows the closed per-message form of the same slot, one
-   identity per message; the `Literal` case below is the one addition, for the string only the
+   identity per message; the `Literal` case above is the one addition, for the string only the
    server can produce.
 6. **Where the error sits in the state — a `sealed interface` member or a nullable field beside the
    content — is `arch-mvvm`'s table**, and it is the same decision as "does content survive the

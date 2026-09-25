@@ -222,7 +222,7 @@ More than one root is normal. The unit is the **process entry**, never the featu
 | Entry | Its root |
 |---|---|
 | The app process | the `Application` / `main()` above |
-| An instrumentation test process | `HiltTestApplication` behind a custom runner, or a test `initKoin` loading fake modules (`di-hilt`) |
+| An instrumentation test process | `HiltTestApplication` behind a custom runner (`di-hilt` → "Testing"), or a test `initKoin` loading fake modules (`di-koin` → "Testing") |
 | A component in its own `android:process` — a worker, a widget provider, a `ContentProvider` | the `Application` is created again there, so the root runs again; a `WorkManager` worker plugs into it with `@HiltWorker` rather than building a second graph |
 | A Spring `@SpringBootTest` or a slice test | its own `ApplicationContext`, built from a subset of the `@Configuration` classes |
 
