@@ -219,8 +219,8 @@ tasks_for() {
   case "$1" in
     android)      echo ":android:compileDebugKotlin" ;;
     android-test) echo ":android:compileDebugUnitTestKotlin" ;;
-    kmp)          echo ":kmp:compileKotlinJvm :kmp:compileAndroidMain" ;;
-    kmp-test)     echo ":kmp:compileTestKotlinJvm" ;;
+    kmp)          echo ":kmp:compileKotlinJvm :kmp:compileAndroidMain :kmp:compileCommonMainKotlinMetadata :kmp:compileKotlinJs" ;;
+    kmp-test)     echo ":kmp:compileTestKotlinJvm :kmp:compileTestKotlinJs" ;;
     *-test)       echo ":${1%-test}:compileTestKotlin" ;;
     *)            echo ":$1:compileKotlin" ;;
   esac

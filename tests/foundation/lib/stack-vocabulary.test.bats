@@ -126,7 +126,7 @@ axes() {
 
 @test "kotlin-init offers no value kept only for detection" {
   grep -qF '| Order | Axis | Options and default |' "$INIT" || { echo "the scan did not reach the dialog"; return 1; }
-  for gone in 'Gradle Groovy' 'kotlinx-cli' 'API 21+'; do
+  for gone in 'Gradle Groovy' 'kotlinx-cli' 'API 21+' 'API 23+'; do
     ! grep -qF -- "$gone" "$INIT" || { echo "init still offers $gone"; return 1; }
     ! grep -qF -- "$gone" "$CMD" || { echo "the command still names $gone"; return 1; }
   done

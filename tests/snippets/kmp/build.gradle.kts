@@ -8,6 +8,7 @@ plugins {
 
 kotlin {
     jvm()
+    js { nodejs() }
     android {
         namespace = "snippets.kmp"
         compileSdk = 37

@@ -41,3 +41,22 @@ setup() {
   run "$SNIP" "$r"
   [ "$status" -eq 1 ] || { echo "the removed stub still resolved from the last build: $output"; return 1; }
 }
+
+@test "a Hilt application compiles in the android module" {
+  r="$BATS_TEST_TMPDIR/root"
+  mkdir -p "$r/skills/app"
+  printf '%s\n' '# App' '' '<!-- compile: android -->' '```kotlin' 'import android.app.Application' \
+    'import dagger.hilt.android.HiltAndroidApp' '' '@HiltAndroidApp' 'class DemoApp : Application()' '```' > "$r/skills/app/SKILL.md"
+  run "$SNIP" "$r"
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "a JDK call in a kmp block fails where commonMain is compiled" {
+  r="$BATS_TEST_TMPDIR/root"
+  mkdir -p "$r/skills/shared"
+  printf '%s\n' '# Shared' '' '<!-- compile: kmp -->' '```kotlin' 'fun readConfig(path: String): String = java.io.File(path).readText()' '```' \
+    > "$r/skills/shared/SKILL.md"
+  run "$SNIP" "$r"
+  [ "$status" -eq 1 ] || { echo "status $status: $output"; return 1; }
+  grep -qF "skills/shared/SKILL.md:5: Unresolved reference 'java'" <<<"$output" || { echo "$output"; return 1; }
+}

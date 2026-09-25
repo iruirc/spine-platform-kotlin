@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -9,7 +9,7 @@ plugins {
 android {
     namespace = "snippets.android"
     compileSdk = 37
-    defaultConfig { minSdk = 23 }
+    defaultConfig { minSdk = 24 }
 }
 
 // scripts/compile-snippets.sh passes the emitted units; without them the module is empty.
