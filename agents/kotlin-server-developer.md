@@ -68,7 +68,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 - `@Repository` for persistence — Spring Data interfaces or custom implementations.
 - `@ConfigurationProperties` for typed configuration — bind YAML/properties to Kotlin data classes.
 - **Constructor injection via `val` in the primary constructor** — never use `@Autowired` on fields.
-- `@Transactional` for database operations that require atomicity — place on service methods, not on repositories or controllers.
+- `@Transactional` for database operations that require atomicity, placed where the `- Architecture:` skill opens the transaction: `arch-layered` → "Transaction Boundary", `arch-hexagonal` → "Where Things Live", `arch-clean` → "On the Server".
 - Use `@Valid` and Bean Validation annotations for request validation at the controller layer.
 - Profile-specific configuration via `application-{profile}.yml` for environment differences.
 
@@ -93,10 +93,10 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 ### Quarkus
 
-- `@Path` resources (RESTEasy Reactive) — thin, delegate to services.
+- `@Path` resources on Quarkus REST (`quarkus-rest`) — thin, delegate to services.
 - `@ApplicationScoped` for stateless services; constructor injection.
 - `@ConfigMapping` for typed configuration; `application.properties` with profiles (`%dev.`, `%prod.`).
-- Panache repositories or plain JPA behind an interface; `@Transactional` on services.
+- Panache repositories or plain JPA behind an interface; `@Transactional` placed as on Spring Boot.
 - Kotlin coroutines via `quarkus-kotlin`: `suspend` resource methods are supported — prefer them over `Uni`.
 
 ### http4k
@@ -111,7 +111,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 ### Command Structure
 
 - **clikt**: Subclass `CliktCommand` for each command. Use `subcommands()` to build command hierarchies. Keep the tree shallow (max 2 levels deep).
-- **kotlinx-cli**: Define `ArgParser` with subcommands. Register arguments and options declaratively.
+- **kotlinx-cli**: Define `ArgParser` with subcommands. Register arguments and options declaratively. The library is obsolete (last release 0.3.6): follow it where a project has it, never start one on it.
 
 ### Arguments and Options
 
@@ -130,8 +130,8 @@ This step is not optional and not satisfied by "I followed the project style" in
 ### Exit Codes
 
 - `0` — success.
-- `1` — general error (invalid input, operation failed).
-- `2` — usage error (wrong arguments, missing required options).
+- A usage error (wrong arguments, a missing required option) exits `1` on Clikt, the default `UsageError.statusCode`, and `127` on kotlinx-cli, whose `ArgParser` prints the message and the usage to stdout and exits. Changing the code of Clikt's built-in usage errors needs Clikt's `parse()` and your own `exitProcess`.
+- A failure the command reports: `throw ProgramResult(code)`, or a `CliktError` (`1` by default). The command maps each service failure to its code, as `error-architecture` → "Layer-by-Layer Mapping" puts it.
 - Use consistent exit codes across all commands in the application.
 
 ### Configuration

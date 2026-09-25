@@ -41,18 +41,17 @@ TESTERS="kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-test
   [ -z "$bad" ] || { echo "tester(s) that lost a side of the split:$bad"; return 1; }
 }
 
-@test "the Spring row names the annotation Spring Boot 3.4 left in place" {
+@test "the Spring row names @MockitoBean and leaves the Boot 3 annotations to di-spring" {
   f="$AGENTS/kotlin-server-tester.md"
   spring="$(awk '$0=="### Spring Boot"{f=1;next} f&&/^#{2,3} /{exit} f' "$f")"
   [ -n "$spring" ] || { echo "no ### Spring Boot section"; return 1; }
   grep -qF '@MockitoBean' <<<"$spring" || { echo "the Spring row does not name @MockitoBean"; return 1; }
-  # @MockBean may still be named here, and should be: it is what the reader remembers.
-  # What it may not be is prescribed, so every line carrying it has to say it is gone.
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    grep -qF 'deprecated' <<<"$line" \
-      || { echo "the Spring row still prescribes @MockBean:$line"; return 1; }
-  done < <(grep -F '@MockBean' <<<"$spring" || true)
+  # Boot 4 removed @MockBean; what replaced it is di-spring's to say, so the row names it nowhere.
+  if grep -qF '@MockBean' <<<"$spring"; then
+    echo "the Spring row names @MockBean:"; grep -F '@MockBean' <<<"$spring"; return 1
+  fi
+  grep -qF '`di-spring` → "Testing"' <<<"$spring" \
+    || { echo "the Spring row does not link di-spring → Testing"; return 1; }
   # Micronaut's @MockBean is a different annotation of a different framework: it is
   # correct, and a blanket rename across the file is what this half catches.
   micronaut="$(awk '$0=="### Micronaut / Quarkus / http4k"{f=1;next} f&&/^#{2,3} /{exit} f' "$f")"

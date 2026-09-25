@@ -98,7 +98,7 @@ The sections below are written in JUnit5. What boots the framework changes with 
 | Environment | JUnit5 | JUnit4 | Kotest |
 |---|---|---|---|
 | Spring context (`@SpringBootTest` and the slices) | nothing to add — the annotations bring `SpringExtension` | `@RunWith(SpringRunner::class)` on the class | `override val extensions = listOf(SpringExtension)` in the spec, beside `@SpringBootTest` |
-| Testcontainers | `@Testcontainers` on the class, `@Container` on the field | `@get:ClassRule` / `@get:Rule` on the container | start it in `beforeSpec` and stop it in `afterSpec`, or install `ContainerExtension` from `kotest-extensions-testcontainers` |
+| Testcontainers | `@Testcontainers` on the class, `@Container` on the field | `start()` in a companion `@BeforeClass` `@JvmStatic` function, `stop()` in `@AfterClass` — a Testcontainers 2 container is not a `TestRule` | `install(TestContainerSpecExtension(container))` from `io.kotest:kotest-extensions-testcontainers`, or start it in `beforeSpec` and stop it in `afterSpec` |
 | Ktor `testApplication { }` | the block suspends: `@Test fun … = testApplication { }` | same | the spec body already suspends: `test("…") { testApplication { … } }` |
 
 `@MicronautTest` and `@QuarkusTest` are JUnit 5 extensions. Micronaut ships a Kotest module
@@ -113,7 +113,8 @@ deviation is named in `## Notes`.
 - `@DataJpaTest` for repository-only tests — loads JPA components only, on the database
   `persistence-jvm-orm` → "Testing" names.
 - `MockMvc` / `WebTestClient` for HTTP endpoint testing — send requests and assert responses.
-- `@MockkBean` (SpringMockK) or `@MockitoBean` for replacing a bean in the Spring context with a double; `@MockBean` is deprecated from Spring Boot 3.4.
+- `@MockkBean` (SpringMockK) or `@MockitoBean` for replacing a bean in the Spring context with a double.
+- Which module each slice ships in, and what replaced Spring Boot 3's mock-bean annotations: `di-spring` → "Testing".
 
 ```kotlin
 @WebMvcTest(UserController::class)
@@ -170,48 +171,14 @@ fun getUser_existingId_returnsUser() = testApplication {
 
 ### Testcontainers
 
-For database integration tests — spin up a real database in a container:
-
-```kotlin
-@Testcontainers
-@SpringBootTest
-class UserRepositoryIntegrationTest {
-
-    companion object {
-        @Container
-        val postgres = PostgreSQLContainer("postgres:15")
-            .withDatabaseName("testdb")
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun properties(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url", postgres::getJdbcUrl)
-            registry.add("spring.datasource.username", postgres::getUsername)
-            registry.add("spring.datasource.password", postgres::getPassword)
-        }
-    }
-
-    @Autowired
-    private lateinit var repository: UserRepository
-
-    @Test
-    fun save_validUser_persistsAndReturns() {
-        // Arrange
-        val user = UserEntity(name = "Alice", email = "alice@example.com")
-
-        // Act
-        val saved = repository.save(user)
-
-        // Assert
-        assertNotNull(saved.id)
-        assertEquals("Alice", saved.name)
-    }
-}
-```
+A repository test, and the one full-stack test per feature, run against the database the service
+deploys on, in a container. The container class, how it reaches the context and why it starts once
+per suite are `persistence-jvm-orm` → "Testing"; a migration test on top of it is
+`persistence-migrations` → "Testing".
 
 ### Micronaut / Quarkus / http4k
 
-- **Micronaut**: `@MicronautTest` boots the context; `@Client` for HTTP; `@MockBean` to replace a bean; `@Property` overrides.
+- **Micronaut**: `@MicronautTest` boots the context; `@Client` for HTTP; Micronaut's own `@MockBean` (`io.micronaut.test.annotation`) to replace a bean; `@Property` overrides.
 - **Quarkus**: `@QuarkusTest` + RestAssured (``given().`when`().get("/users/1").then().statusCode(200)`` — `when` is a Kotlin keyword, so it is backticked; or the Kotlin extensions `Given { } When { } Then { }`); `@InjectMock` for a bean; `@TestProfile` for configuration.
 - **http4k**: a handler is a function — call it with a `Request` and assert on the `Response`; no server boot needed. `http4k-testing-approval` for golden responses.
 
@@ -221,15 +188,15 @@ class UserRepositoryIntegrationTest {
 |---|---|---|
 | Unit: service with MockK repositories | nothing | business rules |
 | Web: `@WebMvcTest` / `testApplication` with fakes | web layer only | request mapping, validation, status codes, error bodies |
-| Repository: `@DataJpaTest` with `@AutoConfigureTestDatabase(replace = NONE)` (without it the slice swaps the container for H2) / Exposed against Testcontainers | database | queries, constraints, migrations |
+| Repository: `@DataJpaTest` / Exposed against Testcontainers, wired as `persistence-jvm-orm` → "Testing" shows | database | queries, constraints, migrations |
 | Full: `@SpringBootTest` / whole Ktor app + Testcontainers | everything | one happy path per feature, not per case |
 
 A test at a higher slice than its assertion needs is a slow test that hides which layer broke.
 
 ## CLI Tests
 
-- Run the command in-process: Clikt `command.test("args")` from `com.github.ajalt.clikt.testing` returns `stdout`, `stderr` and `statusCode` in one result — never `parse()` directly, which throws `CliktError` instead of exiting; kotlinx-cli `parser.parse(args)` for valid input.
-- Assert three things: exit code (`0` / `1` / `2`), stdout content, stderr content — separately.
+- Run the command in-process: Clikt `command.test("args")` from `com.github.ajalt.clikt.testing` returns `stdout`, `stderr` and `statusCode` in one result, and captures what goes through the command's terminal (`echo`, Clikt's own error and usage output), never `println` — never `parse()` directly, which throws `CliktError` instead of exiting; kotlinx-cli `parser.parse(args)` for valid input only, since its parse error exits the JVM — a kotlinx-cli usage error is asserted by running the installed distribution as a subprocess.
+- Assert three things: the exit code the command maps that outcome to, stdout content, stderr content — separately.
 - Configuration precedence (flags > env > file > defaults) is one parameterized test, not four.
 - A command that touches the file system runs in `@TempDir`.
 

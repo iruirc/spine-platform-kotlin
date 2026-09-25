@@ -47,7 +47,7 @@ Incremental scope trades completeness for cost — it won't catch a regression f
 
 Before finding issues:
 - What is this code supposed to do?
-- Which layer does it belong to (UI, ViewModel, Service, Repository, Domain — or controller, service, repository, domain on a server)?
+- Which layer does it belong to (UI, ViewModel, Service, Repository, Domain — or, on a server or CLI, the layer or ring the `- Architecture:` skill places it in)?
 - What framework conventions apply (Compose, Views, Spring Boot, Ktor, coroutines, RxJava)?
 - What patterns does the project already use?
 
@@ -138,7 +138,7 @@ neighbouring skills, a finding here may block.
 
 ### Spring Boot
 
-- `@Transactional` on service methods, not on controllers or repositories.
+- `@Transactional` where the `- Architecture:` skill opens the transaction: `arch-layered` → "Transaction Boundary", `arch-hexagonal` → "Where Things Live", `arch-clean` → "On the Server".
 - `@ConfigurationProperties` instead of scattered `@Value` annotations.
 - Constructor injection via `val` in primary constructor, not `@Autowired` on fields.
 - Proper use of `@Valid` for request validation at controller boundary.
@@ -226,7 +226,7 @@ Consult these skills when reviewing code against architectural / framework expec
 - `net-openapi` — PR red flags: generated types crossing the adapter into the domain or the UI; generated sources committed instead of produced by the build; an unknown or undocumented response branch collapsed into a crash; the spec edited to match the client rather than the server
 - `persistence-architecture` — PR red flags: a storage-engine type (Room entity, Exposed row, JPA entity) crossing the Repository boundary; a database call on the main thread or inside a composable; a token or PII in `SharedPreferences`/`DataStore` with no encryption; two sources of truth for one screen and no stated cache policy
 - `persistence-room-sqldelight` — PR red flags: `allowMainThreadQueries()`; a one-shot query polled in a loop where a `Flow` query belongs; a schema change with no exported schema or `.sq`/`.sqm` counterpart; a query assembled by string concatenation instead of a bound parameter
-- `persistence-jvm-orm` — PR red flags: a JPA entity declared as a `data class` (equals/hashCode over a mutable id); the transaction boundary in the repository instead of the service; a lazy association read outside the transaction; a per-row query inside a loop where a join or batch fetch belongs
+- `persistence-jvm-orm` — PR red flags: a JPA entity declared as a `data class` (equals/hashCode over a mutable id); a transaction opened where the `- Architecture:` skill does not open it; a lazy association read outside the transaction; a per-row query inside a loop where a join or batch fetch belongs
 - `persistence-migrations` — PR red flags: an already-shipped migration edited in place; a column dropped in the same release that stopped writing it (no expand/contract); a new migration with no fixture test running the old schema forward; destructive fallback presented as a recovery path
 - `di-composition-root` — what belongs in the composition root and what does not: the graph assembled once, scopes handed out by lifecycle, no bootstrap work hidden in a constructor
 - `di-hilt` — PR red flags: `@Inject lateinit var` field injection where constructor injection is available; a `SingletonComponent` binding holding an Activity- or Context-derived object; `@HiltViewModel` paired with a hand-written `ViewModelProvider.Factory`; a screen-scoped dependency installed in the singleton component

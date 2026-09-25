@@ -164,7 +164,7 @@ Record per attempt into `Validation.md`. Hypothesize a cause when obvious (timin
 
 For **classification of observed failures only** — never to propose fixes.
 
-- `arch-layered` / `arch-hexagonal` — when the failure is a layer violation surfacing at runtime: a transaction opened outside the service, an adapter concern reaching the core.
+- `arch-layered` / `arch-hexagonal` — when the failure is a layer violation surfacing at runtime: a transaction opened where the `- Architecture:` skill does not open it, an adapter concern reaching the core.
 - `net-architecture` — when the symptom is a timeout or a retry storm against an outbound dependency.
 - `net-openapi` — when the response served and the spec disagree.
 - `persistence-jvm-orm` — an N+1 in the SQL log, or lazy loading outside a transaction.

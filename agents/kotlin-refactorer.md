@@ -436,7 +436,7 @@ Consult these when the refactoring touches the concern they own — the skill bo
 - `di-spring` — rebinding under Spring: constructor injection, `@Configuration`, proxying constraints on the moved bean
 - `net-architecture` — the ApiClient boundary to pull transport types back behind once they have leaked upward
 - `persistence-architecture` — the Repository boundary to pull storage-engine types back behind
-- `persistence-jvm-orm` — moving the transaction boundary onto the service and untangling entity from domain model
+- `persistence-jvm-orm` — moving the transaction boundary to where the `- Architecture:` skill opens it (`arch-layered` → "Transaction Boundary", `arch-hexagonal` → "Where Things Live", `arch-clean` → "On the Server"), and untangling entity from domain model
 - `concurrency-coroutines` — replacing callbacks, removing `GlobalScope`, hoisting screen-bound work to the scope that owns it
 - `reactive-flow` — RxJava and LiveData to Flow, and the `stateIn`/`shareIn` policy a migrated stream needs
 - `error-architecture` — splitting a god `AppError` into per-layer hierarchies with explicit mapping between them
