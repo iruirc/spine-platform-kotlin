@@ -70,14 +70,21 @@ both.
 6. **The data-safety form is part of the release, not of the paperwork afterwards.** A new SDK that
    collects an identifier changes the declaration, and a declaration that disagrees with the binary
    is a takedown risk, not a review delay.
+7. **Play's target API floor rises every year, and an upload below it is refused.** From 31 August
+   2026 a new app or an update must target API 36 (Android 16); an extension to 1 November 2026 can
+   be requested in Play Console. An existing app left on API 34 or lower is offered only to devices
+   whose Android version is no newer than its target. Raising `targetSdk` opts into the new
+   release's behaviour changes, so it is feature work with its own estimate, not a one-line bump on
+   submission day.
 
 ## Platform fragmentation
 
 **`Platform fragmentation` — the platform's answer to core's key, for Android: +20%–30%.** Apply it
 when the feature depends on OEM behaviour, background limits, or a permission whose UX changed
-across API levels. The project's `- Baseline:` line sets the span — `API 21+` covers far more of the
-fragmented matrix than `API 26+` — and the affected baseline is the feature's own: the work items
-that touch the fragmented surface, not the whole estimate.
+across API levels. The project's `- Baseline:` line sets the span — `API 24+` covers more of the
+fragmented matrix than `API 26+`, where background execution limits begin — and the affected
+baseline is the feature's own: the work items that touch the fragmented surface, not the whole
+estimate.
 
 | Fragmented | What varies | Cost |
 |---|---|---|
@@ -173,7 +180,12 @@ density and language on Play's side.
 5. **Assemble the release build on every push.** R8, resource shrinking and the signing config only
    run in that configuration, so a lane that never builds it discovers what was stripped on release
    day.
-6. **Play App Signing means two keys**, and only the upload one is in CI
+6. **Native libraries must support 16 KB pages.** Play requires every app targeting API 35+ to run on
+   64-bit devices with 16 KB memory pages; from 1 February 2027 an update that does not cannot be
+   released. Code built with NDK r28+ and packaged by AGP 8.5.1+ is aligned already; the usual
+   offender is a prebuilt `.so` inside a third-party SDK, fixed by updating the SDK.
+   `zipalign -c -P 16 -v 4 app.apk` or APK Analyzer's *Alignment* column checks the output.
+7. **Play App Signing means two keys**, and only the upload one is in CI
    (`release-ops` → "Secrets in CI"). The App Link fingerprint must match the *signing* key Play uses, not the
    upload key — the source of the `assetlinks.json` mismatch that only reproduces from Play
    (`nav-deeplinks`).
@@ -240,7 +252,7 @@ density and language on Play's side.
   `contentDescription` parameter of `Icon`/`Image`, or `Modifier.semantics { contentDescription = … }`
   on a custom control. A decorative image takes `null` on purpose — that is a decision, not an
   omission.
-- **Merge composite controls into one node** with `Modifier.semantics(mergeDescendants = true)`, so
+- **Merge composite controls into one node** with `Modifier.semantics(mergeDescendants = true) {}`, so
   a card of three texts is announced once, in order, instead of three separate stops.
 - **Touch targets are 48 dp minimum.** Material 3 components apply
   `minimumInteractiveComponentSize` themselves; a bare `Modifier.clickable` on a 24 dp icon does not,

@@ -58,14 +58,14 @@ quoting a number:
 
 | Artifact | Version | Derived from |
 |---|---|---|
-| any published artifact, and the build's `version` | semver `MAJOR.MINOR.PATCH` | the git tag, via `git describe` |
+| any published artifact, and its module's `version` | semver `MAJOR.MINOR.PATCH` | the git tag, via `git describe` |
 | Android `versionName` | that same semver string | the same tag |
 | Android `versionCode` | a monotonic integer | the CI run number, or `git rev-list --count HEAD` — never hand-edited |
 | a server image tag | `<semver>-<short sha>` | the tag plus the commit that built it |
 | a desktop `packageVersion` | plain `MAJOR.MINOR.PATCH`, no suffix | the semver, stripped |
 
 ```kotlin
-// build.gradle.kts — computed once, at the root, from git
+// app/build.gradle.kts — read from git in the module that ships the version
 val describe = providers.exec { commandLine("git", "describe", "--tags", "--always", "--dirty") }
     .standardOutput.asText.get().trim()
 val commits = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }
@@ -84,23 +84,28 @@ android {
 1. **One source of truth, and it is git.** A version typed into a build file is a merge conflict on
    every release branch and a number that disagrees with the tag exactly when it matters; the
    `releaseVersion` property is there so the release lane, and nothing else, can pin an exact value.
-2. **Every read above is a configuration-time input, so read it through `providers`.**
-   `providers.environmentVariable` and `providers.gradleProperty` are tracked by the configuration
-   cache (`## CI Lanes` rule 2); `System.getenv` is not, and bakes whatever it saw into the cached
-   task graph. Tracked also means the entry is invalidated whenever the commit or the run number
-   changes — free on CI, where nothing was warm anyway, and a miss on every local commit, which is
-   the reason to keep the git reads in the one module that needs them.
-3. **`versionCode` is monotonic and machine-derived.** Play requires a number no build of this app
+2. **Every read above is a configuration-time input, and the configuration cache tracks each one**
+   (`pkg-gradle-modules` → "Build Performance"): the entry is invalidated whenever the commit, the
+   run number or `releaseVersion` changes — free on CI, where nothing was warm anyway, and a full
+   reconfiguration after every local commit, which is the price of a version nobody types.
+3. **`version` belongs to one project.** Set in the root script it leaves `:app` at `unspecified`,
+   and the root has no `android { }` to set `versionName` in; the reads go in the module that ships
+   the version, and a library that publishes reads the same way in its own script.
+4. **CI clones one commit unless told otherwise.** `actions/checkout` defaults to `fetch-depth: 1`
+   with no tags: `git describe` finds no tag and falls back to the bare sha, and
+   `git rev-list --count HEAD` answers 1. Every lane that builds a version checks out with
+   `fetch-depth: 0` (`## CI Lanes`).
+5. **`versionCode` is monotonic and machine-derived.** Play requires a number no build of this app
    has used before — the constraint is app-wide, not per track, so a bundle pushed to internal
    testing burns that number for production too. The user never sees it, so it has no business being
    meaningful: a CI run number is monotonic by construction, and the commit count is monotonic on a
    branch that only fast-forwards.
-4. **`versionName` is the semver string and nothing else.** It is what the user reads in Settings and
+6. **`versionName` is the semver string and nothing else.** It is what the user reads in Settings and
    what the crash reporter groups by, so a build-metadata suffix splits one release into two groups
    in the dashboard — which means `git describe` output (`1.4.2-7-gab12cd-dirty`) is an artifact
    name, not a `versionName`. Let it through in every lane except release; the release lane passes
    `-PreleaseVersion=1.4.2` so the shipped build carries the plain tag.
-5. **A server image tag carries both the semver and the sha, and is immutable.** That is what makes
+7. **A server image tag carries both the semver and the sha, and is immutable.** That is what makes
    rollback "deploy the previous tag" rather than "rebuild and hope" (`release-ops-server`).
 
 ## CI Lanes
@@ -119,7 +124,10 @@ lint  →  unit  →  integration  →  assemble  →  release
 
 ```yaml
 # .github/workflows/ci.yml — the lane, not the whole file
-- uses: gradle/actions/setup-gradle@v4
+- uses: actions/checkout@v7
+  with:
+    fetch-depth: 0   # git describe needs the tags, rev-list --count the history
+- uses: gradle/actions/setup-gradle@v6
   with:
     cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 - run: ./gradlew detekt lintRelease
@@ -144,6 +152,23 @@ lint  →  unit  →  integration  →  assemble  →  release
 6. **The release build gets assembled on every push, not on release day.** R8, resource shrinking
    and the signing config only run in that configuration, and a lane that never builds it finds out
    what R8 strips at the worst moment (`release-ops-android` → "Binary").
+7. **`integrationTest` exists only once a test suite declares it.** Gradle gives a JVM module `test`
+   and nothing else — without the suite the lane fails with "task 'integrationTest' not found". The
+   JVM Test Suite plugin, part of the `java` plugin Kotlin applies, adds the source set
+   (`src/integrationTest/kotlin`), its dependencies and the task:
+
+```kotlin
+// server/build.gradle.kts
+testing {
+    suites {
+        register<JvmTestSuite>("integrationTest") {
+            useJUnitJupiter()
+            dependencies { implementation(project()) }
+            targets.all { testTask.configure { shouldRunAfter(tasks.test) } }
+        }
+    }
+}
+```
 
 ## Crash and Error Reporting
 
@@ -195,13 +220,13 @@ tier and apply the same value in the best and the worst scenario.
 
 ## Secrets in CI
 
-The chain is **CI secret store → environment variable → a `-P` Gradle property or `System.getenv`
-in the build script**. Nothing else, and nothing committed.
+The chain is **CI secret store → environment variable, or a `-P` Gradle property → `providers` in
+the build script**. Nothing else, and nothing committed.
 
 ```kotlin
-// build.gradle.kts — the secret is read in exactly one place
-val keystorePassword: String? = System.getenv("KEYSTORE_PASSWORD")
-    ?: providers.gradleProperty("keystorePassword").orNull
+// app/build.gradle.kts — the secret is read in exactly one place
+val keystorePassword: String? = providers.environmentVariable("KEYSTORE_PASSWORD")
+    .orElse(providers.gradleProperty("keystorePassword")).orNull
 ```
 
 ```yaml

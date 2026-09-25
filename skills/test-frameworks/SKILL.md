@@ -34,9 +34,9 @@ Where only one framework can drive a surface, it wins over the axis value.
 
 | Surface | Framework | Why |
 |---|---|---|
-| A Compose UI test (`createComposeRule()`) | JUnit4 | the rule is a JUnit4 `TestRule`, and JUnit5 has no `@Rule` |
+| A Compose UI test (`createComposeRule()`) | JUnit4; on a device, JUnit5 too once the module applies `de.mannodermaus.android-junit` | the rule is a JUnit4 `TestRule`, and JUnit5 has no `@Rule`; that plugin's `createComposeExtension()` is the JUnit5 form |
 | A Robolectric test | JUnit4 | `RobolectricTestRunner` is a JUnit4 runner |
-| A test in `androidInstrumentedTest` | JUnit4 | the device runner is `AndroidJUnitRunner` |
+| A test in `androidInstrumentedTest` | JUnit4, or JUnit5 once the module applies `de.mannodermaus.android-junit` | the device runner is `AndroidJUnitRunner`, which reaches JUnit5 only through that plugin, and only on devices of API 26+ |
 | A test in `commonTest` of a KMP module | `kotlin.test`, or Kotest with its multiplatform engine | `org.junit` and `org.junit.jupiter` are JVM-only artifacts and do not resolve in common code |
 | A test that boots Quarkus (`@QuarkusTest`) | JUnit5 | the Quarkus test support is a JUnit 5 extension and there is no other |
 | Anything else | the axis value | — |
@@ -59,6 +59,7 @@ that file's framework instead of the module's.
 annotation on the class itself. A fresh instance is created per test method, so a property of the
 class does not leak between tests; anything in a `companion object` does.
 
+<!-- compile: jvm-test -->
 ```kotlin
 class CheckoutServiceTest {
     @Test
@@ -81,7 +82,8 @@ sentence in `@DisplayName` instead and keep the identifier.
 `kotlin.test` (`assertEquals`, `assertTrue`, `assertNull`, `assertFailsWith<T> { }`) or AssertJ
 (`assertThat(x).isEqualTo(y)`), whichever the project already imports — never both in one module.
 `org.junit.jupiter.api.assertThrows<T> { }` returns the exception, so its message can be asserted.
-`assertAll { }` reports several failures from one test instead of stopping at the first.
+`assertAll({ … }, { … })` takes one lambda per check and reports every failure among them — one
+`MultipleFailuresError` — instead of stopping at the first.
 
 ### Lifecycle
 
@@ -123,9 +125,14 @@ assertions.
 
 `testImplementation("org.junit.jupiter:junit-jupiter")`,
 `testRuntimeOnly("org.junit.platform:junit-platform-launcher")`, and
-`tasks.withType<Test>().configureEach { useJUnitPlatform() }`. On Android, unit tests need
-`testOptions { unitTests.all { it.useJUnitPlatform() } }` and the `de.mannodermaus.android-junit5`
-plugin; instrumented tests stay on JUnit4 whatever this says.
+`tasks.withType<Test>().configureEach { useJUnitPlatform() }`. On Android, unit tests need the
+same two dependencies and `testOptions { unitTests.all { it.useJUnitPlatform() } }`, or the
+`de.mannodermaus.android-junit` plugin, which does the wiring for every variant; the plugin is also
+what runs JUnit5 in `androidTest` (`## Forced by surface`).
+
+JUnit 6 keeps the `org.junit.jupiter` API of this section: it needs Java 17, deprecates
+`junit-vintage-engine`, and runs a `suspend fun` test method itself — without a virtual clock, so
+`runTest` stays wherever time is advanced.
 
 ## JUnit4
 
@@ -135,6 +142,7 @@ plugin; instrumented tests stay on JUnit4 whatever this says.
 where a runner is required — `RobolectricTestRunner`, `AndroidJUnit4`, `Parameterized`. A fresh
 instance per test method, as in JUnit5.
 
+<!-- compile: android-test -->
 ```kotlin
 @RunWith(RobolectricTestRunner::class)
 class PreferencesManagerTest {
@@ -164,7 +172,8 @@ JUnit4 classes anyway. `assertThrows(EmptyCartException::class.java) { }` return
 must be `@JvmStatic` members of a `companion object`. Everything else is a rule: `@get:Rule` for a
 per-test rule (`TemporaryFolder`, `InstantTaskExecutorRule`, `createComposeRule()`), `@get:ClassRule`
 for a per-class one. In Kotlin the `@get:` prefix is not optional — a rule annotated `@Rule` on the
-property lands on a private backing field and is silently never applied.
+property lands on the private backing field, and JUnit4 rejects the class before any test runs:
+`InvalidTestClassError: … The @Rule 'tmp' must be public.`
 
 ### Parameterization
 
@@ -199,7 +208,10 @@ A spec is a class extending a style — `FunSpec`, `StringSpec`, `BehaviorSpec`,
 test's name is the string, not a method name, so the `method_condition_expected` parts go into the
 string. Match the style the project already uses; a second style in the same module is noise.
 
+<!-- compile: jvm-test -->
 ```kotlin
+import io.kotest.assertions.throwables.shouldThrow
+
 class CheckoutServiceSpec : FunSpec({
     test("submit with an empty cart throws EmptyCartException") {
         val service = CheckoutService(FakeOrderRepository())
@@ -247,10 +259,11 @@ is replaced by a listener — Main Dispatcher in Tests, below.
 
 The same JUnit XML as the other two: Kotest runs on the JUnit Platform, so Gradle writes
 `build/test-results/test/TEST-<spec fqcn>.xml`. What differs is what a `<testcase name>` holds — the
-test's own string, under the `classname` of the spec, with the enclosing containers in the path the
-report shows. A failure is `<failure type="io.kotest.assertions.AssertionFailedError">`, and the
-message is the matcher's (`expected:<2> but was:<1>`). A validator reading the XML needs no second
-parser for this value.
+leaf test's own string under the `classname` of the spec, with no enclosing container: a `withData`
+case inside `context("doubling")` is `name="2"`, and only the console prints `doubling > 2`. A
+failure is `<failure type="org.opentest4j.AssertionFailedError">` on the JVM, and the message is the
+matcher's (`expected:<2> but was:<1>`). A validator reading the XML needs no second parser for this
+value, but it cannot tell two same-named cases in different containers apart.
 
 ### Setup
 
@@ -327,8 +340,9 @@ class OrdersViewModelSpec : FunSpec({
 - **`@BeforeEach` in a class a JUnit4 runner collects.** It compiles wherever jupiter is on the
   classpath and is never called: the test runs with nothing arranged, and the failure reads like a
   bug in production code.
-- **`@Rule` without `@get:`.** The annotation lands on a private backing field, JUnit4 does not see
-  it, and a Compose test fails with "no compose hierarchy found" rather than "no rule".
+- **`@Rule` without `@get:`.** The annotation lands on a private backing field and the whole class
+  fails as `initializationError` with "The @Rule 'tmp' must be public" — one red line where the
+  class's tests should be, none of them run.
 - **A JUnit import in `commonTest`.** It does not resolve, and the fix is not adding a dependency —
   it is `kotlin.test`, or Kotest with its multiplatform engine.
 - **`@BeforeAll` on a non-static member** without `@TestInstance(Lifecycle.PER_CLASS)` — JUnit 5
