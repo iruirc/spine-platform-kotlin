@@ -87,13 +87,17 @@ Not for the layer above the client — the API interface, retry, refresh, paging
 |---|---|---|---|
 | `kotlinx.serialization` | every Kotlin target | a compiler plugin generates the serializer from `@Serializable`; no reflection | new Kotlin code, and mandatory in `commonMain` — the other two do not exist there |
 | Moshi | JVM and Android | KSP codegen (`@JsonClass(generateAdapter = true)`) or reflection via `moshi-kotlin` | the codebase already uses it; it is Kotlin-aware about nullability and default values |
-| Jackson | JVM | reflection plus modules | a Spring server, where it is the default and every starter assumes it |
+| Jackson 3 (`tools.jackson.*`) | JVM | reflection plus modules | a Spring server: Boot 4's default, which every starter assumes |
 
 1. **`ignoreUnknownKeys = true` on any wire you do not own.** The default is to fail, so the day the
    server adds a field the app stops parsing — an outage caused by a backwards-compatible change.
-2. **`jackson-module-kotlin` is not optional.** Without it Jackson ignores Kotlin nullability and
-   default arguments, writes `null` into a non-null `val` through reflection, and the
-   `NullPointerException` lands far away in code the compiler proved safe.
+2. **`jackson-module-kotlin` is not optional.** Without it Jackson calls a Kotlin constructor as if
+   it were Java: a Boot build compiles with `-java-parameters`, so the names resolve, but a field the
+   payload omits is passed as `null` whatever its default, and an absent or `null` value for a
+   non-null parameter fails the read with "Parameter specified as non-null is null". (Without
+   `-java-parameters` it finds no constructor at all: "no Creators".) With it, defaults apply and a
+   `null` for a non-null `val` fails naming the property. On Boot 4 it is
+   `tools.jackson.module:jackson-module-kotlin`, and Boot registers it once it is on the classpath.
 3. **Moshi's codegen over its reflection.** Reflection pulls `kotlin-reflect` into the app, is slower
    to start, and the adapter errors arrive at runtime instead of at build time.
 4. **One configured instance, injected.** A `Json { }`, a `Moshi` or an `ObjectMapper` built at a call
@@ -104,7 +108,13 @@ Not for the layer above the client — the API interface, retry, refresh, paging
 
 ## Configuration per Client
 
+<!-- compile: net -->
 ```kotlin
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
+import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.logging.HttpLoggingInterceptor.Level
+
 val logging = HttpLoggingInterceptor().apply {
     level = if (BuildConfig.DEBUG) Level.BODY else Level.NONE
     redactHeader("Authorization")
@@ -187,8 +197,13 @@ and the engine argument are left out for length — see the reference for the fu
 2. **One `OkHttpClient` per process, one `HttpClient` per process.** The instance owns the connection
    pool, the dispatcher's threads and the response cache; building one per call throws all three away
    every time and leaks threads until the pool evicts them. A variant — a different timeout for
-   uploads, an extra interceptor — comes from `newBuilder()`, which shares the pool and the cache with
-   its parent. Retrofit instances over a shared client are cheap; the client is what is expensive.
+   uploads, an extra interceptor — comes from `newBuilder()`, which shares the pool, the dispatcher
+   and the cache with its parent. Retrofit instances over a shared client are cheap; the client is
+   what is expensive. The token-refresh client is the exception that must not share the dispatcher:
+   the auth interceptor holds a dispatcher thread until the refresh returns, so a refresh queued on
+   the same `Dispatcher` waits for the calls that wait for it, and at five parallel 401s to one host
+   nothing ever completes. Build it from a client without the auth interceptor, with
+   `.dispatcher(Dispatcher())`.
 3. **Close what needs closing.** A Ktor `HttpClient` holds engine resources and is `close()`d at
    shutdown; a long-lived one that is never closed in a CLI keeps the process alive.
 4. **Redact before you log, not after.** `HttpLoggingInterceptor.redactHeader("Authorization")` and
@@ -232,17 +247,17 @@ and the engine argument are left out for length — see the reference for the fu
 2. **`runBlocking` around a suspending call.** It blocks the calling thread until the request
    finishes — on Android's main thread that is a frozen UI and an ANR, on a server thread it is the
    thread pool it was supposed to free. It exists for `main()`, for tests, and for blocking callbacks
-   OkHttp invokes on its own threads (`Interceptor`, `Authenticator`) — nowhere else
-   (`concurrency-coroutines`).
+   OkHttp invokes on its own threads (`Interceptor`, `Authenticator`) under the two conditions the
+   reference's `Retrofit + OkHttp` names — nowhere else (`concurrency-coroutines`).
 3. **Logging bodies in release.** `Level.BODY` left on ships tokens and personal data into logcat or
    the log aggregator, and the `Authorization` header goes with it unless it was redacted. Body
    logging is behind a debug check, and `redactHeader` is not optional.
 4. **A new client per request.** Every call pays a fresh TCP and TLS handshake, the response cache
    never hits, and the abandoned dispatchers keep their threads until they idle out. One instance,
    `newBuilder()` for variants.
-5. **Jackson without `jackson-module-kotlin`.** Non-null `val`s get `null` written into them by
-   reflection, default arguments are ignored, and the failure surfaces as an NPE in code with no
-   nullable type in sight.
+5. **Jackson without `jackson-module-kotlin`.** Kotlin defaults are ignored: the first payload that
+   omits a field with a default fails with "Parameter specified as non-null is null", so an optional
+   field the server stops sending breaks parsing.
 6. **Default timeouts, or no policy at all.** A Ktor client with `HttpTimeout` never installed has no
    client-level policy and inherits whatever its engine happens to default to — different on `CIO`,
    `OkHttp` and `Darwin`. An OkHttp client with no `callTimeout` holds a spinner on screen for as long

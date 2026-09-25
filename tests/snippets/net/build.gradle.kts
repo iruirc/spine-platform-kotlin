@@ -34,6 +34,7 @@ providers.gradleProperty("snippets.units").orNull?.let { units ->
 dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
+    implementation(libs.okhttp.coroutines)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.retrofit.converter.scalars)

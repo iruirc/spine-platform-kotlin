@@ -54,6 +54,7 @@ middleware                logging -> auth -> retry -> timeout
 socket
 ```
 
+<!-- compile: android -->
 ```kotlin
 // :data — the seam. Domain-shaped arguments, wire-shaped results, no client type in the signature.
 interface OrdersApi {
@@ -91,7 +92,7 @@ Cross-cutting behaviour belongs in one stack around the client, in one order, ou
 | # | Layer | Sees | Why here |
 |---|---|---|---|
 | 1 | logging | one entry per logical call: the final request, its final status, the total elapsed time | outermost, so a call that refreshed a token and retried twice is one line and not four |
-| 2 | auth | the 401, and the replay that follows a refresh | above retry, so the request replayed with a refreshed token is one retry then guards |
+| 2 | auth | the 401, and the replay that follows a refresh | above retry, so every attempt below it carries the refreshed token and the replay is retried like a first attempt |
 | 3 | retry | one attempt's failure, and the decision to repeat it | below auth, above the per-attempt timeout |
 | 4 | timeout | one attempt | innermost, so each attempt gets its own budget instead of sharing one |
 
@@ -111,11 +112,12 @@ Cross-cutting behaviour belongs in one stack around the client, in one order, ou
    `RetryAndFollowUpInterceptor`, below every application interceptor, so an app-level retry added
    with `addInterceptor` would wrap it and put row 3 outside row 2. With an app-level retry, auth is
    an application interceptor that refreshes and replays itself.
-3. **Ktor installs the same layering as plugins.** `Auth` and `HttpRequestRetry` both wrap the send
-   and nest in install order, the first installed being the outer one, so `install(Auth)` goes above
-   `install(HttpRequestRetry)` in the `HttpClient { }` block. `Logging` and `HttpTimeout` sit on
-   other pipeline phases, so their position in the block does not change the nesting; what matters is
-   that `HttpTimeout` bounds one request execution and `HttpRequestRetry` re-executes, which is row 4.
+3. **Ktor installs rows 2 to 4 as plugins, nested in install order.** `Auth`, `HttpRequestRetry` and
+   `HttpTimeout` all wrap the send, the first installed being the outer one, so the `HttpClient { }`
+   block installs them in that order. Installed after the retry, `HttpTimeout` bounds each attempt;
+   installed before it, one budget covers every attempt. `Logging` cannot take row 1: it hooks the
+   send pipeline, which every attempt runs again, so a call retried twice is three entries wherever
+   the plugin is installed.
 4. **The order is a property of the client instance, not of a call site.** A retry written inside one
    repository method is invisible to the other twenty, and the twenty-first will be written
    differently. `net-http-clients` covers where that single instance is built.
@@ -126,15 +128,21 @@ Cross-cutting behaviour belongs in one stack around the client, in one order, ou
 
 One expired token must produce one refresh, however many requests are in flight.
 
+<!-- compile: android -->
 ```kotlin
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
 class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
     private val mutex = Mutex()
     private var inFlight: Deferred<Token>? = null
     var current: Token = Token.NONE
         private set
 
-    // `seen` is the token whose request got the 401: if it is no longer the current one,
-    // somebody else already refreshed and this caller only has to re-read.
+    // `seen` is the token the 401 was sent with; if it is no longer current, just re-read.
     suspend fun refresh(seen: Token): Token {
         val job = mutex.withLock {
             if (current != seen) return current
@@ -151,13 +159,16 @@ class TokenStore(private val scope: CoroutineScope, private val auth: AuthApi) {
 }
 ```
 
-1. **The refresh runs in an application scope, not the caller's.** Started in a `viewModelScope`, the
-   shared `Deferred` dies with the first screen to navigate away and every waiter fails with it
-   (`concurrency-coroutines`).
+1. **The refresh runs in an application scope with a `SupervisorJob`, not the caller's.** Started in
+   a `viewModelScope`, the shared `Deferred` dies with the first screen to navigate away and every
+   waiter fails with it; under a plain `Job`, the first refresh that throws cancels the scope, and
+   every refresh after it fails with `JobCancellationException` (`concurrency-coroutines`).
 2. **Compare against the token the caller actually sent.** Without that check the second, third and
    fourth 401 each start a refresh of their own once the first has finished.
 3. **The refresh request must not travel through the auth layer.** Its own 401 would recurse into
-   another refresh; give it a bare client or an exempt path.
+   another refresh; give it a client without the auth layer, or an exempt path. On OkHttp only the
+   first is safe, and that client needs a `Dispatcher` of its own:
+   `net-http-clients` → "Configuration per Client".
 4. **A rotating refresh token makes single-flight mandatory, not an optimization.** The server
    invalidates the old refresh token on use, so N parallel refreshes leave N-1 callers holding a dead
    one and the user is signed out for no reason they can describe.
