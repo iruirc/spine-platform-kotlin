@@ -31,12 +31,12 @@ room { schemaDirectory("$projectDir/schemas") }
 
 dependencies {
     implementation("androidx.room:room-runtime:<version>")
-    implementation("androidx.room:room-ktx:<version>")
     ksp("androidx.room:room-compiler:<version>")
     androidTestImplementation("androidx.room:room-testing:<version>")
 }
 ```
 
+<!-- compile: android -->
 ```kotlin
 @Database(entities = [OrderEntity::class], version = 2, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
@@ -65,10 +65,14 @@ the source sets by hand. New code uses the plugin.
 Anything that transforms data — a split, a merge, a type change, a computed default — is written
 out. Room does not infer it and will not try.
 
+<!-- compile: android -->
 ```kotlin
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
-        // Additive first: nullable, so rows that exist stay valid.
+        // SQLite fills the rows that exist with the DEFAULT; NOT NULL without one is rejected.
         db.execSQL("ALTER TABLE orders ADD COLUMN total_cents INTEGER NOT NULL DEFAULT 0")
         // Then the transform: cents from a REAL currency column, rounded once, here.
         db.execSQL("UPDATE orders SET total_cents = CAST(ROUND(total * 100) AS INTEGER)")
@@ -76,9 +80,10 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
-    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)   // adjacent pairs; Room walks the chain
-    .build()
+fun buildDatabase(context: Context): AppDatabase =
+    Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)   // adjacent pairs; Room walks the chain
+        .build()
 ```
 
 Room runs each `migrate` inside a transaction it owns, so a failure part-way leaves the database at
@@ -88,15 +93,29 @@ mismatch is `IllegalStateException: Migration didn't properly handle: orders(...
 column that differs — usually a missing index or a nullability that does not match the entity.
 
 Dropping a column needs SQLite 3.35, which arrives with Android 14 (API 34, SQLite 3.39). Below
-that baseline it is the four-step dance:
+that baseline it is the four-step dance — here dropping `total` once `total_cents` has taken over:
 
+<!-- compile: android -->
 ```kotlin
-db.execSQL("CREATE TABLE orders_new (id TEXT NOT NULL PRIMARY KEY, total_cents INTEGER NOT NULL)")
-db.execSQL("INSERT INTO orders_new (id, total_cents) SELECT id, total_cents FROM orders")
-db.execSQL("DROP TABLE orders")
-db.execSQL("ALTER TABLE orders_new RENAME TO orders")
-db.execSQL("CREATE INDEX index_orders_placed_at ON orders(placed_at)")   // indices do not survive
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE orders_new (id TEXT NOT NULL PRIMARY KEY, " +
+                "placed_at INTEGER NOT NULL, total_cents INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "INSERT INTO orders_new (id, placed_at, total_cents) " +
+                "SELECT id, placed_at, total_cents FROM orders",
+        )
+        db.execSQL("DROP TABLE orders")
+        db.execSQL("ALTER TABLE orders_new RENAME TO orders")
+        db.execSQL("CREATE INDEX index_orders_placed_at ON orders(placed_at)")   // indices do not survive
+    }
+}
 ```
+
+The new table carries every column the entity still has, `placed_at` included: the index recreated
+on a column the copy left out fails with `no such column`.
 
 On Room 2.7's KMP targets the signature is `override fun migrate(connection: SQLiteConnection)`,
 and statements go through `connection.execSQL(...)`. Everything else is the same.
@@ -129,16 +148,18 @@ abstract class AppDatabase : RoomDatabase() {
 - **No spec is needed for unambiguous changes** — a new table, a new column with a default, a
   dropped table. `AutoMigration(from = 1, to = 2)` alone covers those.
 - **A spec is required the moment the diff is ambiguous.** A rename is indistinguishable from a drop
-  plus an add, so without `@RenameColumn` Room generates the destructive reading and the build
-  reports that it cannot determine what happened.
+  plus an add, so without `@RenameColumn` Room's processor fails the build with
+  `AutoMigration Failure: Please declare an interface extending 'AutoMigrationSpec'` — it never
+  guesses the destructive reading.
 - **A rename keeps the column's type.** `@RenameColumn` emits a rename, not a conversion, which is
   why `total` (REAL) cannot become `total_cents` (INTEGER) this way: the migration would run and
   then fail Room's validation against a `Long` field. That change is the hand migration above.
 - **The annotations available are `@RenameColumn`, `@DeleteColumn`, `@RenameTable` and
   `@DeleteTable`.** Anything else — a type change, a split, a value computed from another table — is
   a hand migration, or an `onPostMigrate` body on columns whose type did not move.
-- **An auto-migration and a hand migration for the same version pair is an error.** Pick one per
-  pair.
+- **A hand migration for the same version pair replaces the auto-migration, silently.** Room adds
+  the generated one only for a pair no `addMigrations` call covers, so the auto-migration's
+  `onPostMigrate` never runs either. Keep one per pair.
 - **Auto-migrations still need tests.** They are generated from JSON, not from your intent, and
   `@DeleteColumn` on the wrong column compiles perfectly.
 
@@ -207,6 +228,8 @@ there from each earlier version.
 
 ```sql
 -- src/commonMain/sqldelight/com/example/db/Order.sq — the current schema
+import kotlin.time.Instant;
+
 CREATE TABLE orderRecord (
   id         TEXT NOT NULL PRIMARY KEY,
   customerId TEXT NOT NULL,
@@ -221,25 +244,28 @@ ALTER TABLE orderRecord ADD COLUMN totalCents INTEGER NOT NULL DEFAULT 0;
 ```
 
 - **The filename is the source version.** `1.sqm` runs against version 1 and produces version 2.
-  The database version is the count of migration files plus one, and SQLDelight derives it — you
-  never write a version constant.
-- **`schemaOutputDirectory` holds the generated `.db` snapshots.** The task writes one per version
-  and they are committed; they are what verification migrates *from*.
-- **`verifyMigrations = true` wires the check into the build.** It replays the `.sqm` files onto the
-  previous snapshot and fails when the result does not match the current `.sq` schema.
-- **The task names carry the source set on 2.x** — `verifyCommonMainAppDatabaseMigration` and
-  `generateCommonMainAppDatabaseSchema` for a database named `AppDatabase` in `commonMain`, against
-  1.x's flat `verifySqlDelightMigration`. The exact spelling is version-sensitive, so read it off
-  `./gradlew tasks` rather than from memory.
+  The database version is the highest `.sqm` number plus one, and SQLDelight derives it — you never
+  write a version constant. The verification task rejects a gap in the numbering.
+- **`schemaOutputDirectory` adds the task that writes a snapshot.** `generateCommonMainAppDatabaseSchema`
+  writes the current schema as `<version>.db` into that directory. Run it before the first `.sqm`
+  and commit the `1.db`; verification replays every `.sqm` from it, so one snapshot covers the
+  chain. Each extra `.db` is replayed as well and only costs build time.
+- **The verification task always runs in `check`.** `verifyCommonMainAppDatabaseMigration` here —
+  `verifyMainAppDatabaseMigration` in a JVM module, `verify<Variant>AppDatabaseMigration` on Android —
+  and `verifySqlDelightMigration` runs every one. It applies the `.sqm` files to each committed
+  `.db` and fails when the result does not match the current `.sq` schema.
+- **`verifyMigrations = true` makes a broken migration fail the build**: an error inside a `.sqm`, or
+  no `.db` to replay it on. Left off, a module with no snapshot passes verification without
+  checking anything.
 - **Verification checks shape, never data.** A `.sqm` that adds the column but leaves it empty
   passes; a JVM test with `JdbcSqliteDriver`, an old snapshot and real rows is what catches that.
 - **`deriveSchemaFromMigrations = true` flips the model**: the `.sq` files hold queries only, the
   schema is whatever replaying every `.sqm` produces. It suits a database SQLDelight adopted rather
   than created, and it is not a setting to change twice.
-- **Migration runs through the driver.** `AndroidSqliteDriver(Schema, context, "app.db")` calls
-  `Schema.migrate(...)` for you; `JdbcSqliteDriver` and `NativeSqliteDriver` need
-  `AppDatabase.Schema.migrate(driver, oldVersion, newVersion)` called explicitly, with the old
-  version read from `PRAGMA user_version`.
+- **Migration runs through the driver.** `AndroidSqliteDriver(Schema, context, "app.db")`,
+  `NativeSqliteDriver(Schema, "app.db")` and `JdbcSqliteDriver(url, properties, Schema)` each call
+  `Schema.migrate(...)` for you, from the version in `PRAGMA user_version` — the JDBC driver only
+  when it is built with the schema. A call of your own on top walks the chain a second time.
 
 ## Flyway — Scripts and Wiring
 
@@ -248,7 +274,8 @@ Scripts live on the classpath under `db/migration` and are named for their versi
 ```text
 src/main/resources/db/migration/V1__init.sql
 src/main/resources/db/migration/V2__add_total_cents.sql
-src/main/resources/db/migration/V3__backfill_total_cents.sql
+src/main/resources/db/migration/V3__index_orders_placed_at.sql
+src/main/resources/db/migration/V3__index_orders_placed_at.sql.conf
 src/main/resources/db/migration/R__order_summary_view.sql
 ```
 
@@ -259,14 +286,43 @@ separate the version from the description; one underscore is a file Flyway ignor
 ```sql
 -- V2__add_total_cents.sql — additive only: the previous release still runs against this.
 ALTER TABLE orders ADD COLUMN total_cents BIGINT;
+```
+
+```sql
+-- V3__index_orders_placed_at.sql — alone: it cannot share a transaction, or a script, with others.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_placed_at ON orders (placed_at);
 ```
 
-`CREATE INDEX CONCURRENTLY` cannot run inside a transaction, so the script needs
-`-- flyway:executeInTransaction=false` at the top (or the `executeInTransaction` script config) —
-without it Flyway wraps the script and Postgres rejects the statement.
+```properties
+# V3__index_orders_placed_at.sql.conf
+executeInTransaction=false
+```
 
-Spring Boot runs Flyway at startup, before Hibernate validates:
+`CREATE INDEX CONCURRENTLY` cannot run inside a transaction, and Flyway will not split a script for
+it. With V2's `ALTER TABLE` in the same file the migration stops with
+`Detected both transactional and non-transactional statements within the same migration`. Alone in
+its script, the statement is recognised and run outside a transaction without further help; the
+`.sql.conf` beside it says so explicitly. Open-source Flyway does not read a
+`-- flyway:executeInTransaction=false` line at the top of the script, and the mixed script fails
+with it all the same.
+
+The index also needs Flyway's session-level lock. By default Flyway guards the migration with a
+transactional advisory lock, held by a transaction that stays open on a second connection until
+the run ends — and `CONCURRENTLY` waits for every open transaction, so the migration never
+finishes. `postgresql.transactional.lock=false` switches to a session lock; the Boot property and
+the Ktor call are below.
+
+On Spring Boot 4 Flyway runs at startup, before Hibernate validates, only with
+`spring-boot-starter-flyway`: `flyway-core` alone boots and migrates nothing. On PostgreSQL the
+database plugin sits beside it, or Flyway stops with `Unsupported Database: PostgreSQL …`. Boot's
+BOM manages Flyway's version, so neither alias carries one:
+
+<!-- compile: catalog -->
+```toml
+[libraries]
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-flyway-database-postgresql = { module = "org.flywaydb:flyway-database-postgresql" }
+```
 
 ```yaml
 spring:
@@ -275,17 +331,28 @@ spring:
     validate-on-migrate: true      # default; the check that catches an edited script
     baseline-on-migrate: false     # true only to adopt a database that predates Flyway
     baseline-version: 4            # and then say which version it already is
+    postgresql:
+      transactional-lock: false    # CREATE INDEX CONCURRENTLY never finishes under the default
   jpa:
     hibernate:
       ddl-auto: validate           # the mapping is checked against the migrated schema
 ```
 
-On Ktor there is no auto-run, so the module does it before installing routes:
+On Ktor there is no auto-run, so the module does it before installing routes, with `flyway-core`
+and `flyway-database-postgresql` at one pinned version:
 
+<!-- compile: ktor -->
 ```kotlin
+import com.zaxxer.hikari.HikariDataSource
+import org.flywaydb.core.Flyway
+import org.flywaydb.database.postgresql.PostgreSQLConfigurationExtension
+
 fun Application.module() {
     val dataSource = HikariDataSource(hikariConfig())
-    Flyway.configure().dataSource(dataSource).load().migrate()   // rule 9, server-side
+    val flyway = Flyway.configure().dataSource(dataSource)
+    flyway.getConfigurationExtension(PostgreSQLConfigurationExtension::class.java)
+        .isTransactionalLock = false   // for CREATE INDEX CONCURRENTLY
+    flyway.load().migrate()   // rule 9, server-side
     configureRouting(dataSource)
 }
 ```
@@ -312,8 +379,9 @@ databaseChangeLog:
   - include: { file: db/changelog/003-backfill-total-cents.yaml }
 ```
 
-One `include` per change, appended at the end — never a reordering, and never `includeAll` on a
-directory whose ordering is then whatever the filesystem returns.
+One `include` per change, appended at the end — never a reordering. `includeAll` runs a directory
+in the lexicographic order of the file paths, so it holds only while every name sorts where it must
+run: `10-…` sorts before `9-…` unless the prefixes are zero-padded.
 
 ```yaml
 # 002-add-total-cents.yaml
@@ -377,14 +445,25 @@ still on the old version during deploy 2, have `total_cents` null — which is w
 cannot exist yet.
 
 ```sql
--- Deploy 3 — V11__enforce_total_cents.sql, the *schema* half only, after the backfill job.
--- SET NOT NULL alone takes ACCESS EXCLUSIVE and scans the table. Validating a NOT VALID check
--- first takes only SHARE UPDATE EXCLUSIVE, and Postgres 12+ then trusts it: no second scan.
+-- Deploy 3 — V11__check_total_cents.sql, after the backfill job. Metadata only: no scan.
+SET LOCAL lock_timeout = '2s';
 ALTER TABLE orders ADD CONSTRAINT total_cents_nn CHECK (total_cents IS NOT NULL) NOT VALID;
+
+-- V12__validate_total_cents.sql — the scan, under SHARE UPDATE EXCLUSIVE: reads and writes go on.
 ALTER TABLE orders VALIDATE CONSTRAINT total_cents_nn;
+
+-- V13__total_cents_not_null.sql — Postgres 12+ trusts the valid check and skips the scan.
+SET LOCAL lock_timeout = '2s';
 ALTER TABLE orders ALTER COLUMN total_cents SET NOT NULL;
 ALTER TABLE orders DROP CONSTRAINT total_cents_nn;
 ```
+
+Three scripts, because a lock lasts until its transaction commits and Flyway commits each versioned
+script on its own (unless `group` is on). `ADD CONSTRAINT` takes `ACCESS EXCLUSIVE` for an instant;
+written in one script with the `VALIDATE`, it keeps that lock through the whole scan, and every read
+and write of `orders` queues behind it. `SET NOT NULL` needs `ACCESS EXCLUSIVE` too, but only after
+the scan is over. `lock_timeout` makes either of them fail fast instead of queueing every query
+behind a lock it is still waiting for.
 
 The backfill itself runs as a job between deploy 2 and deploy 3, in batches:
 
@@ -397,11 +476,10 @@ WHERE total_cents IS NULL AND id IN (
 
 Run until it affects zero rows, with a pause between batches. `WHERE total_cents IS NULL` makes it
 resumable and re-runnable: killing it loses nothing. Only when it reports zero remaining does
-deploy 3's `SET NOT NULL` succeed — and deploy 3's code reads `total_cents` while still writing
-both.
+deploy 3's `VALIDATE` succeed — and deploy 3's code reads `total_cents` while still writing both.
 
 ```sql
--- Deploy 4 — V12__contract_total.sql, run only once deploy 4 has fully rolled out.
+-- Deploy 4 — V14__contract_total.sql, run only once deploy 4 has fully rolled out.
 ALTER TABLE orders DROP COLUMN total;
 ```
 
@@ -433,13 +511,21 @@ The migration that matters is the one applied to the schema production actually 
 rarely the one a fresh `migrate` produces. The test starts a container from an old dump and runs
 the whole chain.
 
+<!-- compile: spring-test -->
 ```kotlin
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import javax.sql.DataSource
+import org.assertj.core.api.Assertions.assertThat
+import org.flywaydb.core.Flyway
+import org.testcontainers.utility.DockerImageName
+
 @Testcontainers
 class MigrationChainTest {
     companion object {
         // withInitScript is enough for a small, committed dump; a real one is restored below.
         @Container @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+        val postgres = PostgreSQLContainer(DockerImageName.parse("postgres:16-alpine"))
             .withInitScript("dumps/production-v7.sql")
     }
 
@@ -458,11 +544,17 @@ class MigrationChainTest {
         assertThat(dataSource.count("select count(*) from orders where total_cents is null"))
             .isZero()
         // The bookkeeping table is part of the assertion: nothing pending, nothing failed.
-        assertThat(dataSource.rows("select success from flyway_schema_history"))
-            .allMatch { it.getBoolean(1) }
+        assertThat(dataSource.count("select count(*) from flyway_schema_history where not success"))
+            .isZero()
+    }
+
+    private fun DataSource.count(sql: String): Long = connection.use { c ->
+        c.createStatement().use { st -> st.executeQuery(sql).use { rs -> rs.next(); rs.getLong(1) } }
     }
 }
 ```
+
+The container and why the test database is never H2: `persistence-jvm-orm` → "Testing".
 
 For a dump too large to commit, restore it into the started container instead of using
 `withInitScript`:

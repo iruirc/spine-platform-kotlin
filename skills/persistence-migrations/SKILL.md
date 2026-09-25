@@ -76,6 +76,7 @@ accepts its first request, so no code ever reads a schema that is halfway migrat
 
 ## Room
 
+<!-- compile: android -->
 ```kotlin
 @Database(entities = [OrderEntity::class], version = 2, exportSchema = true)
 abstract class AppDatabase : RoomDatabase()
@@ -107,10 +108,11 @@ room { schemaDirectory("$projectDir/schemas") }
 6. **SQLite cannot drop or alter a column before 3.35**, so Room's own generated path for those is
    create-new-table, copy, drop, rename. A hand migration doing the same must recreate indices and
    foreign keys too — which is exactly why the auto-migration is preferable when it applies.
-7. **`fallbackToDestructiveMigration()` never ships.** It deletes the database on any version bump
-   it has no path for: the user's offline drafts, their queued writes, their local history, gone
-   with no message. `fallbackToDestructiveMigrationFrom(...)` for a specific dead version is the
-   narrow, deliberate exception.
+7. **`fallbackToDestructiveMigration(dropAllTables)` never ships.** It deletes the database on any
+   version bump it has no path for: the user's offline drafts, their queued writes, their local
+   history, gone with no message. `fallbackToDestructiveMigrationFrom(dropAllTables, startVersions)`
+   for a specific dead version is the narrow, deliberate exception. The forms without
+   `dropAllTables` are deprecated; the flag says whether tables Room does not manage go too.
 
 ## SQLDelight
 
@@ -125,18 +127,24 @@ ALTER TABLE orderRecord ADD COLUMN totalCents INTEGER NOT NULL DEFAULT 0;
 2. **The `.sq` files always describe the current schema.** Change the `CREATE TABLE` there *and*
    add the `.sqm`: the `.sq` file is what the generated code is typed against, the `.sqm` is what an
    existing database is walked through.
-3. **`verifyMigrations = true` makes the build check them.** The Gradle task is
-   `verifySqlDelightMigration` in 1.x and `verify<DatabaseName>Migration` in 2.x; it applies the
-   migrations to the previous schema snapshot and fails the build when the result does not match
-   the current `.sq` files.
-4. **Verification needs snapshots.** `schemaOutputDirectory` is where the generated `.db` files go;
-   they are committed, and a new one is produced per released version — without them there is
-   nothing to migrate *from*.
+3. **The verification task runs in `check`.** It is `verify<SourceSet><Database>Migration` —
+   `verifyMainAppDatabaseMigration` in a JVM module, `verifyCommonMainAppDatabaseMigration` in KMP,
+   one per variant on Android — and `verifySqlDelightMigration` runs them all. For every committed
+   `<version>.db` it applies the `.sqm` files from that version on and fails the build when the
+   result differs from the current `.sq` schema. `verifyMigrations = true` adds two failures: an
+   error inside a `.sqm`, and no `.db` to verify from.
+4. **One snapshot is enough.** `schemaOutputDirectory` adds the `generate<SourceSet><Database>Schema`
+   task, which writes the current schema as `<version>.db`. Run it once before the first `.sqm` and
+   commit the `1.db`: the whole chain is replayed from it. More snapshots are allowed and only make
+   the task slower; with none, and `verifyMigrations` off, the task has nothing to migrate *from*
+   and passes.
 5. **`deriveSchemaFromMigrations = true` inverts the model:** the migrations become the source of
    truth and the schema is computed by replaying them, so the `.sq` files hold queries only. It is
    the right setting for a database that predates SQLDelight; it is a one-way door.
-6. **`Schema.migrate(driver, oldVersion, newVersion)` is what runs at startup**, usually via
-   `AndroidSqliteDriver(schema, context, name)` which does it for you. On other drivers you call it.
+6. **The driver runs `Schema.migrate(driver, oldVersion, newVersion)` at startup** when it is handed
+   the schema: `AndroidSqliteDriver(schema, context, name)`, `NativeSqliteDriver(schema, name)`, and
+   `JdbcSqliteDriver(url, properties, schema)`, which keeps the version in `PRAGMA user_version`. A
+   `Schema.migrate` call of your own on top is a second walk of the chain.
 
 ## Flyway and Liquibase
 
@@ -161,10 +169,13 @@ ALTER TABLE orderRecord ADD COLUMN totalCents INTEGER NOT NULL DEFAULT 0;
 3. **`baselineOnMigrate` adopts an existing database.** It records the current state as the baseline
    version so the tool does not try to run version 1 against tables that already exist. Set the
    `baselineVersion` explicitly; the default of 1 is rarely what you meant.
-4. **Spring Boot runs the migration at startup, before JPA validates.** With
-   `spring.jpa.hibernate.ddl-auto=validate` that ordering is the whole safety net: the schema is
-   migrated, then the mapping is checked against it, and a mismatch fails the boot
-   (`persistence-jvm-orm`).
+4. **Spring Boot runs the migration at startup, before JPA validates.** On Boot 4 that takes
+   `spring-boot-starter-flyway`: with `flyway-core` alone the application boots and migrates
+   nothing. PostgreSQL also needs `flyway-database-postgresql`, or Flyway stops with
+   `Unsupported Database: PostgreSQL …`; declare it without a version, since Boot's BOM manages
+   Flyway's. With `spring.jpa.hibernate.ddl-auto=validate` the ordering
+   is the whole safety net: the schema is migrated, then the mapping is checked against it, and a
+   mismatch fails the boot (`persistence-jvm-orm`).
 5. **On Ktor there is no auto-run.** Call it in the module before routes are installed:
    `Flyway.configure().dataSource(ds).load().migrate()`. That placement is also rule 9.
 6. **The migration runs once per deploy, not once per pod.** Several replicas starting together all
@@ -181,7 +192,7 @@ time. Every migration must therefore be compatible with the version before it, w
 |---|---|---|
 | 1 — expand | add `total_cents`, nullable, no constraint | unchanged; still reads and writes `total` |
 | 2 — dual write | none | writes both columns, reads `total` |
-| 3 — backfill and switch | backfill `total_cents` in batches, then a `CHECK … NOT VALID`, `VALIDATE CONSTRAINT` and `SET NOT NULL` | reads `total_cents`, still writes both |
+| 3 — backfill and switch | backfill `total_cents` in batches as a job, then three migrations: `CHECK … NOT VALID`, `VALIDATE CONSTRAINT`, `SET NOT NULL` | reads `total_cents`, still writes both |
 | 4 — contract | drop `total`, **after** the deploy has fully rolled out | writes only `total_cents` |
 
 Step 4 is the one step whose migration must not run at the start of its deploy: while it rolls,
@@ -200,11 +211,19 @@ migration of the next release.
    still serve.
 4. **The backfill is not part of the migration script** once the table is large — see
    `Long Migrations And Recovery`.
-5. **`CREATE INDEX CONCURRENTLY` on Postgres, outside a transaction.** A plain `CREATE INDEX` takes
-   a write lock for the duration; Flyway needs the script marked so it does not wrap it in one.
+5. **`CREATE INDEX CONCURRENTLY` on Postgres, alone in its script, outside a transaction.** A plain
+   `CREATE INDEX` blocks writes for the duration. Flyway runs a script holding only that statement
+   outside a transaction by itself; `executeInTransaction=false` in a
+   `V<n>__<description>.sql.conf` beside it states the intent, and a `-- flyway:` comment inside it
+   is not read. The index also needs Flyway's session lock (`postgresql.transactional.lock=false`):
+   under the default transactional one it waits for Flyway's own open transaction and never
+   finishes.
 6. **`SET NOT NULL` scans the table under `ACCESS EXCLUSIVE`.** Add a
-   `CHECK (col IS NOT NULL) NOT VALID` first, `VALIDATE CONSTRAINT` it under a lock that lets reads
-   and writes through, and the `SET NOT NULL` that follows is metadata-only on Postgres 12+.
+   `CHECK (col IS NOT NULL) NOT VALID` in one migration and `VALIDATE CONSTRAINT` it in the next,
+   under `SHARE UPDATE EXCLUSIVE`, which lets reads and writes through; the `SET NOT NULL` that
+   follows is metadata-only on Postgres 12+. Flyway commits each script in its own transaction, and
+   that is what the split buys: in one script the `ADD CONSTRAINT`'s `ACCESS EXCLUSIVE` lock lasts
+   through the whole `VALIDATE` scan.
 7. **`ADD COLUMN … NOT NULL DEFAULT <non-volatile>` is metadata-only on Postgres 11+**, and a full
    table rewrite before that and on some other engines. It is a different statement from the one
    above, with a different cost; check your version before assuming either step is free.
@@ -276,8 +295,8 @@ A user can be on any previously shipped version, and a database can be restored 
 1. **`exportSchema = false`, or `schemaDirectory` never configured.** It silences a build warning
    and removes the input every auto-migration and every migration test needs. It is discovered
    exactly at the moment it can no longer be fixed — when the un-exported version is on devices.
-2. **`fallbackToDestructiveMigration()` in a release build.** The first version bump without a path
-   wipes the user's data silently. It is in the codebase because it made a development crash go
+2. **`fallbackToDestructiveMigration(...)` in a release build.** The first version bump without a
+   path wipes the user's data silently. It is in the codebase because it made a development crash go
    away, and nobody removed it.
 3. **Editing a shipped migration.** The checksum no longer matches, so every environment that
    already ran it fails validation on the next deploy — and the environments that had not run it
