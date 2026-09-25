@@ -131,6 +131,7 @@ empty statement list being the usual answer when the app opens a browser.
 The whole trust boundary in one file. Everything downstream may assume a `Route` it receives is
 well-formed, because this is where an ill-formed one became `null`.
 
+<!-- compile: android -->
 ```kotlin
 // commonMain/kotlin/com/example/app/deeplink/DeepLinkParser.kt
 // Route is the sealed hierarchy in SKILL.md's Core Shape
@@ -187,24 +188,34 @@ project already has it (`net-http-clients`) — percent-encoding and repeated ke
 hand-written parsing goes wrong, and it goes wrong on the untrusted input path.
 
 The Android edge is the only Android-typed line in the feature:
-`fun Intent.deepLinkUrl(): String? = takeIf { it.action == Intent.ACTION_VIEW }?.data?.toString()`.
-The router is the only thing that knows about the gate:
 
+<!-- compile: android -->
 ```kotlin
-class DeepLinkRouter(
-    private val navigator: Navigator,                     // nav-multiplatform
-    private val pending: PendingRoute,
-    private val gate: DeepLinkGate,
-) {
-    fun handle(url: String) {
-        val route = DeepLinkParser.parse(url) ?: return   // unknown link: the app opens as usual
-        if (gate.allows(route)) navigator.navigate(route) else pending.hold(route)
+import android.content.Intent
+
+fun Intent.deepLinkUrl(): String? = takeIf { it.action == Intent.ACTION_VIEW }?.data?.toString()
+```
+
+Every parsed link goes to one ViewModel, which owns the `PendingRoute` and so the only handle that
+outlives the process. It holds the link and never navigates: the graph replays it, passing in the
+gate and the navigation call, so no `NavController` or `Navigator` reaches the ViewModel
+(`nav-compose` → "The Boundary"):
+
+<!-- compile: android -->
+```kotlin
+class DeepLinkViewModel(handle: SavedStateHandle) : ViewModel() {
+    private val pending = PendingRoute(handle)
+    val held: StateFlow<String?> = pending.held
+
+    // an unknown link holds nothing, and the app opens as usual
+    fun handle(url: String) { DeepLinkParser.parse(url)?.let(pending::hold) }
+
+    fun replay(gate: DeepLinkGate, navigate: (Route) -> Unit) {
+        val route = pending.consume() ?: return
+        if (gate.allows(route)) navigate(route) else pending.hold(route)
     }
 
-    /** Called when the graph composes, and whenever session or onboarding state changes. */
-    fun onGateOpened() = pending.consume()?.let { route ->
-        if (gate.allows(route)) navigator.navigate(route) else pending.hold(route)
-    }
+    fun drop() = pending.drop()
 }
 ```
 
@@ -213,6 +224,7 @@ class DeepLinkRouter(
 The table is the contract. It runs in `commonTest` with no device, no Robolectric and no graph —
 which is the entire reason `parse` takes a `String`.
 
+<!-- compile: android-test -->
 ```kotlin
 class DeepLinkParserTest {
 
@@ -243,7 +255,7 @@ class DeepLinkParserTest {
             val actual = DeepLinkParser.parse(url)
             "$url -> $actual, expected $expected".takeIf { actual != expected }
         }
-        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+        assertTrue(failures.isEmpty(), failures.joinToString("\n"))
     }
 }
 ```
@@ -263,36 +275,43 @@ class DeepLinkParserTest {
 
 The two Activity callbacks, and the guard that keeps a rotation from navigating twice.
 
+<!-- compile: android -->
 ```kotlin
+import android.content.Intent
+import androidx.activity.viewModels
+import org.koin.android.ext.android.inject
+
 class MainActivity : ComponentActivity() {
 
-    private val router: DeepLinkRouter by inject()   // di-koin; di-hilt injects the same object
+    private val deepLinks: DeepLinkViewModel by viewModels()
+    private val sessions: SessionRepository by inject()   // di-koin; di-hilt injects the same object
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // savedInstanceState == null means a genuinely fresh Activity: the launch intent is
-        // re-delivered to every recreation, and handling it again pushes a second detail screen
-        if (savedInstanceState == null) intent.deepLinkUrl()?.let(router::handle)
-        setContent { App() }
+        // the launch intent is re-delivered to every recreation; a link held before it is in the handle
+        if (savedInstanceState == null) intent.deepLinkUrl()?.let(deepLinks::handle)
+        setContent { App(deepLinks, sessions.session) }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)                  // so any later getIntent() is not the stale one
-        intent.deepLinkUrl()?.let(router::handle)
+        intent.deepLinkUrl()?.let(deepLinks::handle)
     }
 }
 ```
 
-`onNewIntent` runs only when the system reuses the existing instance, and that is a manifest
-decision:
+`onNewIntent` runs only when the system reuses the existing instance. The manifest decides that, and
+so does the sender: an intent carrying `FLAG_ACTIVITY_SINGLE_TOP` gets `singleTop` behaviour for that
+one launch.
 
 | `launchMode` | A link arriving while the app is already running |
 |---|---|
-| `standard` (default) | a **new** Activity instance on top of the old one; `onNewIntent` never fires, and back walks a pile of duplicates |
+| `standard` (default) | a **new** Activity instance on top of the old one; `onNewIntent` does not fire, and back walks a pile of duplicates |
 | `singleTop` | reused when it is already at the top of the task → `onNewIntent`; a new instance otherwise |
-| `singleTask` | always reused, and **everything above it in the task is destroyed** first |
+| `singleTask` | always reused → `onNewIntent`, and **everything above it in the task is destroyed** first |
 | `singleInstance` | as `singleTask`, alone in its own task — almost never right for an app with a back stack |
+| `singleInstancePerTask` | as `singleInstance`, one instance per task (API 31+) |
 
 1. **`singleTop` for a single-Activity Compose app.** It is the only mode that gives `onNewIntent`
    without also deciding, in the manifest, that every link wipes the back stack — and whether a
@@ -300,7 +319,7 @@ decision:
 2. **Read the parameter, not `getIntent()`, inside `onNewIntent`** — and call `setIntent` so a later
    reader agrees. Reading the getter first is how an app routes to the link before last.
 3. **Nothing here parses.** The Activity checks `ACTION_VIEW`, extracts a `String` and calls the
-   router. That is the whole of its involvement, and it is why none of this needs a device.
+   ViewModel. That is the whole of its involvement, and it is why none of this needs a device.
 
 ## Entry Points — NavDeepLink
 
@@ -397,24 +416,19 @@ the parser changes on any of the three.
 Links do not wait for the app: one may land before the graph exists, before the app knows who is
 signed in, or halfway through onboarding. One holder, one gate, one replay.
 
-`PendingRoute` is the holder printed in `SKILL.md`, plus a `drop()` that clears the slot without
-replaying it. It lives in `commonMain` because `lifecycle-viewmodel-savedstate` went multiplatform
+`PendingRoute` is the holder printed in `SKILL.md`; its `drop()` clears the slot without replaying
+it. It lives in `commonMain` because `lifecycle-viewmodel-savedstate` went multiplatform
 in Lifecycle **2.9.0** — not 2.8, which shipped the multiplatform `lifecycle-viewmodel` and
 `lifecycle-runtime-compose` and left saved state on Android. The gate beside it:
 
+<!-- compile: android -->
 ```kotlin
 fun interface DeepLinkGate { fun allows(route: Route): Boolean }
 
-class SessionGate(
-    private val session: StateFlow<Session>,
-    private val graphReady: StateFlow<Boolean>,
-) : DeepLinkGate {
-    override fun allows(route: Route): Boolean {
-        if (!graphReady.value) return false
-        return when (route) {
-            Route.Home, is Route.Search -> true                       // public: no gate at all
-            is Route.OrderDetail -> session.value is Session.SignedIn
-        }
+class SessionGate(private val session: Session) : DeepLinkGate {
+    override fun allows(route: Route): Boolean = when (route) {
+        Route.Home, is Route.Search -> true                       // public: no gate at all
+        is Route.OrderDetail -> session is Session.SignedIn
     }
 }
 ```
@@ -422,14 +436,16 @@ class SessionGate(
 The route is stored serialized because `SavedStateHandle` holds `Bundle`-able values on Android and
 the `Route` is `@Serializable` already — the same annotation `nav-compose` needs for the graph.
 
+<!-- compile: android -->
 ```kotlin
 @Composable
-fun App(router: DeepLinkRouter, session: StateFlow<Session>, graphReady: MutableStateFlow<Boolean>) {
-    AppNavHost(rememberNavController())
+fun App(deepLinks: DeepLinkViewModel, session: StateFlow<Session>) {
+    val navController = rememberNavController()
+    AppNavHost(navController)
     // effects run after the composition is applied, so the NavHost above already exists here
-    LaunchedEffect(Unit) {
-        graphReady.value = true
-        session.collect { router.onGateOpened() }
+    LaunchedEffect(deepLinks, navController) {
+        combine(deepLinks.held, session) { _, current -> SessionGate(current) }
+            .collect { gate -> deepLinks.replay(gate) { navController.navigate(it) } }
     }
 }
 ```
@@ -437,16 +453,51 @@ fun App(router: DeepLinkRouter, session: StateFlow<Session>, graphReady: Mutable
 1. **`consume`, never `get`**, and `hold` overwrites. A rotation after the replay must not navigate
    a second time — the duplicate detail screen on the back stack is how this is reported — and a
    second link arriving before the gate opens is simply the newer one.
-2. **`graphReady` is set from an effect, not from `onCreate`.** The `NavController` exists as soon as
-   `rememberNavController()` returns, but a destination is registered only once `NavHost` has
-   composed; navigating between those two points throws, naming a destination that is about to exist.
+2. **The replay runs from an effect below the `NavHost`, never from `onCreate`.** The
+   `NavController` exists as soon as `rememberNavController()` returns, but a destination is
+   registered only once `NavHost` has composed; navigating between those two points throws, naming a
+   destination that is about to exist. The effect replays again on every new link and every session
+   change, so a warm-start link and a finished sign-in take the same path.
 3. **A session that is still loading is not "signed out".** `allows` returns `false` for an
    unresolved session, or every cold-start deep link bounces off the login wall.
-4. **Drop it when the attempt ends.** The router calls `pending.drop()` when the user abandons
-   sign-in; a route replayed at the start of the next session is navigation nobody asked for.
-5. **The gate is a unit test** over a plain `SavedStateHandle` and two `MutableStateFlow`s — no
-   Activity, no graph, no device. On Compose Desktop the handle has no disk behind it, and needs
-   none: a desktop process that dies loses the link with it.
+4. **Drop it when the attempt ends.** The sign-in screen calls `deepLinks.drop()` when the user
+   abandons it; a route replayed at the start of the next session is navigation nobody asked for.
+5. **The gate and the replay are unit tests** over a plain `SavedStateHandle` and a `Session` — no
+   Activity, no graph, no device. On Compose Desktop the handle has no disk behind it, and needs none: a desktop
+   process that dies loses the link with it.
+
+Process death is one Robolectric test. The second Activity is a new instance with a new
+`ViewModelStore`, built from the first one's saved `Bundle` — what Android hands an Activity it
+restores after killing the process:
+
+<!-- compile: android-test -->
+```kotlin
+import org.robolectric.Robolectric
+
+@RunWith(RobolectricTestRunner::class)
+class DeepLinkProcessDeathTest {
+
+    @Test
+    fun handle_processDiesBeforeReplay_restoredViewModelReplaysRoute() {
+        val first = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+        val url = "https://example.com/orders/42"
+        ViewModelProvider(first.get())[DeepLinkViewModel::class.java].handle(url)
+        val saved = Bundle()
+        first.pause().stop().saveInstanceState(saved).destroy()
+
+        val second = Robolectric.buildActivity(ComponentActivity::class.java).setup(saved)
+        var replayed: Route? = null
+        ViewModelProvider(second.get())[DeepLinkViewModel::class.java]
+            .replay(DeepLinkGate { true }) { replayed = it }
+
+        assertEquals(Route.OrderDetail("42"), replayed)
+    }
+}
+```
+
+`ViewModelProvider(activity)` resolves exactly what `by viewModels()` does in `MainActivity`. Build
+the ViewModel over `SavedStateHandle()` instead — the handle a DI container hands out — and the
+second Activity replays nothing.
 
 ## Desktop Scheme Registration
 
@@ -499,15 +550,18 @@ Receiving the URL is not symmetric either, and the registration has to happen be
 
 ```kotlin
 fun main(args: Array<String>) {
-    val router = DeepLinkRouter(/* … */)
+    val sessions = SessionRepository(/* … */)
+    val deepLinks = DeepLinkViewModel(SavedStateHandle())
     // macOS: register before application { }. A handler installed from a composition effect is
     // too late — the launch-time OpenURIEvent has already been delivered and dropped.
-    val desktop = Desktop.getDesktop()
-    if (desktop.isSupported(Desktop.Action.APP_OPEN_URI)) {
-        desktop.setOpenURIHandler { router.handle(it.uri.toString()) }
+    if (Desktop.isDesktopSupported()) {  // getDesktop() throws where it is not, a headless JVM for one
+        val desktop = Desktop.getDesktop()
+        if (desktop.isSupported(Desktop.Action.APP_OPEN_URI)) {
+            desktop.setOpenURIHandler { deepLinks.handle(it.uri.toString()) }
+        }
     }
-    args.firstOrNull()?.let(router::handle)   // Windows and Linux only: macOS passes no arguments
-    application { Window(onCloseRequest = ::exitApplication) { App() } }
+    args.firstOrNull()?.let(deepLinks::handle)   // Windows and Linux only: macOS passes no arguments
+    application { Window(onCloseRequest = ::exitApplication) { App(deepLinks, sessions.session) } }
 }
 ```
 

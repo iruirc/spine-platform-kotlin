@@ -40,6 +40,7 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+    implementation(libs.ktor.http)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     implementation(libs.orbit.core)

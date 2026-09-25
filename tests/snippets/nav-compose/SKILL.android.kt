@@ -1,8 +1,5 @@
-@Serializable
-sealed interface Route {
-    @Serializable data class OrderDetail(val id: String) : Route
-    @Serializable data class Invoice(val id: String) : Route
-}
+@Composable
+fun HomeRoute(onOpenOrder: (String) -> Unit) {}
 
 data class OrderDetailUiState(val title: String = "")
 sealed interface OrderDetailEvent
@@ -23,3 +20,12 @@ fun OrderDetailScreen(
     onBack: () -> Unit,
     onOpenInvoice: (String) -> Unit,
 ) {}
+
+class CheckoutViewModel : ViewModel() {
+    fun onCurrencyPicked(code: String) {}
+}
+
+class OrderDraftViewModel : ViewModel()
+
+@Composable
+fun ShippingRoute(draft: OrderDraftViewModel) {}

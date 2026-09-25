@@ -11,7 +11,7 @@ ViewModel's business. What a screen holds while it is on screen is `arch-mvvm` a
 the same graph on a Multiplatform target, where the library list changes, is `nav-multiplatform`.
 
 > **Related skills:**
-> - `nav-multiplatform` — the same decision when the UI is shared with iOS, and why neither library below leads that list
+> - `nav-multiplatform` — the same decision when the UI is shared with iOS, where Decompose and Voyager join the list
 > - `nav-deeplinks` — the URL half: intent filters, verification, and the parser that hands this graph a typed Route
 > - `arch-mvvm` — the effect channel behind the navigation lambdas the Route composable wires here
 > - `arch-mvi` — the same boundary when the screen's state machine is a reducer instead of an `update {}`
@@ -43,18 +43,19 @@ stack for you, and Navigation 3 hands it back.
 | A destination is | a `@Serializable` type registered by `composable<T>` | a `NavKey` the `entryProvider` maps to content |
 | Two panes on one screen | one destination hosting both, hand-rolled | a `SceneStrategy`; `ListDetailSceneStrategy` ships |
 | Surviving process death | automatic for the whole graph | `rememberNavBackStack(...)`, keys `@Serializable` |
-| Maturity | stable, the Android default | alpha — the API still moves between releases |
+| Maturity | stable, the Android default | stable since 1.0; newer, with fewer answers in circulation |
 
 **Take Navigation 3 when the back stack is application state.** One signal is enough: the app must
 compute its own stack (an adaptive layout collapsing two destinations into one pane, a wizard whose
 steps depend on the answers, a stack restored from the server), or multi-pane is a requirement and
-`ListDetailSceneStrategy` is the feature you are about to hand-roll. Accept the alpha churn.
+`ListDetailSceneStrategy` is the feature you are about to hand-roll.
 
 **Take Navigation Compose when the project already runs it**, and in a new project matching no
 signal above. It is stable, every Android answer in circulation assumes it, and the type-safe API in
 2.8 removed the one thing that used to be wrong with it. On Compose Desktop the coordinate is
 JetBrains' `org.jetbrains.androidx.navigation:navigation-compose` — the same type-safe API, so every
-sample below reads the same on both targets.
+sample below reads the same on both targets — and Navigation 3's is
+`org.jetbrains.androidx.navigation3:navigation3-ui`.
 
 **Never both in one app.** They share no back stack, so a destination in one is invisible to the
 other and system back reaches exactly one. The rest of this file is written against Navigation
@@ -64,6 +65,7 @@ Compose, naming the Navigation 3 counterpart wherever the shapes differ.
 
 A destination is a `@Serializable` type. No route in this file is a string.
 
+<!-- compile: android -->
 ```kotlin
 // in the module every feature depends on: a sealed family is extended only where it is declared
 @Serializable
@@ -71,16 +73,23 @@ sealed interface Route {
     @Serializable data object Home : Route
     @Serializable data class OrderDetail(val id: String) : Route
     @Serializable data class Search(val query: String? = null) : Route
-    // Invoice(id) and Checkout — further members of this family, elided here
+    @Serializable data class Invoice(val id: String) : Route
+    @Serializable data object Checkout : Route
+    @Serializable data object Shipping : Route
 }
 
-NavHost(navController, startDestination = Route.Home) {
-    composable<Route.Home> {
-        HomeRoute(onOpenOrder = { id -> navController.navigate(Route.OrderDetail(id)) })
-    }
-    composable<Route.OrderDetail> { backStackEntry ->
-        val args = backStackEntry.toRoute<Route.OrderDetail>()
-        OrderDetailRoute(id = args.id, onBack = { navController.popBackStack() })
+@Composable
+fun AppNavHost(navController: NavHostController) {
+    NavHost(navController, startDestination = Route.Home) {
+        composable<Route.Home> {
+            HomeRoute(onOpenOrder = { id -> navController.navigate(Route.OrderDetail(id)) })
+        }
+        composable<Route.OrderDetail> {
+            OrderDetailRoute(
+                onBack = { navController.popBackStack() },
+                onOpenInvoice = { id -> navController.navigate(Route.Invoice(id)) },
+            )
+        }
     }
 }
 ```
@@ -100,7 +109,9 @@ NavHost(navController, startDestination = Route.Home) {
 6. **The ViewModel reads its own arguments** with `savedStateHandle.toRoute<Route.OrderDetail>()` — not a
    string key, and not a `NavController` it should not have.
 
-The same two screens under Navigation 3, where keys are `NavKey` and the stack is yours:
+The same two screens under Navigation 3, where keys are `NavKey` and the stack is yours. The key
+never reaches the entry's `SavedStateHandle`, so rule 6 does not carry over: the ViewModel takes the
+id from its factory — an assisted factory under `di-hilt`, `parametersOf` under `di-koin`:
 
 ```kotlin
 // the same family, with `NavKey` on the interface: `sealed interface Route : NavKey`
@@ -110,7 +121,13 @@ NavDisplay(
     onBack = { backStack.removeLastOrNull() },
     entryProvider = entryProvider {
         entry<Route.Home> { HomeRoute(onOpenOrder = { backStack.add(Route.OrderDetail(it)) }) }
-        entry<Route.OrderDetail> { key -> OrderDetailRoute(id = key.id, onBack = { backStack.removeLastOrNull() }) }
+        entry<Route.OrderDetail> { key ->
+            OrderDetailRoute(
+                onBack = { backStack.removeLastOrNull() },
+                onOpenInvoice = { backStack.add(Route.Invoice(it)) },
+                viewModel = hiltViewModel<OrderDetailViewModel, OrderDetailViewModel.Factory> { it.create(key.id) },
+            )
+        }
     },
 )
 ```
@@ -120,6 +137,7 @@ NavDisplay(
 **One graph per feature, nested inside the root graph.** The feature module exposes an extension on
 `NavGraphBuilder`; the app module installs it and never learns which screens are inside.
 
+<!-- compile: android -->
 ```kotlin
 @Serializable data object OrdersGraph
 
@@ -127,13 +145,18 @@ NavDisplay(
 fun NavGraphBuilder.ordersGraph(navController: NavHostController, onOpenInvoice: (String) -> Unit) {
     navigation<OrdersGraph>(startDestination = Route.Home) {
         composable<Route.Home> { HomeRoute(onOpenOrder = { navController.navigate(Route.OrderDetail(it)) }) }
-        composable<Route.OrderDetail> { OrderDetailRoute(onOpenInvoice = onOpenInvoice) }
+        composable<Route.OrderDetail> {
+            OrderDetailRoute(onBack = { navController.popBackStack() }, onOpenInvoice = onOpenInvoice)
+        }
     }
 }
 
 // in the app module
-NavHost(navController, startDestination = OrdersGraph) {
-    ordersGraph(navController, onOpenInvoice = { navController.navigate(Route.Invoice(it)) })
+@Composable
+fun RootNavHost(navController: NavHostController) {
+    NavHost(navController, startDestination = OrdersGraph) {
+        ordersGraph(navController, onOpenInvoice = { navController.navigate(Route.Invoice(it)) })
+    }
 }
 ```
 
@@ -146,8 +169,8 @@ NavHost(navController, startDestination = OrdersGraph) {
    flow — a wizard, a checkout — where the inner stack is popped as a unit.
 4. **A feature graph does not name another feature's destinations.** It takes a lambda, as above.
    Otherwise the module graph and the navigation graph are the same graph, and neither can change.
-5. **Navigation 3 has no graph object.** A feature exposes an `EntryProviderBuilder` extension, the
-   stack stays flat, and grouping is by key type and scene strategy — rule 4 survives the change.
+5. **Navigation 3 has no graph object.** A feature exposes an `EntryProviderScope<NavKey>` extension,
+   the stack stays flat, and grouping is by key type and scene strategy — rule 4 survives the change.
 
 ## Passing Results Back
 
@@ -156,12 +179,15 @@ Two mechanisms, and the split between them is how long the value has to live.
 **A one-off pick — the previous entry's `SavedStateHandle`.** The picker writes into the entry it
 will return to, then pops:
 
+<!-- compile: android -->
 ```kotlin
 private const val PickedCurrency = "picked_currency"
 
 // in the picker's Route, on the way out
-navController.previousBackStackEntry?.savedStateHandle?.set(PickedCurrency, code)
-navController.popBackStack()
+fun returnCurrency(navController: NavHostController, code: String) {
+    navController.previousBackStackEntry?.savedStateHandle?.set(PickedCurrency, code)
+    navController.popBackStack()
+}
 
 // in the Route of the screen that asked — `composable<Route.Checkout> { entry -> CheckoutRoute(entry, …) }`
 @Composable
@@ -182,12 +208,15 @@ fun CheckoutRoute(
 **A multi-step flow — a ViewModel scoped to the parent graph.** Three screens editing one draft
 share one ViewModel whose store owner is the graph entry, so it dies when the flow is popped:
 
+<!-- compile: android -->
 ```kotlin
-composable<Route.OrderDetail> { entry ->
-    val parentEntry = remember(entry) { navController.getBackStackEntry<OrdersGraph>() }
-    val draft: OrderDraftViewModel = hiltViewModel(parentEntry)
-    // with Koin: koinViewModel<OrderDraftViewModel>(viewModelStoreOwner = parentEntry)
-    OrderDetailRoute(draft = draft)
+fun NavGraphBuilder.shippingStep(navController: NavHostController) {
+    composable<Route.Shipping> { entry ->
+        val parentEntry = remember(entry) { navController.getBackStackEntry<OrdersGraph>() }
+        val draft: OrderDraftViewModel = hiltViewModel(parentEntry)
+        // with Koin: koinViewModel<OrderDraftViewModel>(viewModelStoreOwner = parentEntry)
+        ShippingRoute(draft = draft)
+    }
 }
 ```
 
@@ -250,7 +279,7 @@ fun AppBottomBar(navController: NavHostController, tabs: List<Tab>) {
    to say:
 
 ```kotlin
-BackHandler(enabled = state.hasUnsavedChanges) { // Android; Desktop draws its own back affordance
+BackHandler(enabled = state.hasUnsavedChanges) { // Android; NavigationBackHandler on Desktop
     showDiscardDialog = true
 }
 ```
@@ -261,8 +290,11 @@ BackHandler(enabled = state.hasUnsavedChanges) { // Android; Desktop draws its o
 4. **`popBackStack()` returns a `Boolean`, and on the root destination it returns `false`.** Check
    it: on Android finish the activity, on Desktop close the window. Ignore it and the user presses
    back on a screen that does not move.
-5. **Compose Desktop has no system back at all.** The app draws the affordance — a toolbar arrow, an
-   `Esc` binding, a mouse side button — and `popBackStack()` sits behind each.
+5. **On Compose Desktop, `Esc` is system back.** The window hands it to its
+   `NavigationEventDispatcher`, `NavHost` pops, and a modal screen intercepts it with
+   `NavigationBackHandler` — `nav-multiplatform` → "Back Handling". Never bind `Esc` to
+   `popBackStack()` yourself: a handler that does not consume the key pops the stack twice. `Esc` is
+   invisible, so the window still draws a toolbar arrow, and `popBackStack()` sits behind it.
 
 ## The Boundary
 
@@ -270,6 +302,8 @@ Three composables per destination, and each one knows strictly less than the one
 
 <!-- compile: android -->
 ```kotlin
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+
 fun NavGraphBuilder.orderDetail(navController: NavHostController) {
     composable<Route.OrderDetail> {
         OrderDetailRoute(
@@ -335,7 +369,7 @@ composable<Route.OrderDetail>(
 @Test
 fun openingAnOrderNavigatesToDetail() {
     lateinit var navController: TestNavHostController
-    composeRule.setContent { // Android instrumented; on Desktop test through the Navigator interface
+    composeRule.setContent { // Android instrumented
         navController = TestNavHostController(LocalContext.current)
         navController.navigatorProvider.addNavigator(ComposeNavigator())
         AppNavHost(navController = navController)

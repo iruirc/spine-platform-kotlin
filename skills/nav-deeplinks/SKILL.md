@@ -13,8 +13,8 @@ graph it is registered in, the back stack it pushes — belongs to `nav-compose`
 
 > **Related skills:**
 > - `nav-compose` — the graph the Route lands in, and the `navDeepLink<T>` registration on the destination side
-> - `nav-multiplatform` — the `Navigator` interface the router calls, and the shared `Route` hierarchy the parser produces
-> - `arch-mvvm` — the effect channel a screen already uses to ask for navigation, which a replayed Route reuses
+> - `nav-multiplatform` — the shared `Route` hierarchy the parser produces, and the graph file that replays it
+> - `arch-mvvm` — the held-in-state effect for what must survive process death, which is what a pending Route is
 > - `compose-state` — `rememberSaveable` and `SavedStateHandle`, the two lifetimes the pending route chooses between
 > - `net-architecture` — loading the object a link only names, and the session state the gate reads before replaying
 > - `release-ops` — the signing certificate behind `sha256_cert_fingerprints`, and the packaging that registers a desktop scheme
@@ -61,21 +61,25 @@ inbound URL          intent data · onNewIntent · notification · shortcut · w
 DeepLinkParser.parse(url: String): Route?        pure, no framework, one table test
       |
       v
-DeepLinkRouter                                   asks the gate, holds at most one Route
-      |
-      +-- not ready / behind a gate --> PendingRoute (SavedStateHandle) --+
-      |                                                                   |
-      v                                                          replayed once
-Navigator.navigate(route)  /  NavController inside the Route composable
+PendingRoute                                     at most one Route, in a ViewModel's SavedStateHandle
       |
       v
-nav-multiplatform · nav-compose
+an effect below the NavHost                      asks the gate; replays once, when it opens
+      |
+      v
+navController.navigate(route)  /  the graph file's Navigator
+      |
+      v
+nav-compose · nav-multiplatform
 ```
 
 The `Route` is the one from the graph — `nav-multiplatform`'s hierarchy in `commonMain`, and the
 same types `nav-compose` registers:
 
+<!-- compile: kmp -->
 ```kotlin
+import io.ktor.http.Url
+
 @Serializable
 sealed interface Route {
     @Serializable data object Home : Route
@@ -85,7 +89,7 @@ sealed interface Route {
 
 object DeepLinkParser {
     fun parse(url: String): Route? {
-        val u = runCatching { Url(url) }.getOrNull() ?: return null  // io.ktor.http.Url
+        val u = runCatching { Url(url) }.getOrNull() ?: return null
         val ours = when (u.protocol.name) {          // scheme and host together, never one alone
             "https" -> u.host in setOf("example.com", "www.example.com")
             "myapp" -> u.host == "app"
@@ -114,7 +118,7 @@ percent-encoding and query parsing are exactly where hand-rolled code is wrong.
 ## Rules
 
 1. **Every surface ends at the same call.** Each entry point produces a URL string and hands it to
-   one router. Two parse sites drift apart within a release, and the disagreement is reported as
+   one ViewModel. Two parse sites drift apart within a release, and the disagreement is reported as
    "the link works from the notification and not from the widget".
 2. **The parser is pure.** No `Context`, no `NavController`, no repository, no suspension. It is the
    only part of this skill that needs heavy testing, and it earns that by being a function.
@@ -127,10 +131,10 @@ percent-encoding and query parsing are exactly where hand-rolled code is wrong.
 5. **The link names, the app loads.** A route argument carries an id; the screen fetches the object
    through the repository (`net-architecture`). A URL is public, size-capped and stale by the time
    it is opened, which is `nav-compose`'s rule about route arguments arriving from outside.
-6. **Routing stops at the `Navigator`.** The router produces a `Route` and hands it to the
-   `Navigator` (`nav-multiplatform`) or to the `NavController` the Route composable owns
-   (`nav-compose`). Moving the destination decision here puts a second copy of the graph in the
-   link layer.
+6. **Routing stops at a `Route`.** The ViewModel holds it; the composable that owns the
+   `NavController`, or the `Navigator` `remember`ed beside it (`nav-multiplatform`), navigates to it.
+   Neither is handed to the ViewModel or to DI: `nav-compose` → "The Boundary". Moving the
+   destination decision here puts a second copy of the graph in the link layer.
 7. **Ship the `https` link as the user-facing one.** Keep a custom scheme for internal callbacks and
    QA, and never carry a token, an auth code or anything else secret on it.
 8. **Verification is a release artifact, not a code change.** The intent filter, the hosted file and
@@ -164,7 +168,7 @@ Every row ends at the same `DeepLinkParser.parse` call.
 | Entry point | Arrives as | Note |
 |---|---|---|
 | Cold start from a link | `Activity.intent.data` read in `onCreate` | the same intent is re-delivered to the recreated Activity, so consume it once |
-| Warm start, app already running | `onNewIntent(intent)` | fires only under `launchMode="singleTop"` or `singleTask`; call `setIntent(intent)` so later reads are not the stale one |
+| Warm start, app already running | `onNewIntent(intent)` | fires only when the running instance is reused — `launchMode` `singleTop` (at the top), `singleTask`, `singleInstance`, `singleInstancePerTask`, or an intent carrying `FLAG_ACTIVITY_SINGLE_TOP`; call `setIntent(intent)` so later reads are not the stale one |
 | Navigation Compose's own matching | `navDeepLink<T>(basePath = …)` on the destination (`nav-compose`) | it matches the URL and synthesises the back stack for you |
 | Notification tap | `PendingIntent` wrapping a `VIEW` intent | `FLAG_IMMUTABLE` **or** `FLAG_MUTABLE` is required of an app targeting API 31+ |
 | App Shortcut | `res/xml/shortcuts.xml`, or `ShortcutManagerCompat` for a dynamic one | each `<intent>` is a `VIEW` action over the app's own URL |
@@ -184,11 +188,22 @@ owner; two owners for one shape is a race whose winner changes with the graph.
 The bug this section exists for: the link works while the app is open and does nothing from a killed
 app, because it arrived before the graph existed or before the app knew who was signed in.
 
+The holder takes a ViewModel's own `SavedStateHandle`: that handle is the one the Activity saves and
+a restore after process death hands back, and a handle built in DI or by hand is never saved. The
+Activity reads its launch link only when `savedInstanceState` is `null` — so a rotation does not
+handle it twice — and a link held before the process died is waiting in the restored handle. `held`
+changes on every hold, which is how the replay learns there is something to replay.
+
+<!-- compile: kmp -->
 ```kotlin
-// survives process death because SavedStateHandle does; the Route is @Serializable already
+import kotlinx.serialization.json.Json
+
 class PendingRoute(private val handle: SavedStateHandle) {
+    val held: StateFlow<String?> = handle.getStateFlow(KEY, null)
+
     fun hold(route: Route) { handle[KEY] = Json.encodeToString(route) }
-    fun consume(): Route? = handle.remove<String>(KEY)?.let { Json.decodeFromString<Route>(it) }
+    fun consume(): Route? = handle.get<String>(KEY)?.let { drop(); Json.decodeFromString<Route>(it) }
+    fun drop() { handle[KEY] = null } // never remove(): it detaches `held` from the key
 
     private companion object { const val KEY = "pending_route" }
 }
@@ -199,13 +214,14 @@ class PendingRoute(private val handle: SavedStateHandle) {
 2. **The gate is app state, not a delay.** It opens when the graph has composed *and* the session
    has resolved to a definite answer (signed in, signed out — never "still loading") *and*
    onboarding is finished. A `delay(300)` in place of that condition is the same bug with a timer.
-3. **Consume, do not read.** `remove`, not `get`: a rotation after the replay must not navigate a
-   second time, and the second copy of the detail screen on the back stack is how you find out.
+3. **Consume, do not read.** `consume()` clears the slot as it returns the route: a rotation after
+   the replay must not navigate a second time, and the second copy of the detail screen on the back
+   stack is how you find out.
 4. **Gate per route, not per app.** A public link should not wait for the session to resolve; only
    the routes that need an identity do.
-5. **Drop it when the gate closes for good.** If the user abandons sign-in, the pending route dies
-   with the attempt — replaying it at the start of the next session is navigation the user did not
-   ask for and cannot explain.
+5. **Drop it when the gate closes for good.** If the user abandons sign-in, `drop()` ends the
+   pending route with the attempt — replaying it at the start of the next session is navigation the
+   user did not ask for and cannot explain.
 6. **Reset or preserve the existing back stack is a product decision**, not a default: a link
    arriving mid-checkout either interrupts it or queues behind it. Capture the answer in
    `spine-toolkit:feature-requirements` before writing either one.
@@ -253,10 +269,11 @@ adb shell pm get-app-links com.example.app
    `LaunchedEffect` above the `NavHost`, or from a callback that fires while the destination is
    still unregistered — an `IllegalArgumentException` naming a destination that is about to exist.
    The gate's first condition is that the graph has composed.
-4. **`launchMode="standard"` with `onNewIntent` code.** The override never runs; every link stacks a
-   fresh Activity instance on top of the old one, and back goes through a museum of them. The mirror
-   image is an `onNewIntent` that reads `getIntent()` instead of its parameter and routes to the
-   link before last.
+4. **`launchMode="standard"` with `onNewIntent` code.** The override runs only for an intent that
+   carries `FLAG_ACTIVITY_SINGLE_TOP`, and a link from outside the app is not the app's to flag;
+   every other link stacks a fresh Activity instance on top of the old one, and back goes through a
+   museum of them. The mirror image is an `onNewIntent` that reads `getIntent()` instead of its
+   parameter and routes to the link before last.
 5. **A `PendingIntent` with neither `FLAG_IMMUTABLE` nor `FLAG_MUTABLE`.** An app targeting API 31
    or later throws, and it throws where the notification is built rather than where the link is
    handled, so the stack trace blames the wrong feature.

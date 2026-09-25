@@ -28,6 +28,7 @@ kotlin {
                 implementation(libs.jetbrains.navigation.compose)
                 implementation(libs.jetbrains.navigation3.ui)
                 implementation(libs.koin.core)
+                implementation(libs.ktor.http)
                 implementation(libs.koin.compose.viewmodel)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)

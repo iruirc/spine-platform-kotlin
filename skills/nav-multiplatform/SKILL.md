@@ -1,11 +1,11 @@
 ---
 name: nav-multiplatform
-description: "Use when choosing and wiring navigation in a Kotlin Multiplatform UI — Compose Multiplatform navigation-compose, Decompose or Voyager. Covers the comparison, back handling per platform, state preservation across Android, iOS and desktop, and keeping navigation out of commonMain business logic."
+description: "Use when choosing and wiring navigation in a Kotlin Multiplatform UI — Compose Multiplatform navigation-compose or Navigation 3, Decompose or Voyager. Covers the comparison, back handling per platform, state preservation across Android, iOS and desktop, and keeping navigation out of commonMain business logic."
 ---
 
 # Navigation in Kotlin Multiplatform
 
-Three libraries answer the same question — who owns the back stack when one UI serves Android, iOS
+Four libraries answer the same question — who owns the back stack when one UI serves Android, iOS
 and desktop — and they answer it differently enough that the choice is hard to reverse. This file
 makes that choice, states what back and state preservation actually mean on each target, and fixes
 the one boundary that keeps the choice reversible. An Android-only or Desktop-only graph is
@@ -16,7 +16,7 @@ the one boundary that keeps the choice reversible. An Android-only or Desktop-on
 > - `nav-deeplinks` — the URL half, and the typed Route it hands to whichever library below you picked
 > - `arch-mvvm` — the effect a shared ViewModel emits where it would otherwise navigate
 > - `compose-state` — `rememberSaveable` and `SaveableStateHolder`, and what each of them survives
-> - `pkg-kmp-source-sets` — where the `Navigator` interface and its per-host implementations sit
+> - `pkg-kmp-source-sets` — where the shared `Route` sits, and which source set holds each host's graph file
 > - `di-koin` — `koinViewModel()` for the shared ViewModels, and the back-stack entry it scopes them to
 > - `architecture-choice` — the compass that names this skill as soon as `target` resolves to KMP
 
@@ -34,33 +34,35 @@ Not for a graph that only ever runs on Android or Desktop — that is `nav-compo
 typed routes and the ViewModel boundary hold for every library named here. Not for turning a URL
 into a destination: `nav-deeplinks` owns that end.
 
-## The Three Options
+## The Options
 
-| | `org.jetbrains.androidx.navigation:navigation-compose` | Decompose | Voyager |
-|---|---|---|---|
-| Model | `NavController` + `NavHost`, the same API as Android's | a tree of components, each with a `ComponentContext`; `childStack` driven by `StackNavigation` | screens as objects, held in a `Navigator`'s list |
-| Typed destinations | `@Serializable` routes, exactly as in `nav-compose` | a `@Serializable` sealed `Config` per stack | the `Screen` object carries its own arguments |
-| Needs Compose | yes | no — the component tree is plain Kotlin, a UI is attached to it | yes |
-| Lifecycle & retention | Compose's, plus the multiplatform `ViewModel` | its own: `Lifecycle`, `StateKeeper`, `InstanceKeeper`, `BackHandler` (Essenty) | `ScreenModel`, retained by the `Navigator` |
-| Nested / parallel stacks | nested graphs, one active stack | native to the model: a component owns children | one `Navigator` per nesting level |
-| Maturity | youngest of the three; iOS and web support still maturing | mature and steadily released | simplest to adopt; maintenance cadence is slower than the other two |
+| | `org.jetbrains.androidx.navigation:navigation-compose` | `org.jetbrains.androidx.navigation3:navigation3-ui` | Decompose | Voyager |
+|---|---|---|---|---|
+| Model | `NavController` + `NavHost`, the same API as Android's | a back stack the app holds, drawn by `NavDisplay` — Android's Navigation 3 | a tree of components, each with a `ComponentContext`; `childStack` driven by `StackNavigation` | screens as objects, held in a `Navigator`'s list |
+| Typed destinations | `@Serializable` routes, exactly as in `nav-compose` | `@Serializable` `NavKey`s, as in `nav-compose` | a `@Serializable` sealed `Config` per stack | the `Screen` object carries its own arguments |
+| Needs Compose | yes | yes | no — the component tree is plain Kotlin, a UI is attached to it | yes |
+| Lifecycle & retention | Compose's, plus the multiplatform `ViewModel` | Compose's, plus a `ViewModel` scoped per entry | its own: `Lifecycle`, `StateKeeper`, `InstanceKeeper`, `BackHandler` (Essenty) | `ScreenModel`, retained by the `Navigator` |
+| Nested / parallel stacks | nested graphs, one active stack | as many lists as the app keeps | native to the model: a component owns children | one `Navigator` per nesting level |
+| Maturity | stable; iOS and web support still maturing | stable, and the newest of the four | mature and steadily released | simplest to adopt; maintenance cadence is slower than the others |
 
 1. **Take `navigation-compose` when the team already knows Navigation Compose** and every target
    renders with Compose Multiplatform. The API, the typed routes and every rule in `nav-compose`
    transfer, so a shared screen and an Android-only screen are written the same way. Pin the version
    and read the release notes: this is where the port is still moving.
-2. **Take Decompose when navigation must exist without a UI.** Its stack is a tree of plain Kotlin
+2. **Take Navigation 3 when the back stack is application state** — the signals are
+   `nav-compose` → "Which Library", and they read the same with a shared UI.
+3. **Take Decompose when navigation must exist without a UI.** Its stack is a tree of plain Kotlin
    components, so it is testable with no Compose runtime, it survives a screen being rendered by the
    platform's own UI toolkit instead of Compose, and nested or parallel stacks (a tab holding its own
    stack, a dialog as a component) are the model rather than a workaround. The cost is ceremony:
    every component takes a `ComponentContext`, and retention is something you declare.
-3. **Take Voyager when the app is small and the stack is a list of screens.** A `Screen` object and a
+4. **Take Voyager when the app is small and the stack is a list of screens.** A `Screen` object and a
    `Navigator` is all there is to learn. Weigh it with open eyes: its release cadence is slower than
-   the other two, so treat "the version we pinned is the version we have for a while" as part of the
+   the others, so treat "the version we pinned is the version we have for a while" as part of the
    decision rather than as a surprise.
-4. **One library per app.** Two of them means two back stacks, and system back reaches one of them.
-   Rule: whichever you pick, hide it behind the `Navigator` below, so the day the pick is wrong the
-   damage is one module.
+5. **One library per app.** Two of them means two back stacks, and system back reaches one of them.
+   Whichever you pick, keep it inside the graph file below, so the day the pick is wrong the damage
+   is one file.
 
 **When in doubt**, and the app is Compose everywhere with an Android-shaped team, start with
 `navigation-compose`. Reach for Decompose the moment a non-Compose UI host or a genuinely nested
@@ -72,30 +74,41 @@ Back is not one gesture. It is three different platform facts sharing a name:
 
 | Target | What "back" is | What the library must map |
 |---|---|---|
-| Android | the system back button and the predictive-back gesture | `OnBackPressedDispatcher`, surfaced to Compose as `BackHandler` |
+| Android | the system back button and the predictive-back gesture | `OnBackPressedDispatcher`, which feeds the `NavigationEventDispatcher` |
 | iOS | the edge swipe and the navigation bar's back control | both, and the swipe wants a live progress preview to feel right |
-| Desktop | nothing — there is no system back | the app draws it: a toolbar arrow, an `Esc` binding, a mouse side button |
+| Desktop | the `Esc` key, which the window hands to its `NavigationEventDispatcher` | nothing — `NavHost` and `NavDisplay` already pop on it |
 
-1. **One back abstraction in `commonMain`, and every screen calls it.** Compose Multiplatform ships
-   one since 1.8 — `BackHandler` and `PredictiveBackHandler` from `androidx.compose.ui.backhandler`,
-   in `org.jetbrains.compose.ui:ui-backhandler`, a separate dependency the `commonMain` source set
-   declares. Still experimental: pin the version and expect the import path to move once more.
+1. **One back abstraction in `commonMain`, and every screen calls it** — `NavigationBackHandler`
+   from `androidx.navigationevent.compose`, which every target's dispatcher feeds. It replaces
+   `BackHandler` and `PredictiveBackHandler` from `org.jetbrains.compose.ui:ui-backhandler`,
+   deprecated in Compose Multiplatform 1.12; the artifact still carries it in as a dependency.
 
+<!-- compile: kmp -->
 ```kotlin
 // commonMain
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+
 @Composable
 fun EditorScreen(state: EditorState, onDiscard: () -> Unit, onBack: () -> Unit) {
-    BackHandler(enabled = state.hasUnsavedChanges) { onDiscard() }
+    NavigationBackHandler(
+        state = rememberNavigationEventState(NavigationEventInfo.None),
+        isBackEnabled = state.hasUnsavedChanges,
+        onBackCompleted = onDiscard,
+    )
     EditorScaffold(state = state, onBack = onBack)
 }
 ```
 
-2. **Decompose brings its own**, from Essenty, plus `PredictiveBackGestureOverlay` — which draws the
-   edge-swipe preview on every target, including the ones whose OS has no such gesture. If the app
-   is on Decompose, use that one and do not mix in the Compose Multiplatform handler.
-3. **On desktop the handler never fires**, so a screen that is only escapable through back is a
-   screen with no exit. Every back path also needs a drawn control, and that control calls the same
-   `onBack` lambda the handler does.
+2. **Decompose brings its own**, from Essenty. Its `PredictiveBackGestureOverlay` draws an edge-swipe
+   preview on the targets whose OS has no such gesture; it exists only outside Android and is
+   `@ExperimentalDecomposeApi`. If the app is on Decompose, use its handler and do not mix in
+   `NavigationBackHandler`.
+3. **On desktop `Esc` is the only back, and nobody finds it.** Every back path also needs a drawn
+   control, and that control calls the same `onBack` lambda the handler does. Never bind `Esc` to
+   `onBack` yourself: the key already reaches the dispatcher, and a handler that does not consume it
+   pops the stack twice.
 4. **Intercept back only for modal UI** — an unsaved-changes dialog, a bottom sheet, a step inside
    one destination — and keep the interception conditional, exactly as `nav-compose` states it for
    the single-target case. An always-on handler cancels the predictive-back preview on Android.
@@ -199,8 +212,8 @@ fun AppNavHost() {
    the parent pushes. A host that draws its own screens gets its own graph file;
    `pkg-kmp-source-sets` decides which source set holds each.
 4. **`Navigator` lives exactly as long as the controller it wraps** — `remember`ed beside it and
-   handed to what moves the user from outside a screen: the deep-link router, a sign-out at the
-   root. It is never a DI binding, for the reason `nav-compose` → "The Boundary" gives.
+   handed to what moves the user from outside a screen: the deep-link replay effect, a sign-out at
+   the root. It is never a DI binding, for the reason `nav-compose` → "The Boundary" gives.
 5. **Voyager also has a type called `Navigator`.** Import-alias the library's one inside its
    implementation file; do not rename the interface. Its name is the app's vocabulary and it is the
    same word on every target.
