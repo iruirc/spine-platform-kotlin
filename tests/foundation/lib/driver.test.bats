@@ -108,3 +108,15 @@ setup() {
                  --exclude-dir=.git --exclude-dir=tests --exclude-dir=.superpowers || true)"
   [ -z "$offenders" ] || { echo "$offenders"; return 1; }
 }
+
+@test "the brief's drive_app and manual_checks outrank every validator's file chain" {
+  # Core resolves drive_app and manual_checks before dispatch and may override them for one run,
+  # which neither Task.md nor CLAUDE-spine-toolkit.md records; the file chain must yield to the brief.
+  bad=""
+  for V in "$ROOT"/agents/kotlin-*-validator.md; do
+    sw="$(sed -n '/^### The drive_app switch$/,/^### /p' "$V")"
+    grep -qF 'that value is final' <<<"$sw" || bad="$bad ${V##*/}:switch"
+    grep -qF 'the stage brief outranks both files' "$V" || bad="$bad ${V##*/}:inputs"
+  done
+  [ -z "$bad" ] || { echo "file chain not subordinate to the brief:$bad"; return 1; }
+}

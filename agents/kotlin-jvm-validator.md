@@ -35,7 +35,7 @@ Produce output in the sections described in the "Output Structure" section below
 In this order:
 
 1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `[DRIVE_APP]` default.
-2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch").
+2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files.
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
 5. Project root: locate `settings.gradle(.kts)` / `pom.xml` / `module.yaml`; `- Build:` in `## Stack` says which tool.
@@ -45,6 +45,8 @@ If `Task.md`, `Plan.md`, or — for BUG — `Reproduce.md` is missing, fail fast
 ## Validation Process by Profile
 
 ### The drive_app switch
+
+When the stage brief names this run's `drive_app` or `manual_checks`, that value is final: core walked the chain below before dispatch and may have overridden it for this run alone, which neither file records. Walk the chain only for a field the brief does not name.
 
 Two independent fields, each resolved the same way — `<task_path>/Task.md` first, then `CLAUDE-spine-toolkit.md`, then the default. Both files spell the field the same way. A missing line in either, or an unrecognised value, falls through to the next step.
 
