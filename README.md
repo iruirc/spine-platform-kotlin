@@ -6,8 +6,8 @@
 
 The Kotlin platform plugin for **spine-toolkit**, with native manifests for Claude Code and Codex.
 One plugin for three surfaces — Android, Compose Desktop and JVM servers, with KMP as the way they
-share code — carrying sixteen Claude Code agents, twenty-nine architecture and infrastructure
-skills, and the manifest that declares all of it to the orchestrator.
+share code — carrying sixteen Claude Code agents, thirty architecture and infrastructure skills,
+and the manifest that declares all of it to the orchestrator.
 
 It is not a standalone toolkit: on its own it has skills you can invoke by hand, but nothing that
 runs a task. spine-toolkit supplies the process; this plugin supplies who does the work and what
@@ -52,7 +52,7 @@ codex plugin add spine-platform-kotlin@personal
 
 Start a new Codex session after installation. What Codex gets is a subset:
 
-- **Works:** the twenty-nine standalone architecture and infrastructure knowledge skills.
+- **Works:** the thirty standalone architecture and infrastructure knowledge skills.
 - **Not supported in Codex yet:** the sixteen `agents/` and the `kotlin-init` command are Claude
   Code components. `spine-toolkit` ships no Codex manifest, so nothing orchestrates tasks, and its
   internal `manifest` and `kotlin-setup` skills cannot complete their workflows. Codex still
@@ -128,16 +128,17 @@ through it, or invoked by name by an agent.
 
 - `spine-toolkit` `>=2.12.0 <3`, declared as a dependency in `plugin.json`. An installed core
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
-- The validators drive Android through `adb` and the `mobile` MCP, desktop apps through the same
-  MCP, and servers with `curl`; a project with none of those available sets `[DRIVE_APP] = [off]`
-  in its config and the checks become a hand-run script.
+- The validators drive Android and desktop apps through the driver the project resolved — the
+  manifest's `## Driver` default when it never chose one — and servers with `curl`; a project with
+  none of those available sets `[DRIVE_APP] = [off]` in its config and the checks become a hand-run
+  script.
 - Foundation tests need `bats-core` ≥ 1.10 (`brew install bats-core`).
 
 ## Internationalization
 
 English is the source of truth. User-facing strings live in `skills/<name>/locales/en.md` with a
-key-for-key `ru.md` beside it — in 1.0 that is `kotlin-setup` alone. The active language comes
-from the project config's `[LANG]` field. Whatever it is, the agents and `kotlin-setup` list
+key-for-key `ru.md` beside it; `kotlin-setup` is the one skill that has them. The active language
+comes from the project config's `[LANG]` field. Whatever it is, the agents and `kotlin-setup` list
 their triggers in both languages; the knowledge skills list English ones.
 Convention: `conventions/i18n.md`.
 

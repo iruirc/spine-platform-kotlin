@@ -1,12 +1,12 @@
 ---
 name: manifest
-description: Platform manifest for spine-platform-kotlin. Data, not instructions — the five tables spine-toolkit reads to bind roles, axes, heuristics, topics and entrypoints.
+description: Platform manifest for spine-platform-kotlin. Data, not instructions — the five required tables spine-toolkit reads to bind roles, axes, heuristics, topics and entrypoints, and the Driver table this platform declares.
 ---
 
 # Kotlin Platform Manifest
 
-> This skill is **data**, not instructions. spine-toolkit reads the five tables below by
-> invoking this skill; there is no procedure here to follow.
+> This skill is **data**, not instructions. spine-toolkit reads the five required tables below,
+> and the optional `## Driver`, by invoking this skill; there is no procedure here to follow.
 
 This is `spine-platform-kotlin`'s manifest — the contract `spine-toolkit` documents and demonstrates
 with its own reference platform manifest, filled in for Kotlin across three surfaces: Android,

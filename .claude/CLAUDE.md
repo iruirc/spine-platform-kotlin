@@ -23,11 +23,12 @@ en
 
 ## Repository layout
 
-- `skills/manifest/SKILL.md` — **the contract core reads.** Five tables: `## Roles`, `## Axes`,
-  `## Heuristics`, `## Topics`, `## Entrypoints`. Everything core knows about Kotlin arrives here.
+- `skills/manifest/SKILL.md` — **the contract core reads.** Five required tables: `## Roles`,
+  `## Axes`, `## Heuristics`, `## Topics`, `## Entrypoints`; and the optional `## Driver`.
+  Everything core knows about Kotlin arrives here.
 - `skills/` — knowledge skills: `architecture-choice`, `arch-*`, `compose-state`, `nav-*`, `net-*`,
   `persistence-*`, `di-*`, `concurrency-coroutines`, `reactive-flow`, `error-architecture`, `pkg-*`,
-  `release-ops*`, plus `kotlin-setup`
+  `release-ops*`, `test-frameworks`, plus `kotlin-setup`
 - `agents/` — sixteen `kotlin-*` Claude Code subagents, named by the manifest's `## Roles` table;
   `developer`, `tester` and `validator` fan out on `target`
 - `commands/` — `/kotlin-init`
