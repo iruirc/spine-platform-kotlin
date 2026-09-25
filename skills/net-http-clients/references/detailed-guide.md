@@ -809,10 +809,8 @@ val mapper: JsonMapper = jacksonMapperBuilder()
 - Customize Boot's mapper, never replace the bean: a `JsonMapper` bean of your own drops every module
   and `spring.jackson.*` setting Boot applied, and the symptom is a date format that changed for no
   traceable reason.
-- Without `jackson-module-kotlin`, Jackson reads the constructor by the parameter names that the Boot
-  Gradle plugin's `-java-parameters` compiles in, and ignores the Kotlin defaults: an absent or `null`
-  value for a non-null parameter fails with "Parameter specified as non-null is null". With it,
-  defaults apply and a `null` for a non-null `val` fails naming the property.
+- Without `jackson-module-kotlin`, Jackson ignores the Kotlin defaults; what that breaks, and how, is
+  `SKILL.md`'s Serializer rule 2.
 - Jackson 3 already does what the Jackson 2 setup did by hand: `java.time` is built in, dates are
   written as ISO-8601, and unknown properties are ignored. A mapper is immutable once built, so every
   setting goes on the builder.

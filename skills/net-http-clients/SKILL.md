@@ -93,11 +93,12 @@ Not for the layer above the client — the API interface, retry, refresh, paging
    server adds a field the app stops parsing — an outage caused by a backwards-compatible change.
 2. **`jackson-module-kotlin` is not optional.** Without it Jackson calls a Kotlin constructor as if
    it were Java: a Boot build compiles with `-java-parameters`, so the names resolve, but a field the
-   payload omits is passed as `null` whatever its default, and an absent or `null` value for a
-   non-null parameter fails the read with "Parameter specified as non-null is null". (Without
-   `-java-parameters` it finds no constructor at all: "no Creators".) With it, defaults apply and a
-   `null` for a non-null `val` fails naming the property. On Boot 4 it is
-   `tools.jackson.module:jackson-module-kotlin`, and Boot registers it once it is on the classpath.
+   payload omits is passed as `null` whatever its default. A nullable field then reads as `null`
+   with no error; a non-null one fails the read with "Parameter specified as non-null is null", an
+   `Int` with "Cannot map `null` into type `int`". (Without `-java-parameters` it finds no
+   constructor at all: "no Creators".) With it, defaults apply and a `null` for a non-null `val`
+   fails naming the property. On Boot 4 it is `tools.jackson.module:jackson-module-kotlin`, and
+   Boot registers it once it is on the classpath.
 3. **Moshi's codegen over its reflection.** Reflection pulls `kotlin-reflect` into the app, is slower
    to start, and the adapter errors arrive at runtime instead of at build time.
 4. **One configured instance, injected.** A `Json { }`, a `Moshi` or an `ObjectMapper` built at a call
@@ -199,11 +200,9 @@ and the engine argument are left out for length — see the reference for the fu
    every time and leaks threads until the pool evicts them. A variant — a different timeout for
    uploads, an extra interceptor — comes from `newBuilder()`, which shares the pool, the dispatcher
    and the cache with its parent. Retrofit instances over a shared client are cheap; the client is
-   what is expensive. The token-refresh client is the exception that must not share the dispatcher:
-   the auth interceptor holds a dispatcher thread until the refresh returns, so a refresh queued on
-   the same `Dispatcher` waits for the calls that wait for it, and at five parallel 401s to one host
-   nothing ever completes. Build it from a client without the auth interceptor, with
-   `.dispatcher(Dispatcher())`.
+   what is expensive. The token-refresh client is the exception: build it from a client without the
+   auth interceptor, with `.dispatcher(Dispatcher())` — the reference's `Retrofit + OkHttp` says why
+   a shared dispatcher deadlocks.
 3. **Close what needs closing.** A Ktor `HttpClient` holds engine resources and is `close()`d at
    shutdown; a long-lived one that is never closed in a CLI keeps the process alive.
 4. **Redact before you log, not after.** `HttpLoggingInterceptor.redactHeader("Authorization")` and
@@ -255,9 +254,8 @@ and the engine argument are left out for length — see the reference for the fu
 4. **A new client per request.** Every call pays a fresh TCP and TLS handshake, the response cache
    never hits, and the abandoned dispatchers keep their threads until they idle out. One instance,
    `newBuilder()` for variants.
-5. **Jackson without `jackson-module-kotlin`.** Kotlin defaults are ignored: the first payload that
-   omits a field with a default fails with "Parameter specified as non-null is null", so an optional
-   field the server stops sending breaks parsing.
+5. **Jackson without `jackson-module-kotlin`.** Kotlin defaults are ignored, so an optional field the
+   server stops sending either breaks parsing or turns `null` in silence (Serializer, rule 2).
 6. **Default timeouts, or no policy at all.** A Ktor client with `HttpTimeout` never installed has no
    client-level policy and inherits whatever its engine happens to default to — different on `CIO`,
    `OkHttp` and `Darwin`. An OkHttp client with no `callTimeout` holds a spinner on screen for as long
