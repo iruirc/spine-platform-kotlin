@@ -41,8 +41,7 @@ boundaries a Kotlin project actually has.
 - Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
   a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
-- Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
-  2.3+, fixed for the test
+- Time → an injected `kotlin.time.Clock`, or `java.time.Clock` in JVM-only code, fixed for the test
 - DI container → a fresh container per test, or test-specific overrides
 - Platform APIs → Android `Context`, sensors, `SharedPreferences`, system services
 

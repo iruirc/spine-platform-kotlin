@@ -29,8 +29,9 @@ design each module by its own target and put the boundary between them in
 
 ### Decision Framework for Client Components (Android / Desktop / KMP UI)
 
-1. Which presentation pattern does the project use? → `- Architecture:` says MVVM, MVI or Clean.
-   Follow it; do not mix per feature.
+1. Which pattern does the project use? → `- Architecture:` names it, and its skill gives the shape:
+   `MVVM` — `arch-mvvm` → "Structure"; `MVI` — `arch-mvi` → "Core Shape"; `Clean Architecture` —
+   `arch-clean` → "Layers and the Dependency Rule". Follow it; do not mix per feature.
 2. How is screen state modelled? → One `UiState` (sealed interface or data class) per screen,
    every state explicit: loading, content, error, empty. Unidirectional: state down, events up.
 3. Where does state live? → ViewModel (`StateFlow`), never in a composable beyond
@@ -44,18 +45,18 @@ design each module by its own target and put the boundary between them in
 
 ### Decision Framework for Server Components
 
-1. Does it fit the existing layering? → `- Architecture:` says Layered or Hexagonal; follow the
-   layer boundaries exactly. See `arch-layered`, `arch-hexagonal`.
-2. Which layer? → Entry point (controller / route), Service (business logic), Repository (data
-   access), Domain (models and value objects).
-3. Which framework conventions? → `- Framework:` says Spring Boot, Ktor, Micronaut, Quarkus or
+1. Where does it go? → `- Architecture:` names the shape and its skill places each part:
+   `Layered` — `arch-layered` → "The Four Layers"; `Hexagonal` — `arch-hexagonal` → "Shape";
+   `Clean Architecture` — `arch-clean` → "Layers and the Dependency Rule". No line, as on a CLI,
+   means Layered. Follow its boundaries exactly.
+2. Which framework conventions? → `- Framework:` says Spring Boot, Ktor, Micronaut, Quarkus or
    http4k. Follow what the project already uses; never introduce a second one.
-4. Does it expose an API? → Contract first: endpoints or gRPC service, request/response DTOs
+3. Does it expose an API? → Contract first: endpoints or gRPC service, request/response DTOs
    separate from domain models. See `net-openapi` when a spec exists.
-5. Does it touch the database? → Schema change, migration strategy and repository interface
+4. Does it touch the database? → Schema change, migration strategy and repository interface
    before implementation; query patterns and indexes considered. See `persistence-jvm-orm`,
    `persistence-migrations`.
-6. New external dependency? → An interface wraps it; no library type leaks into the domain.
+5. New external dependency? → An interface wraps it; no library type leaks into the domain.
 
 ### Decision Framework for CLI Components
 
@@ -89,8 +90,7 @@ design each module by its own target and put the boundary between them in
 ### Reviewing Architecture
 
 1. Verify the chosen pattern is applied consistently.
-2. Check dependency direction — inward only (entry point → service → repository → domain;
-   UI → ViewModel → domain → data). No reverse edges.
+2. Check dependency direction against the rule of the `- Architecture:` skill. No reverse edges.
 3. Confirm the design declares the interfaces `arch-clean` → "Interfaces and Concrete Classes"
    calls for, and no others.
 4. Validate separation of concerns — no business logic in controllers or composables, no
@@ -127,7 +127,7 @@ Consult the skill that matches the target and the concern at hand:
 - `arch-hexagonal` — ports and adapters on a JVM server: a framework-free core, inbound and outbound ports
 - `compose-state` — where state lives in a Compose UI: hoisting, `remember` vs `rememberSaveable` vs ViewModel, stability, recomposition
 - `nav-compose` — Navigation Compose and Navigation 3: type-safe routes, nested graphs, arguments and results, back handling
-- `nav-multiplatform` — KMP navigation: navigation-compose vs Decompose vs Voyager, back handling and state preservation per platform
+- `nav-multiplatform` — KMP navigation: navigation-compose vs Navigation 3 vs Decompose vs Voyager, back handling and state preservation per platform
 - `nav-deeplinks` — URL → typed Route: App Links vs custom schemes, OS entry points, cold-start buffering behind auth
 - `net-architecture` — the networking layer: the ApiClient boundary, middleware order, auth refresh, retry, pagination, caching
 - `net-http-clients` — choosing and configuring the HTTP client and serializer (Retrofit + OkHttp, Ktor client, Spring RestClient/WebClient)

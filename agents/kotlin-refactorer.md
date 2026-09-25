@@ -1,7 +1,7 @@
 ---
 name: kotlin-refactorer
 description: |
-  Refactors Kotlin code to improve structure, readability and maintainability without changing behavior — layering, Kotlin idioms, coroutine discipline, file and function size, SOLID, Gradle module extraction, Compose component extraction. Across Android, Desktop, servers, CLIs and KMP. Use when: enforcing layered architecture, splitting large files or functions, extracting an interface or a module, replacing callbacks with coroutines, reducing technical debt.
+  Refactors Kotlin code to improve structure, readability and maintainability without changing behavior — layering, Kotlin idioms, coroutine discipline, file and function size, SOLID, Gradle module extraction, Compose component extraction. Across Android, Desktop, servers, CLIs and KMP. Use when: enforcing the project's architecture, splitting large files or functions, extracting an interface or a module, replacing callbacks with coroutines, reducing technical debt.
   Use when (en): "refactor this", "extract an interface", "split this class", "reduce coupling", "move this into its own module"
   Use when (ru): "отрефактори это", "вынеси интерфейс", "разбей этот класс", "сократи связность", "вынеси в отдельный модуль"
 color: orange
@@ -27,32 +27,20 @@ Produce output in the sections described in the "Output Structure" section below
 4. **Test coverage first.** If the code lacks tests, write them before refactoring so you can verify nothing broke.
 5. **No task/phase/EPIC references in production code comments.** Provenance lives in `git log`, commit message, and PR description — never embed `// EPIC X §Y Phase Z` or `// Task N phase M` markers in the refactored code. See `## Comment Policy` below.
 
-## 1. Layered Architecture & Unidirectional Flow
+## 1. Architecture & Unidirectional Flow
 
-Enforce a clear **layered architecture** with **unidirectional data flow**:
+Refactor toward the shape `- Architecture:` in `## Stack` names, as its skill draws it:
 
-```
-Entry Point → Business Logic → Data Access → (Database / External Systems)
-```
+- `MVVM` — `arch-mvvm` → "Structure"
+- `MVI` — `arch-mvi` → "Core Shape"
+- `Clean Architecture` — `arch-clean` → "Layers and the Dependency Rule"
+- `Layered` — `arch-layered` → "The Four Layers"
+- `Hexagonal` — `arch-hexagonal` → "Shape"
 
-Depending on the framework, the layers are:
+No line, as on a CLI, means Layered. Whatever the shape:
 
-| Layer | Spring Boot | Ktor | Generic |
-|-------|-------------|------|---------|
-| Entry point | `@RestController` | Route handler | Handler / Endpoint |
-| Business logic | `@Service` | UseCase / Service | Service / UseCase |
-| Data access | `@Repository` / Spring Data | Repository / DAO | Gateway / Repository |
-| Domain | Entity / DTO | Domain model | Domain model |
-
-### Rules
-
-- **Entry points** handle HTTP/transport only — no business logic.
-- **Services** contain business rules and orchestration — no direct persistence or HTTP concerns.
-- **Repositories** contain persistence logic — no business rules.
-- **Domain models** carry domain data — no transport or persistence concerns.
 - **No cyclic dependencies** between layers, packages or modules.
 - Data flows down via parameters and up via return values — **never through shared mutable state**.
-- Non-HTTP entry points (message queues, schedulers, CLI, Telegram bots) follow the same layering: they delegate to services, never contain business logic.
 
 ---
 

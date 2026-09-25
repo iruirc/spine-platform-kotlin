@@ -41,8 +41,7 @@ boundaries a Kotlin project actually has.
 - Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
   a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
-- Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
-  2.3+, fixed for the test
+- Time → an injected `kotlin.time.Clock`, or `java.time.Clock` in JVM-only code, fixed for the test
 - DI container → a fresh container per test, or test-specific overrides
 - Platform APIs → Android `Context`, sensors, `SharedPreferences`, system services
 
@@ -97,9 +96,9 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 | Behaviour | Source set | Framework |
 |---|---|---|
 | Shared logic, contracts, mappers, ViewModels | `commonTest` | `kotlin.test` (`@Test`, `assertEquals`, `assertFailsWith`) — or a Kotest spec where the module has `kotest-framework-engine`; never JUnit, which is JVM-only |
-| An `actual` | the platform test set (`androidUnitTest`, `jvmTest`, `desktopTest`) | the module's `- Tests:` value, except where Robolectric forces JUnit4 |
+| An `actual` | the platform test set (`androidUnitTest`, `jvmTest`, `desktopTest`) | the module's `- Tests:` value, unless `test-frameworks` → "Forced by surface" names the surface |
 | Compose Multiplatform screen | `commonTest` with `compose.uiTest` (`runComposeUiTest { setContent { } }`) | runs on every target that has a UI |
-| Something that needs a device | `androidInstrumentedTest` | JUnit4 + AndroidX test |
+| Something that needs a device | `androidInstrumentedTest` | `test-frameworks` → "Forced by surface" |
 
 A `commonTest` test cannot import MockK or Turbine unless the project's catalog makes them
 multiplatform dependencies; check `libs.versions.toml` before writing the import, and prefer
@@ -112,7 +111,7 @@ and the Lifecycle subsections of `test-frameworks` have both.
 - `./gradlew :shared:allTests` — every target the host can run; the summary lists each.
 - `./gradlew :shared:jvmTest` / `:shared:testDebugUnitTest` / `:shared:desktopTest` — one target, for the loop.
 - `iosSimulatorArm64Test` exists on a macOS host with Xcode; name it in `## Notes` as the runner the other platform's validator owns, do not run it here.
-- Coroutines in `commonTest`: `runTest` from `kotlinx-coroutines-test` is multiplatform; `Dispatchers.setMain` is not — inject the dispatcher (see the developer's standard 13) so the same test runs on a JVM target without Main.
+- Coroutines in `commonTest`: `runTest` and `Dispatchers.setMain` from `kotlinx-coroutines-test` are both multiplatform. Code that launches on `Main` gets it replaced per `test-frameworks` → "Main Dispatcher in Tests"; code that takes its dispatcher as a parameter (the developer's standard 13) gets the test dispatcher instead.
 
 ## What You Generate
 
@@ -176,7 +175,6 @@ carry, because it is Kotlin's:
 
 - Modify production code.
 - Put a JVM-only dependency in `commonTest`.
-- Call `Dispatchers.setMain` in a shared test.
 - Duplicate a `commonTest` test per target.
 - Run the iOS runner.
 

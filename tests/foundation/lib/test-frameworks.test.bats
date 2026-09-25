@@ -62,12 +62,12 @@ h2s() {
   done
 }
 
-@test "the skill replaces Dispatchers.Main once per value, and no other skill defines a replacement" {
+@test "the skill replaces Dispatchers.Main once per value, and no other skill or agent defines a replacement" {
   body="$(awk '$0=="## Main Dispatcher in Tests"{f=1;next} f&&/^## /{exit} f' "$SKILL")"
   for m in MainDispatcherExtension MainDispatcherRule MainDispatcherListener; do
     grep -qF "class $m(" <<<"$body" || { echo "no $m in ## Main Dispatcher in Tests"; return 1; }
   done
-  hits="$(grep -rlE 'class MainDispatcher(Rule|Extension|Listener)[(]' "$ROOT/skills" | grep -v '/test-frameworks/' || true)"
+  hits="$(grep -rlE 'class MainDispatcher(Rule|Extension|Listener)[(]' "$ROOT/skills" "$ROOT/agents" | grep -v '/test-frameworks/' || true)"
   [ -z "$hits" ] || { echo "a second copy of the replacement: $hits"; return 1; }
 }
 

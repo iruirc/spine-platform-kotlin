@@ -34,7 +34,7 @@ Read the files involved. Look for:
 - `GlobalScope`, a `CoroutineScope` created without a `Job` to cancel, `launch` without a stored handle where the owner dies
 - `runBlocking` inside a coroutine or on the main thread, `Dispatchers.IO` for CPU work, a blocking call with no `withContext` around it
 - Shared mutable state across coroutines without `Mutex`/`AtomicReference`/confinement
-- Flow misuse: `collectAsState` without lifecycle (Android), `SharedFlow` with replay 0 consumed late, `stateIn` with `Eagerly` where `WhileSubscribed` was meant
+- Flow misuse: `collectAsState` where `arch-mvvm` → "Binding" collects with lifecycle, `SharedFlow` with replay 0 consumed late, `stateIn` with `Eagerly` where `WhileSubscribed` was meant
 - Compose: side effects in composition, unstable parameters, `remember` keyed on nothing, `LaunchedEffect(Unit)` that should key on an id
 - Server: lazy-loaded JPA association touched outside a transaction, `@Transactional` on a `private` or self-invoked method (proxy bypass), blocking JDBC on a WebFlux/Ktor event loop
 - KMP: an `actual` that differs in behaviour from its siblings, `Dispatchers.Main` in shared code hit by a JVM target

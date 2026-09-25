@@ -41,8 +41,7 @@ boundaries a Kotlin project actually has.
 - Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
   a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
-- Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
-  2.3+, fixed for the test
+- Time → an injected `kotlin.time.Clock`, or `java.time.Clock` in JVM-only code, fixed for the test
 - DI container → a fresh container per test, or test-specific overrides
 - Platform APIs → Android `Context`, sensors, `SharedPreferences`, system services
 
@@ -95,7 +94,7 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 - **The framework itself**: `- Tests:` in `## Stack` names it, `spine-toolkit:test-authoring` says which value this file takes, and `test-frameworks` has the section for that value — how a test is declared so the runner collects it, how it asserts, its hooks, parameterization and report. None of that is repeated here.
 - **MockK**: `mockk<T>()` with `every { } returns`, `coEvery` for suspend functions, `verify` with exact `exactly =` counts; `relaxed = true` is a code smell in a unit test — it hides a missing stub.
 - **Turbine** for `Flow`: `flow.test { awaitItem(); awaitComplete() }`; assert every emission, never `first()` on a hot flow.
-- **Clock**: inject `kotlinx.datetime.Clock`, `java.time.Clock`, or `kotlin.time.Clock` on Kotlin 2.3+; a fixed clock in tests, never `Clock.System` in an assertion.
+- **Clock**: inject `kotlin.time.Clock`, or `java.time.Clock` in JVM-only code; a fixed clock in tests, never `Clock.System` in an assertion.
 
 ## What You Generate
 

@@ -34,7 +34,8 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 1. Understand requirements fully; identify which source sets the feature touches before writing.
 2. Push logic to `commonMain`: business rules, state, contracts, models, networking (Ktor client),
-   serialization (kotlinx.serialization), time (kotlinx-datetime). Platform code is the edge.
+   serialization (kotlinx.serialization), time (`kotlin.time.Instant` and `Clock`; kotlinx-datetime
+   for calendar types). Platform code is the edge.
 3. A per-platform seam — a file path provider, a secure store, a platform logger — takes the
    shape `pkg-kmp-source-sets` → "expect and actual" gives it.
 4. UI in Compose Multiplatform where the project shares UI; otherwise the platform's own toolkit
@@ -116,7 +117,7 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 - `pkg-kmp-source-sets` — laying out a KMP module: the hierarchy template, intermediate source sets, `expect`/`actual` rules, per-source-set dependencies
 - `di-koin` — Koin on KMP: modules and definitions, the constructor DSL, platform modules, verifying the graph in tests
-- `nav-multiplatform` — KMP navigation: navigation-compose vs Decompose vs Voyager, back handling and state preservation per platform
+- `nav-multiplatform` — KMP navigation: navigation-compose vs Navigation 3 vs Decompose vs Voyager, back handling and state preservation per platform
 - `compose-state` — where state lives in a Compose UI: hoisting, `remember` vs `rememberSaveable` vs ViewModel, stability, recomposition
 - `arch-mvvm` — MVVM: ViewModel with `StateFlow`, `UiState` modelling, events, one-shot effects, testing with Turbine and test dispatchers
 - `arch-mvi` — MVI: Intent → Reducer → State, side-effect channels, hand-rolled reducers vs Orbit, MVIKotlin, Circuit, Molecule

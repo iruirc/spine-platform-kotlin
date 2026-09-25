@@ -41,8 +41,7 @@ boundaries a Kotlin project actually has.
 - Persistence → a fake repository behind the interface the code uses; a DAO or query test runs on
   a real engine — client: `persistence-room-sqldelight` → "Testing"; server: `persistence-jvm-orm` → "Testing"
 - File system → `@TempDir` (JUnit) or `createTempDirectory()`
-- Time → an injected `java.time.Clock`, `kotlinx.datetime.Clock`, or `kotlin.time.Clock` on Kotlin
-  2.3+, fixed for the test
+- Time → an injected `kotlin.time.Clock`, or `java.time.Clock` in JVM-only code, fixed for the test
 - DI container → a fresh container per test, or test-specific overrides
 - Platform APIs → Android `Context`, sensors, `SharedPreferences`, system services
 
@@ -94,11 +93,11 @@ fun fetchData_networkSuccess_emitsData() = runTest {
 
 ### Compose UI Testing
 
-The Compose test rule is a JUnit4 `@Rule`, so a Compose test class is JUnit4-shaped — `@Before` /
-`@After`, `@get:Rule`, and `@RunWith` where Robolectric is needed — whatever `- Tests:` says. So is
-a Robolectric test, and so is anything in `androidInstrumentedTest`: all three are rows of
-`test-frameworks` → "Forced by surface". Everything else in this file takes the axis value, and
-`test-frameworks` has its hooks.
+A Compose test, a Robolectric test and anything in `androidInstrumentedTest` take the framework
+their row of `test-frameworks` → "Forced by surface" gives them, whatever `- Tests:` says. The
+samples below use the JUnit4 Compose rule — `@get:Rule`, `@Before` / `@After`, and `@RunWith` where
+Robolectric is needed. Everything else in this file takes the axis value, and `test-frameworks` has
+its hooks.
 
 - `createComposeRule()` for test rule — sets up the Compose test environment.
 - Find nodes: `onNodeWithText()`, `onNodeWithTag()`, `onNodeWithContentDescription()`.
@@ -212,9 +211,11 @@ fun loadData_success_updatesLiveData() {
 | Test kind | Source set | Runs on | Gradle task | Framework |
 |---|---|---|---|---|
 | ViewModel, mapper, use case | `src/test` | JVM | `testDebugUnitTest` | the axis value |
-| Compose component in isolation | `src/test` with Robolectric, or `src/androidTest` | JVM / device | `testDebugUnitTest` / `connectedDebugAndroidTest` | JUnit4 (Compose rule) |
-| Anything touching `Context`, resources, `SharedPreferences` | `src/test` with Robolectric | JVM | `testDebugUnitTest` | JUnit4 (Robolectric) |
-| Navigation graph end to end, permissions, real sensors | `src/androidTest` | device or emulator | `connectedDebugAndroidTest` | JUnit4 (AndroidX test) |
+| Compose component in isolation | `src/test` with Robolectric, or `src/androidTest` | JVM / device | `testDebugUnitTest` / `connectedDebugAndroidTest` | by surface |
+| Anything touching `Context`, resources, `SharedPreferences` | `src/test` with Robolectric | JVM | `testDebugUnitTest` | by surface |
+| Navigation graph end to end, permissions, real sensors | `src/androidTest` | device or emulator | `connectedDebugAndroidTest` | by surface |
+
+A "by surface" row takes the framework `test-frameworks` → "Forced by surface" names for it.
 
 Prefer the JVM row whenever it can observe the behaviour: an instrumented test costs an emulator boot and cannot run in the validator's default lane. Name in `## Notes` every test that needs a device, so the validator knows what it will not see without one.
 
