@@ -17,6 +17,7 @@
 
 Domain and formatting, identical under both UiState shapes.
 
+<!-- compile: android -->
 ```kotlin
 // domain — plain Kotlin, no androidx, no Compose
 @JvmInline
@@ -29,15 +30,19 @@ interface OrderRepository {
     suspend fun load(): List<Order>
 }
 
-fun interface MoneyFormatter {
-    fun format(cents: Long): String
+// JVM-only: String.format has no common implementation.
+class MoneyFormatter {
+    fun format(cents: Long): String = "$%.2f".format(cents / 100.0)
 }
 ```
 
 The ViewModel never resolves a localized string, so failures travel as a typed message and the
 composable turns it into text (`error-architecture` covers the full hierarchy):
 
+<!-- compile: android -->
 ```kotlin
+import java.io.IOException
+
 sealed interface UiMessage {
     data object Offline : UiMessage
     data object Unexpected : UiMessage
@@ -46,11 +51,14 @@ sealed interface UiMessage {
 data class OrderRow(val id: OrderId, val title: String, val total: String)
 
 fun Order.toRow(money: MoneyFormatter) = OrderRow(id, title, money.format(totalCents))
+
+fun Throwable.toUiMessage(): UiMessage = if (this is IOException) UiMessage.Offline else UiMessage.Unexpected
 ```
 
 The fake both test sections use. A settable result and a call counter cover every case the mock
 framework would have; nothing here pins the ViewModel to a call order.
 
+<!-- compile: android -->
 ```kotlin
 class FakeOrderRepository : OrderRepository {
     private var result: Result<List<Order>> = Result.success(emptyList())
@@ -66,8 +74,7 @@ class FakeOrderRepository : OrderRepository {
     }
 }
 
-// String.format is JVM-only — on KMP the formatter is injected per platform.
-val money = MoneyFormatter { cents -> "$%.2f".format(cents / 100.0) }
+val money = MoneyFormatter()
 val beans = Order(OrderId("1"), "Coffee beans", totalCents = 1800)
 val beansRow = OrderRow(OrderId("1"), "Coffee beans", "$18.00")
 ```
@@ -77,6 +84,7 @@ val beansRow = OrderRow(OrderId("1"), "Coffee beans", "$18.00")
 Use this shape when the screen shows one thing at a time: a spinner, or a list, or an error pane.
 There is no state in which a list and an error are both on screen, so the type forbids it.
 
+<!-- compile: android -->
 ```kotlin
 sealed interface OrdersUiState {
     data object Loading : OrdersUiState
@@ -95,6 +103,7 @@ sealed interface OrdersEffect {
 }
 ```
 
+<!-- compile: android -->
 ```kotlin
 @HiltViewModel
 class OrdersViewModel @Inject constructor(
@@ -122,15 +131,10 @@ class OrdersViewModel @Inject constructor(
         loadJob?.cancel()
         _state.value = OrdersUiState.Loading
         loadJob = viewModelScope.launch {
-            try {
-                _state.value = OrdersUiState.Content(repository.load().map { it.toRow(money) })
-            } catch (e: CancellationException) {
-                throw e                                  // never swallow cancellation
-            } catch (e: IOException) {
-                _state.value = OrdersUiState.Error(UiMessage.Offline)
-            } catch (e: Exception) {
-                _state.value = OrdersUiState.Error(UiMessage.Unexpected)
-            }
+            _state.value = catching { repository.load() }.fold(
+                onSuccess = { orders -> OrdersUiState.Content(orders.map { it.toRow(money) }) },
+                onFailure = { error -> OrdersUiState.Error(error.toUiMessage()) },
+            )
         }
     }
 }
@@ -140,13 +144,17 @@ Three things carry the design:
 
 - `Appeared` guarded by `loadJob == null` replaces `init { load() }`: the first load is an event the
   Route sends, so a test can arrange the repository first and a retry re-runs the same path.
-- `CancellationException` is rethrown before the broad catch. `runCatching` here would leave a
-  cancelled screen sitting on stale content, because it catches cancellation as a failure.
+- `catching`, never `runCatching` or a bare `catch (e: Exception)`: a load cancelled by the next
+  `RetryClicked` rethrows instead of landing on the error pane. The helper is
+  `error-architecture` → "The runCatching Rule".
 - `trySend` on a `BUFFERED` channel never suspends, so `onEvent` stays a plain function.
 
 ## Sealed UiState — Screen
 
+<!-- compile: android -->
 ```kotlin
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+
 @Composable
 fun OrdersRoute(
     onOpenOrder: (OrderId) -> Unit,
@@ -174,7 +182,10 @@ looking at, and the `Channel` holds the rest until the screen resumes. One eleme
 `receiveAsFlow()` may have taken it out of the channel at the instant collection is cancelled. Where
 losing it is not acceptable, keep the effect in `UiState` behind a consume callback instead.
 
+<!-- compile: android -->
 ```kotlin
+import androidx.compose.ui.tooling.preview.Preview
+
 @Composable
 fun OrdersScreen(
     state: OrdersUiState,
@@ -344,17 +355,18 @@ class OrdersViewModel @Inject constructor(
             it.copy(isLoading = !refreshing, isRefreshing = refreshing, error = null)
         }
         loadJob = viewModelScope.launch {
-            try {
-                val rows = repository.load().map { it.toRow(money) }
-                _state.update {
-                    it.copy(isLoading = false, isRefreshing = false, orders = rows, error = null)
+            catching { repository.load() }
+                .onSuccess { orders ->
+                    val rows = orders.map { it.toRow(money) }
+                    _state.update {
+                        it.copy(isLoading = false, isRefreshing = false, orders = rows, error = null)
+                    }
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                val message = if (e is IOException) UiMessage.Offline else UiMessage.Unexpected
-                _state.update { it.copy(isLoading = false, isRefreshing = false, error = message) }
-            }
+                .onFailure { error ->
+                    _state.update {
+                        it.copy(isLoading = false, isRefreshing = false, error = error.toUiMessage())
+                    }
+                }
         }
     }
 }
@@ -509,24 +521,24 @@ private fun load(refreshing: Boolean) {
         else it.copy(content = OrdersUiState.Content.Loading, banner = null)
     }
     loadJob = viewModelScope.launch {
-        try {
-            val rows = repository.load().map { it.toRow(money) }
-            _state.update {
-                it.copy(content = OrdersUiState.Content.Loaded(rows), isRefreshing = false)
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val message = if (e is IOException) UiMessage.Offline else UiMessage.Unexpected
-            _state.update { current ->
-                // A failed refresh keeps the rows and shows a banner; a failed first load replaces them.
-                if (current.content is OrdersUiState.Content.Loaded) {
-                    current.copy(isRefreshing = false, banner = message)
-                } else {
-                    current.copy(content = OrdersUiState.Content.Failed(message), isRefreshing = false)
+        catching { repository.load() }
+            .onSuccess { orders ->
+                val rows = orders.map { it.toRow(money) }
+                _state.update {
+                    it.copy(content = OrdersUiState.Content.Loaded(rows), isRefreshing = false)
                 }
             }
-        }
+            .onFailure { error ->
+                val message = error.toUiMessage()
+                _state.update { current ->
+                    // A failed refresh keeps the rows and shows a banner; a failed first load replaces them.
+                    if (current.content is OrdersUiState.Content.Loaded) {
+                        current.copy(isRefreshing = false, banner = message)
+                    } else {
+                        current.copy(content = OrdersUiState.Content.Failed(message), isRefreshing = false)
+                    }
+                }
+            }
     }
 }
 ```
@@ -575,14 +587,9 @@ val effects: Flow<OrdersEffect> = _effects.receiveAsFlow()
 
 fun onArchiveClicked(id: OrderId) {
     viewModelScope.launch {
-        try {
-            repository.archive(id)
-            _effects.send(OrdersEffect.ShowSnackbar(UiMessage.Archived))
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            _effects.send(OrdersEffect.ShowSnackbar(UiMessage.Unexpected))
-        }
+        val message = catching { repository.archive(id) }
+            .fold(onSuccess = { UiMessage.Archived }, onFailure = { UiMessage.Unexpected })
+        _effects.send(OrdersEffect.ShowSnackbar(message))
     }
 }
 ```
@@ -610,36 +617,47 @@ dismissed, so every later effect queues behind it; launch it in a child coroutin
 (`launch { snackbarHostState.showSnackbar(…) }`) when a navigation must not wait for a message.
 
 The state-driven alternative, for an effect that must survive process death (a payment result, a
-completed wizard) — the flag lives in the state and the Screen reports back when it has acted:
+completed wizard) — the flag lives in the state and the Route reports back when it has acted:
 
+<!-- compile: android -->
 ```kotlin
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+
 data class CheckoutUiState(val paidOrderId: OrderId? = null)
 
-// ViewModel
-fun onNavigatedToReceipt() { _state.update { it.copy(paidOrderId = null) } }
+@HiltViewModel
+class CheckoutViewModel @Inject constructor(private val handle: SavedStateHandle) : ViewModel() {
+    // The one state, read from the handle, so the flag is back after the process is killed.
+    val state: StateFlow<CheckoutUiState> = handle.getStateFlow<String?>(PAID_ORDER, null)
+        .map { id -> CheckoutUiState(paidOrderId = id?.let(::OrderId)) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CheckoutUiState())
 
-// Route
-LaunchedEffect(state.paidOrderId) {
-    state.paidOrderId?.let { id ->
-        onOpenReceipt(id)
-        viewModel.onNavigatedToReceipt()
+    fun onPaid(id: OrderId) { handle[PAID_ORDER] = id.value }
+    fun onNavigatedToReceipt() { handle[PAID_ORDER] = null }
+
+    private companion object { const val PAID_ORDER = "paidOrderId" }
+}
+
+@Composable
+fun CheckoutRoute(
+    onOpenReceipt: (OrderId) -> Unit,
+    viewModel: CheckoutViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.paidOrderId) {
+        state.paidOrderId?.let { id ->
+            onOpenReceipt(id)
+            viewModel.onNavigatedToReceipt()
+        }
     }
 }
 ```
 
 It costs a field and a consume callback, and it is the only one of the three that comes back after
-the process is killed, provided the field is written through `SavedStateHandle`. Use it there; use
-the channel everywhere else. That handle is where a search query, a wizard step and a pending route
-belong too — it is the ViewModel's own store, and it holds `Bundle`-able values, not domain types:
-
-```kotlin
-class CheckoutViewModel(private val handle: SavedStateHandle) : ViewModel() {
-    val paidOrderId: StateFlow<String?> = handle.getStateFlow("paidOrderId", null)
-
-    fun onPaid(id: OrderId) { handle["paidOrderId"] = id.value }
-    fun onNavigatedToReceipt() { handle["paidOrderId"] = null }
-}
-```
+the process is killed — because the field is written through `SavedStateHandle`, not held in a
+`MutableStateFlow`. Use it there; use the channel everywhere else. That handle is where a search
+query, a wizard step and a pending route belong too — it is the ViewModel's own store, and it holds
+`Bundle`-able values, not domain types, which is why the id goes in as a `String`.
 
 ## Test Setup
 

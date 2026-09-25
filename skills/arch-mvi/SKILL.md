@@ -61,7 +61,7 @@ surface, not the state.
 | Input surface | one `sealed interface Intent`, one `dispatch(intent)` | named functions on the ViewModel: `onQueryChange`, `onSubmit` |
 | Transition | `reduce(state, intent): State` — a pure function callable with no ViewModel | `_state.update { it.copy(…) }` inline in each handler |
 | Async work | an executor turns one intent into further intents; only intents move the state | the handler launches, then updates the state at each step |
-| Types per screen | State, Intent, internal Result intents, Effect, reducer, store | State, Effect, ViewModel |
+| Types per screen | State, Intent, Result, Effect, reducer, store | State, Effect, ViewModel |
 | Replay and logging | every transition is one `(state, intent)` pair; a log of intents replays the screen | each handler must be instrumented on its own |
 | Pick when | inputs interleave, order decides the outcome, transitions are worth a table test | one state object is enough and the whole win is forbidding invalid combinations |
 
@@ -80,6 +80,7 @@ surface, not the state.
 
 Three data types and one function. Everything else on the screen is plumbing around them.
 
+<!-- compile: android -->
 ```kotlin
 sealed interface Status {
     data object Idle : Status
@@ -95,45 +96,52 @@ data class SearchState(
     val results: List<ResultRow> = emptyList(),
 )
 
-sealed interface SearchIntent {
+/** Everything the reducer takes: what the user did, and what the executor found out. */
+sealed interface SearchAction
+
+sealed interface SearchIntent : SearchAction {
     data class QueryChanged(val value: String) : SearchIntent
     data class FilterToggled(val filter: Filter) : SearchIntent
     data object SubmitClicked : SearchIntent
     data object RetryClicked : SearchIntent
+}
 
-    // Results — sent by the executor, never by the UI.
-    internal data class ResultsLoaded(val rows: List<ResultRow>, val forQuery: String) : SearchIntent
-    internal data class LoadFailed(val error: UiMessage, val forQuery: String) : SearchIntent
+// Results — sent by the executor; `dispatch(SearchIntent)` cannot take one.
+sealed interface SearchResult : SearchAction {
+    data class ResultsLoaded(val rows: List<ResultRow>, val forQuery: String) : SearchResult
+    data class LoadFailed(val error: UiMessage, val forQuery: String) : SearchResult
 }
 ```
 
+<!-- compile: android -->
 ```kotlin
-fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent) {
-    is SearchIntent.QueryChanged -> state.copy(query = intent.value)
-    is SearchIntent.FilterToggled -> state.copy(filters = state.filters.toggle(intent.filter))
+fun reduce(state: SearchState, action: SearchAction): SearchState = when (action) {
+    is SearchIntent.QueryChanged -> state.copy(query = action.value)
+    is SearchIntent.FilterToggled -> state.copy(filters = state.filters.toggle(action.filter))
     SearchIntent.SubmitClicked -> state.copy(submittedQuery = state.query, status = Status.Loading)
     SearchIntent.RetryClicked -> state.copy(status = Status.Loading)
     // A result that answers a query nobody is waiting for changes nothing.
-    is SearchIntent.ResultsLoaded ->
-        if (intent.forQuery != state.submittedQuery) state
-        else state.copy(status = Status.Idle, results = intent.rows)
-    is SearchIntent.LoadFailed ->
-        if (intent.forQuery != state.submittedQuery) state
-        else state.copy(status = Status.Failed(intent.error))
+    is SearchResult.ResultsLoaded ->
+        if (action.forQuery != state.submittedQuery) state
+        else state.copy(status = Status.Idle, results = action.rows)
+    is SearchResult.LoadFailed ->
+        if (action.forQuery != state.submittedQuery) state
+        else state.copy(status = Status.Failed(action.error))
 }
 ```
 
 1. **`reduce` is pure.** No `suspend`, no dispatcher, no repository, no clock, no `Random`, no
    logging, no `trySend`. A reducer that needs a coroutine is a reducer doing the executor's job, and
    it takes the whole test story down with it.
-2. **Async work lives in an executor beside the reducer**, and it reports back **as further
-   intents** — `ResultsLoaded`, `LoadFailed`. Name them Results, keep them in the same sealed
-   hierarchy (or a sibling one), and mark them internal so no composable can dispatch a `LoadFailed`.
+2. **Async work lives in an executor beside the reducer**, and it reports back **as Results** —
+   `ResultsLoaded`, `LoadFailed` — that go through the same reducer. Declare them as a sibling of the
+   intent type under one parent, so the reducer takes both while the store's public
+   `dispatch(intent: SearchIntent)` takes neither: no composable can dispatch a `LoadFailed`.
 3. **One intent in, one state out.** The reducer returns a state and nothing else; it never emits an
    effect and never starts work. Deciding *whether* to start work is the executor's, and it reads the
    whole transition — the intent plus the states either side of it — so an intent the reducer refused
    starts nothing.
-4. **The store is the only writer.** `dispatch` runs `reduce` and assigns; every other component
+4. **The store is the only writer.** It runs `reduce` and assigns; every other component
    reads. If two coroutines can dispatch at once, serialize — a `MutableStateFlow.update { }` around
    `reduce`, or an actor. Orbit does not do it for you: every `intent { }` runs as a coroutine of its
    own, and only each `reduce { }` is one atomic `update`.
@@ -155,10 +163,12 @@ fun reduce(state: SearchState, intent: SearchIntent): SearchState = when (intent
 
 1. **Start hand-rolled.** Two screens' worth is roughly sixty lines and no dependency; you find out
    whether the pattern earns its keep before it is in the version catalog.
-2. **Orbit is the default when a library is wanted** on Android or KMP: `orbit-viewmodel` on
-   Android, `orbit-compose` for the UI side, `orbit-core` alone for a `commonMain` container with no
-   `androidx.lifecycle`. Its `intent { }` block *is* the executor and `reduce { }` is the only state
-   step, so the purity rule is enforced by the DSL rather than by review.
+2. **Orbit is the default when a library is wanted** on Android or KMP. Orbit 12's
+   `orbit-viewmodel` is multiplatform, so the store is a `ViewModel` implementing
+   `OrbitContainerHost` with `orbitContainer(...)` on every target; `orbit-compose` is the UI side,
+   and `orbit-core` alone serves a host that is not a `ViewModel`. Its `intent { }` block *is* the
+   executor and `reduce { }` is the only state step, so the purity rule is enforced by the DSL rather
+   than by review.
 3. **MVIKotlin when the separation is the point** — `Store`, `Executor`, `Reducer` and `Bootstrapper`
    as named types, with time-travel over a whole graph of stores. Same screen, roughly twice the
    type count; on a two-screen app that is the tax with none of the return.
@@ -179,8 +189,9 @@ private val _effects = Channel<SearchEffect>(Channel.BUFFERED)
 val effects: Flow<SearchEffect> = _effects.receiveAsFlow()
 ```
 
-1. **An effect kept in `State` is consumed by an intent.** The Route dispatches `ReceiptOpened` and
-   the reducer clears the field — never a `_state` write from outside `dispatch`.
+1. **An effect kept in `State` is consumed by an intent.** For a `receipt: OrderId?` field, the Route
+   dispatches a `ReceiptOpened` intent once it has navigated, and the reducer's branch for it sets
+   the field back to `null` — never a `_state` write from outside the store.
 2. **The reducer never emits.** Effects are sent by the executor, or by the store *after* `reduce`
    returns, from the branch that already knows the intent. Reducer purity is the reason a transition
    can be replayed in a test loop.
@@ -190,7 +201,10 @@ val effects: Flow<SearchEffect> = _effects.receiveAsFlow()
 
 ## Compose Integration
 
+<!-- compile: android -->
 ```kotlin
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+
 @Composable
 fun SearchRoute(
     onOpenResult: (ResultId) -> Unit,
@@ -210,23 +224,20 @@ fun SearchRoute(
 }
 ```
 
-1. **`collectAsStateWithLifecycle()` on Android and in `commonMain`; `collectAsState()` on Compose
-   Desktop only.** Same rule, same reasons as `arch-mvvm` — it is one pattern's worth of binding, not
-   two.
+1. **The store's state and effects are collected as an MVVM screen collects them**, on every target:
+   `arch-mvvm` → "Binding" and `arch-mvvm` → "One-shot Effects". A reducer behind the `StateFlow`
+   changes nothing about the Route.
 2. **Key the effect `LaunchedEffect` on the store, not on `Unit`.** `LaunchedEffect(viewModel, lifecycle)`
    restarts collection exactly when one of those changes and never on an unrelated recomposition;
    `LaunchedEffect(Unit)` in a reused composition can leave the old collector running.
-3. **`flowWithLifecycle(lifecycle)` is not optional on Android** — without it a backgrounded screen
-   keeps consuming effects and navigates under the one the user is looking at. Compose Desktop, which
-   has no lifecycle to observe, drops it and the `lifecycle` key with it.
-4. **On Orbit, use `orbit-compose`**: `viewModel.collectAsState()` (orbit-compose's own extension
+3. **On Orbit, use `orbit-compose`**: `viewModel.collectAsState()` (orbit-compose's own extension
    on the container host, not `androidx.compose.runtime`'s `Flow.collectAsState()`) for the state and
    `viewModel.collectSideEffect { }` for effects. Both are lifecycle-aware already, so writing the
    `flowWithLifecycle` dance around them is duplicated machinery, not extra safety.
-5. **The stateless half takes `(state, onIntent)` and nothing else.** A composable typed against the
+4. **The stateless half takes `(state, onIntent)` and nothing else.** A composable typed against the
    store cannot be previewed, and the `onIntent: (SearchIntent) -> Unit` signature is the one thing
    MVI gives the UI layer for free — one lambda, whatever the screen grows.
-6. **Do not dispatch an intent from composition.** Text-field input is `onValueChange`, a first load
+5. **Do not dispatch an intent from composition.** Text-field input is `onValueChange`, a first load
    is a `LaunchedEffect(Unit) { dispatch(Appeared) }` at the Route, and neither is a call in the
    render path where recomposition decides how often it runs.
 
@@ -235,29 +246,30 @@ fun SearchRoute(
 The reducer is a pure function, so its test is a table and needs no dispatcher, no `runTest`, no
 `Dispatchers.setMain` and no fake.
 
+<!-- compile: android-test -->
 ```kotlin
 @Test
 fun reduce_everyCase_returnsExpectedState() {
-    val cases = listOf(
-        // state, intent, expected
+    val cases = listOf<Triple<SearchState, SearchAction, SearchState>>(
+        // state, action, expected
         Triple(
-            SearchState(query = "kotlin"), SubmitClicked,
-            SearchState(query = "kotlin", submittedQuery = "kotlin", status = Loading),
+            SearchState(query = "kotlin"), SearchIntent.SubmitClicked,
+            SearchState(query = "kotlin", submittedQuery = "kotlin", status = Status.Loading),
         ),
         Triple(
-            SearchState(submittedQuery = "kotlin", status = Loading),
-            ResultsLoaded(listOf(row), forQuery = "kotlin"),
-            SearchState(submittedQuery = "kotlin", status = Idle, results = listOf(row)),
+            SearchState(submittedQuery = "kotlin", status = Status.Loading),
+            SearchResult.ResultsLoaded(listOf(row), forQuery = "kotlin"),
+            SearchState(submittedQuery = "kotlin", status = Status.Idle, results = listOf(row)),
         ),
         // A result answering a query nobody waits for is dropped.
         Triple(
-            SearchState(submittedQuery = "ktor", status = Loading),
-            ResultsLoaded(listOf(row), forQuery = "kotlin"),
-            SearchState(submittedQuery = "ktor", status = Loading),
+            SearchState(submittedQuery = "ktor", status = Status.Loading),
+            SearchResult.ResultsLoaded(listOf(row), forQuery = "kotlin"),
+            SearchState(submittedQuery = "ktor", status = Status.Loading),
         ),
     )
-    cases.forEach { (state, intent, expected) ->
-        assertEquals(expected, reduce(state, intent), "$intent on $state")
+    cases.forEach { (state, action, expected) ->
+        assertEquals(expected, reduce(state, action), "$action on $state")
     }
 }
 ```
@@ -272,10 +284,10 @@ fun reduce_everyCase_returnsExpectedState() {
    arriving after the query changed. That is the bug MVI was adopted to prevent, and it is one row.
 5. **The executor is tested separately**, with `runTest` and a fake repository, asserting *which
    intents it produced* — not the state. Two tests, two seams, neither needing the other's setup.
-6. **On Orbit, use `orbit-test`**: `viewModel.test(this)` puts the container in test mode, and
-   inside the block `expectInitialState()`, `expectState { copy(…) }` and
-   `expectSideEffect(effect)` assert the sequence the DSL produced — `containerHost` is the handle
-   the block gives you back for dispatching. It is the only way to reach an Orbit `reduce { }`
+6. **On Orbit, use `orbit-test`**: `viewModel.testWithInternalState(this)` puts the container in
+   test mode and checks the initial state itself; inside the block `expectInternalState { copy(…) }`
+   and `expectSideEffect(effect)` assert the sequence the DSL produced — `containerHost` is the
+   handle the block gives you back for dispatching. It is the only way to reach an Orbit `reduce { }`
    block, which is not a standalone function.
 
 ## When Appropriate
@@ -301,9 +313,10 @@ a single `UiState` is already unidirectional.
 2. **A one-shot kept in `State` with no process death to survive** — a `navigateTo: ResultId?`
    field: `arch-mvvm` → "One-shot Effects". Where one is warranted, clearing it from the composable
    instead of by an intent is mistake 7.
-3. **UI-dispatchable Result intents.** `LoadFailed` in the same public sealed interface as
-   `SubmitClicked` means a composable can fake a failure, and a reviewer cannot tell the screen's
-   real input surface from the executor's. Split them, or keep the internal half `internal`.
+3. **UI-dispatchable Results.** `LoadFailed` in the same sealed interface as `SubmitClicked` means a
+   composable can fake a failure, and a reviewer cannot tell the screen's real input surface from the
+   executor's. Split them into sibling types, as Core Shape does. `internal` is no substitute: it is
+   module visibility, and the composable usually sits in the same module as the store.
 4. **One intent per widget property** — `QueryTextChanged`, `QueryFocusChanged`, `QueryCleared`,
    `QuerySubmitted` — until the sealed interface has forty members and the reducer's `when` scrolls.
    Intents name user-meaningful actions, not field mutations.
@@ -316,7 +329,7 @@ a single `UiState` is already unidirectional.
 7. **Reintroducing a second writer** — a `_state.value = …` somewhere outside `dispatch`, usually in
    `init` or a Flow collector. The reducer is no longer the whole story, and the transition log no
    longer replays the screen. Feed that collector's emissions in as intents.
-8. **`LaunchedEffect(Unit)` around effect collection on Android**, with no `flowWithLifecycle`:
+8. **`LaunchedEffect(Unit)` around effect collection**, with no `flowWithLifecycle`:
    `arch-mvvm` → "One-shot Effects".
 9. **A library adopted for the word.** Orbit or MVIKotlin added to keep one screen's `when`
    exhaustive buys a container lifecycle, a testing idiom and a migration for the next reader — the

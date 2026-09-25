@@ -80,8 +80,9 @@ with a reducer inside.
 **Model** — domain entities, repositories, use cases. Plain Kotlin: `suspend` functions and `Flow`,
 no `androidx.*`, no Compose. It must compile in a plain JVM test source set.
 
-**ViewModel** — extends `androidx.lifecycle.ViewModel`. Owns exactly one `MutableStateFlow<UiState>`
-and exposes it as `StateFlow`. Turns domain results into `UiState`: formatting, sorting, the
+**ViewModel** — extends `androidx.lifecycle.ViewModel`. Owns the screen's one `UiState` and exposes
+it as a `StateFlow` — from a private `MutableStateFlow`, or from a repository flow turned into state
+with `stateIn` (Binding, below). Turns domain results into `UiState`: formatting, sorting, the
 empty/error decision. Receives events, launches work in `viewModelScope`. Knows no composable, no
 `Context`, no `NavController`.
 
@@ -171,13 +172,14 @@ share sheet, a haptic. Anything still true after a configuration change belongs 
 ## Binding
 
 ```kotlin
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+
 @Composable
 fun OrdersRoute(
     onOpenOrder: (OrderId) -> Unit,
     viewModel: OrdersViewModel = hiltViewModel(),   // koinViewModel() on KMP/Desktop
 ) {
-    val state by viewModel.state.collectAsStateWithLifecycle()   // Android and commonMain
-    // val state by viewModel.state.collectAsState()             // Compose Desktop only
+    val state by viewModel.state.collectAsStateWithLifecycle()
     OrdersScreen(state = state, onEvent = viewModel::onEvent)
 }
 ```
@@ -297,10 +299,9 @@ different problems, and adding both at once fixes neither.
 
 ## Common Mistakes
 
-1. **`collectAsState()` in an Android app** — the screen keeps collecting in the back stack and
-   behind a locked screen, holding its upstream open and recomposing off-screen. Use
-   `collectAsStateWithLifecycle()`; `collectAsState()` is for Compose Desktop only — `commonMain`
-   that also runs on Android needs the lifecycle-aware collector just as much.
+1. **`collectAsState()` on a screen** — the screen keeps collecting in the back stack and behind
+   a locked screen, holding its upstream open and recomposing off-screen. Use
+   `collectAsStateWithLifecycle()` on every target, Compose Desktop included (Binding, above).
 2. **Business logic in the composable** — a `try/catch` around a repository call inside
    `LaunchedEffect`, or `if (user.isPremium && cart.total > 100)` in the render. Recomposition runs
    it an unpredictable number of times, and no unit test can reach it.
