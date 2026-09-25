@@ -1,7 +1,7 @@
 {
   "name": "spine-platform-kotlin",
   "description": "Kotlin knowledge for spine-toolkit: Android, Compose Desktop, JVM servers, CLI tools and KMP — architecture, DI, networking, persistence, concurrency and release skills, and sixteen agents fanned out by target.",
-  "version": "1.15.0",
+  "version": "1.15.1",
   "author": { "name": "Dmitry Nuzhin" },
   "repository": "https://github.com/iruirc/spine-platform-kotlin",
   "dependencies": [
