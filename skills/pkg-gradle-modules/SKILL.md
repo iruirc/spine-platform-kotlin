@@ -45,7 +45,7 @@ inside a multiplatform module (`pkg-kmp-source-sets`).
 |---|---|
 | The six modules every later section builds against | `The Build It Wires` |
 | `settings.gradle.kts`, the included build, where the catalog is declared | `Settings and the Included Build` |
-| The `build-logic` build file, `kotlin-dsl`, and registering plugin ids | `The build-logic Build File` |
+| The `build-logic` build file, `kotlin-dsl`, registering plugin ids, and the root that loads each plugin once | `The build-logic Build File` |
 | The Android conventions as `Plugin<Project>` classes, and the helper they share | `Convention Plugins` |
 | The same thing as a `*.gradle.kts` script named after its id | `Precompiled Script Plugins` |
 | A catalog with `[versions]`, `[libraries]`, `[bundles]`, `[plugins]` | `The Version Catalog` |
@@ -144,19 +144,20 @@ composition root.
 
 `gradle/libs.versions.toml` is the one place a version is written. Four tables, one accessor rule:
 
+<!-- compile: catalog -->
 ```toml
 [versions]
-kotlin = "2.2.20"
-ktor = "3.0.3"
+kotlin = "2.4.20"
+ktor = "3.6.0"
 
 [libraries]
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
-ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
 [bundles]
-ktor-client = ["ktor-client-core", "ktor-client-okhttp", "ktor-client-content-negotiation", "ktor-serialization-json"]
+ktor-client = ["ktor-client-core", "ktor-client-okhttp", "ktor-client-content-negotiation", "ktor-serialization-kotlinx-json"]
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
@@ -172,10 +173,11 @@ kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
    one left behind on the next upgrade, and it is invisible to the dependency-update tooling.
 4. **`versionCatalogs { create("libs") }` in `settings.gradle.kts` is only for a non-default name or a
    catalog published as an artifact.** A file at `gradle/libs.versions.toml` is picked up with no
-   declaration at all.
-5. **`build-logic` does not get the `libs` accessors for free.** A precompiled script plugin can
-   declare the same catalog in its own settings file; a binary plugin reads it through
-   `VersionCatalogsExtension` (see the reference). This is the one gotcha in the whole setup.
+   declaration at all, and declaring it again with `from(files(...))` fails the build.
+5. **A convention plugin gets no `libs` accessors**, script or class. build-logic's settings declare
+   the catalog so that build-logic's own build file can name the plugin artifacts; the plugins it
+   compiles read the catalog of the build that applies them through `VersionCatalogsExtension` (see
+   the reference). This is the one gotcha in the whole setup.
 
 ## Convention Plugins
 
@@ -249,8 +251,11 @@ kotlin.incremental=true
 1. **The configuration cache is the largest single win** and the one that needs work: it serializes
    the configured task graph and skips the configuration phase entirely on a rerun. It breaks when a
    task reaches for `project` at execution time — capturing `Project` in a task action, reading
-   `project.buildDir` or `System.getenv` outside a `Provider`. The fix is a `Property`/`Provider` on
-   the task; disabling the cache to silence one plugin gives back seconds on every build in the repo.
+   `project.version` from one. The fix is a `Property`/`Provider` on the task; disabling the cache
+   to silence one plugin gives back seconds on every build in the repo. An environment variable or
+   file read during configuration does not break it: Gradle records it, and a changed value
+   reconfigures the build instead of reusing the entry — which is why a value that changes on every
+   CI run belongs in a task input, not in the configuration.
 2. **`org.gradle.parallel=true` pays exactly as much as the graph is wide** (see When to Modularize,
    rule 3), and the build cache pays most on CI, where nothing is incremental — a local cache for
    developers, a remote node for CI (`release-ops`).
@@ -312,7 +317,9 @@ includeBuild("../shared-lib") {
    of the same library.
 6. **Turning the configuration cache off because one plugin fails it.** The failing plugin is usually
    one `Provider` away from working, or has a newer version that already does; the build pays for that
-   decision on every invocation, on every machine, forever.
+   decision on every invocation, on every machine, forever. A plugin with no compatible version yet
+   gets `notCompatibleWithConfigurationCache("<why>")` on its tasks: the builds that run them go
+   without the cache, and every other build keeps it.
 7. **`allprojects { }` or `subprojects { }` in the root build file.** It configures modules that have
    not been evaluated yet, is invisible from the module it affects, and is the first thing the
    configuration cache and isolated project execution reject. Convention plugins are the replacement.

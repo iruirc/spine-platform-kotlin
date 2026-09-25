@@ -15,7 +15,7 @@ is `pkg-gradle-modules`.
 > - `pkg-gradle-modules` — whether this is even a module of its own, and what it may depend on
 > - `arch-clean` — the `:domain` module that is all `commonMain`, and the `:data` module that owns the platform halves
 > - `di-koin` — `expect val platformModule` and its `actual`s: the preferred alternative to an `expect class`
-> - `nav-multiplatform` — the `Navigator` interface in `commonMain` and one implementation per host
+> - `nav-multiplatform` — the `Route` vocabulary in `commonMain`, and the graph file each host owns
 > - `persistence-room-sqldelight` — a `commonMain` schema with a driver per target, the canonical shape
 > - `net-http-clients` — why KMP forces Ktor, and where the per-target engine is declared
 > - `architecture-choice` — the compass that reaches this skill as soon as the target is KMP
@@ -78,17 +78,24 @@ An intermediate source set is code shared by *some* targets. The template alread
 useful native ones; the group worth adding by hand is JVM plus Android:
 
 ```kotlin
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+
 @OptIn(ExperimentalKotlinGradlePluginApi::class)   // the hierarchy DSL is still experimental
 kotlin {
     jvm()
-    androidTarget()
+    android {
+        namespace = "com.example.shared"
+        compileSdk = 37
+        minSdk = 24
+    }
     iosArm64(); iosSimulatorArm64()
 
     applyDefaultHierarchyTemplate {
         common {
             group("jvmAndAndroid") {
                 withJvm()
-                withAndroidTarget()
+                withCompilations { it.platformType == KotlinPlatformType.androidJvm }
             }
         }
     }
@@ -104,7 +111,10 @@ kotlin {
    with; the third is a bug that was fixed in one copy.
 4. **Never reach for a group to dodge an `expect`.** If the two platforms genuinely differ, the group
    only moves the duplication one level up.
-5. **The native groups are already there.** `appleMain` for code shared by iOS and macOS targets,
+5. **The Android half is matched by platform type.** `withAndroidTarget()` matches only the old
+   `androidTarget()`; against the `android { }` target it matches nothing, the group holds JVM alone,
+   and every `actual` in it goes missing on Android — "The 'expect' declaration … has no 'actual'".
+6. **The native groups are already there.** `appleMain` for code shared by iOS and macOS targets,
    `nativeMain` for everything Kotlin/Native — including a target that runs on neither.
 
 ## expect and actual
@@ -169,8 +179,10 @@ kotlin {
 
 1. **`commonMain` takes multiplatform artifacts only.** A multiplatform library publishes Gradle
    module metadata and one variant per target; the build picks the right one per compilation. A
-   JVM-only artifact has no variant for `iosArm64`, and the build fails at resolution with "no
-   matching variant" — at configuration time, before a line is compiled.
+   JVM-only artifact fails in one of two ways, depending on how it is published: one with module
+   metadata has no variant for `iosArm64`, and the build stops with "No matching variant"; a plain
+   jar with only a POM resolves, and the common and native compilations then fail on its imports with
+   "Unresolved reference".
 2. **Check the catalog before writing the line, not after.** The multiplatform ones a Kotlin project
    actually reaches for: `kotlinx-coroutines-core`, `kotlinx-serialization-json`, `kotlinx-datetime`,
    `ktor-client-*`, `sqldelight`, `koin-core`, `okio`. A `-jvm` suffix on the artifact id is the
@@ -183,39 +195,55 @@ kotlin {
    platform context. The common set depends on the core artifact; each platform set adds its own
    implementation (`net-http-clients`, `persistence-room-sqldelight`).
 6. **Test source sets follow the same tree.** `commonTest` for a test that must pass everywhere,
-   `iosTest` only for what genuinely tests the iOS half.
+   `iosTest` only for what genuinely tests the iOS half. On Android `commonTest` runs only once the
+   target asks for host tests: `withHostTest {}` inside `android { }`.
 
 ## Targets
 
 ```kotlin
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
+}
+
 kotlin {
     jvm()
-    androidTarget()                 // requires an Android Gradle plugin on this module
+    android {                       // the target com.android.kotlin.multiplatform.library adds
+        namespace = "com.example.shared"
+        compileSdk = 37
+        minSdk = 24
+    }
     listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach {
         it.binaries.framework { baseName = "Shared" }   // what the iOS build links against
     }
     macosArm64()
-    js(IR) { browser() }            // IR is the only backend now; the argument is optional
-    wasmJs { browser() }            // needs @OptIn(ExperimentalWasmDsl::class)
+    js { browser() }
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs { browser() }
 }
 ```
 
 1. **Declare a target only if something builds it.** Each one costs compile time on every build and a
    set of source sets to keep honest; `iosX64()` in a project whose simulators are all Apple silicon
    is pure cost.
-2. **`androidTarget()` needs an Android plugin on the module** — `com.android.library`, or the
-   multiplatform-shaped `com.android.kotlin.multiplatform.library`. That is a plugin on the module's
-   classpath, which is exactly why `arch-clean` keeps `androidTarget()` off `:domain` and lets Android
-   consumers take the `jvm()` variant instead.
+2. **The Android target is `android { }`, from `com.android.kotlin.multiplatform.library`.** On AGP 9
+   it is the only one: `com.android.library` refuses to share a module with
+   `org.jetbrains.kotlin.multiplatform`, and `androidTarget()` fails beside the plugin that replaces it.
+   It is still an Android plugin on the module's classpath, which is exactly why `arch-clean` keeps the
+   Android target off `:domain` and lets Android consumers take the `jvm()` variant instead.
 3. **Declare the iOS targets even when the iOS app is built by its own build tool.** The framework
    that app consumes is produced *by these targets*; without them there is nothing to hand over.
 4. **`binaries.framework { }` is the hand-over point.** It names the framework the other build tool
    links against; the packaging of it belongs to that tool and not to this file.
-5. **Apple targets build only on an Apple host.** A Linux CI lane can build the JVM and Android halves
-   and must be told to skip the rest (see Publishing); the Apple lane is a second lane
+5. **Apple targets link only on an Apple host.** A Linux CI lane compiles their Kotlin to klibs —
+   `kotlin.native.enableKlibsCrossCompilation` is on by default — but cannot link the framework or run
+   the Apple tests; those tasks are skipped with a warning, and the Apple lane is a second lane
    (`release-ops`).
 6. **The target list is a commitment.** Adding one later can turn a `commonMain` dependency into a
-   resolution failure, because the library you picked may have no variant for it.
+   build failure, because the library you picked may have no variant for it (Dependencies per Source
+   Set, rule 1).
 
 ## Publishing
 
@@ -228,8 +256,8 @@ kotlin {
 3. **Publish from a host that can build every target.** A partial publish produces a root module
    whose metadata promises variants that were never uploaded, and the consumer's failure is a
    resolution error far from here.
-4. **`kotlin.native.ignoreDisabledTargets=true`** lets a build that declares Apple targets configure
-   and run on a host that cannot build them — the lane that only checks the JVM half.
+4. **`kotlin.native.ignoreDisabledTargets=true` only silences a warning** — the one a host prints for
+   each native task it cannot run. The build does the same work with it and without it.
 5. **`kotlin.mpp.enableCInteropCommonization=true`** when a cinterop library is used from an
    intermediate native source set such as `appleMain`; without it the interop bindings are visible
    only in the leaf target sets.
@@ -238,8 +266,9 @@ kotlin {
 
 ## Common Mistakes
 
-1. **A JVM-only artifact in `commonMain`** — the most common first failure, and the message ("no
-   matching variant for `iosArm64`") reads like a repository problem. Check the artifact for a
+1. **A JVM-only artifact in `commonMain`** — the most common first failure, and neither message
+   ("No matching variant", or "Unresolved reference" on the library's package) points at the source
+   set that declared it. Check the artifact for a
    multiplatform publication; if there is none, the code that uses it belongs in `jvmAndAndroid` or
    behind an interface.
 2. **`expect class` for everything.** Every member has to be mirrored on every platform, an added
