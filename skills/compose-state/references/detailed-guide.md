@@ -19,13 +19,29 @@
 
 ## Shared Type
 
+<!-- compile: android -->
 ```kotlin
-data class OrderRow(val id: String, val title: String, val isOpen: Boolean)
+import kotlinx.collections.immutable.ImmutableList
+
+// :domain — a plain Kotlin module, no Compose compiler applied to it
+data class Money(val cents: Long, val currency: String)
+
+// :feature-orders
+@Immutable
+data class OrderRow(
+    val id: String,
+    val title: String,
+    val isOpen: Boolean,
+    val total: Money,
+    val tags: ImmutableList<String>,
+)
 ```
 
-Imports are Android's. On Compose Multiplatform the same code compiles in `commonMain`; the two
-places that differ — `rememberSaveable` persistence and the Gradle report block — say so where they
-come up.
+Every section reads this row. `Stability — The Unstable Class` shows it declared the naive way, and
+`Stability — The Fix` says why each field is typed as it is; `ImmutableList` comes from
+`kotlinx-collections-immutable`. Imports are Android's. On Compose Multiplatform the same code
+compiles in `commonMain`; the two places that differ — `rememberSaveable` persistence and the Gradle
+report block — say so where they come up.
 
 ## Hoisting — Before
 
@@ -72,6 +88,7 @@ needs to read or write.
 State moves up to the lowest composable that must read it — here the screen, because the app bar
 shows the count. Events come back as lambdas.
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderSearchBar(
@@ -96,34 +113,47 @@ The owner. `rememberSaveable` because the query is something the user produced; 
 `remember`ed on its inputs because recomputing it on an unrelated recomposition is waste, not
 because it is state.
 
+<!-- compile: android -->
 ```kotlin
+import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.collections.immutable.toImmutableList
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OrderScreen(orders: List<OrderRow>, modifier: Modifier = Modifier) {
+fun OrderScreen(
+    orders: ImmutableList<OrderRow>,
+    onOpen: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var query by rememberSaveable { mutableStateOf("") }
     var onlyOpen by rememberSaveable { mutableStateOf(false) }
 
     val visible = remember(orders, query, onlyOpen) {
         orders.filter {
             it.title.contains(query, ignoreCase = true) && (!onlyOpen || it.isOpen)
-        }
+        }.toImmutableList()
     }
 
     Column(modifier) {
         TopAppBar(title = { Text("${visible.size} orders") })
         OrderSearchBar(query, onlyOpen, { query = it }, { onlyOpen = it })
-        if (visible.isEmpty()) EmptyState() else OrderList(visible)
+        if (visible.isEmpty()) EmptyState() else OrderList(visible, onOpen)
     }
 }
 ```
 
 Both halves are now testable: `OrderSearchBar` with a value and a recording lambda, `OrderScreen`
 with a list. Neither knows about a ViewModel; when the orders start arriving from one, only
-`OrderScreen`'s caller changes.
+`OrderScreen`'s caller changes. `TopAppBar` is still `@ExperimentalMaterial3Api`, so the screen that
+uses it opts in.
 
 Ship the stateful wrapper too, for callers with no opinion — the same pattern the Material components
 use:
 
+<!-- compile: android -->
 ```kotlin
+import androidx.compose.runtime.saveable.rememberSaveable
+
 @Composable
 fun OrderSearchBar(initialQuery: String = "", modifier: Modifier = Modifier) {
     var query by rememberSaveable { mutableStateOf(initialQuery) }
@@ -139,6 +169,7 @@ scrolling down" rule, the screen composable becomes a pile of unrelated `remembe
 UI logic, and UI logic is a plain class — not a ViewModel, which would outlive the layout it
 describes.
 
+<!-- compile: android -->
 ```kotlin
 @Stable
 class OrderScreenState(
@@ -163,6 +194,7 @@ lifetime.
 
 The factory, by the naming convention Compose itself uses. The keys are what forces a new instance:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun rememberOrderScreenState(
@@ -171,9 +203,15 @@ fun rememberOrderScreenState(
 ): OrderScreenState = remember(listState, scope) { OrderScreenState(listState, scope) }
 ```
 
-Used from the screen, this collapses four `remember`s into one line:
+Used from the screen, this collapses four `remember`s into one line. The icon is
+`androidx.compose.material:material-icons-extended`, versioned by the Compose BOM — Material 3 does
+not bring it:
 
+<!-- compile: android -->
 ```kotlin
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowUpward
+
 @Composable
 fun OrderScreen(state: OrderScreenState = rememberOrderScreenState()) {
     if (state.showScrollToTop) {
@@ -234,20 +272,17 @@ Rules the compiler will not enforce:
 
 ## Stability — The Unstable Class
 
-The order list scrolls badly and every row redraws when one row's badge changes. The state type looks
-innocent:
+The order list scrolls badly and every row redraws when one row's badge changes. The row, declared
+the naive way, looks innocent:
 
 ```kotlin
-// :domain — a plain Kotlin module, no Compose compiler applied to it
-data class Money(val cents: Long, val currency: String)
-
-// :feature-orders
+// :feature-orders — the Shared Type row before the fix
 data class OrderRow(
     val id: String,
     val title: String,
+    var isOpen: Boolean,
     val total: Money,
     val tags: List<String>,
-    var seen: Boolean,
 )
 
 @Composable
@@ -258,10 +293,10 @@ fun OrderList(orders: List<OrderRow>, onClick: (String) -> Unit) {
 }
 ```
 
-Three separate defects, and each alone is enough to stop skipping:
+Three separate defects, and each alone keeps the class from being stable:
 
-1. `var seen` — a public mutable property that Compose is not told about, so the class cannot promise
-   anything about its own contents.
+1. `var isOpen` — a public mutable property that Compose is not told about, so the class cannot
+   promise anything about its own contents.
 2. `tags: List<String>` — the stdlib `List` interface carries no immutability promise; the instance
    behind it may be a `MutableList`.
 3. `total: Money` — a class from a module the Compose compiler never saw, so it cannot be analysed
@@ -270,60 +305,72 @@ Three separate defects, and each alone is enough to stop skipping:
 ## Stability — The Compiler Report
 
 Turn on the reports (`Diagnosing — Compiler Metrics` has the Gradle block) and the compiler names all
-three without guessing. From `<module>_<variant>-classes.txt`:
+three without guessing. From `<module>-classes.txt`, as the Kotlin 2.4 compiler writes it:
 
 ```
-unstable class OrderRow {
+unstable class com.example.orders.OrderRow {
   stable val id: String
   stable val title: String
+  stable var isOpen: Boolean
   unstable val total: Money
-  unstable val tags: List<String>
-  unstable var seen: Boolean
+  runtime val tags: List<String>
   <runtime stability> = Unstable
 }
 ```
 
-Every defect gets its own line, `total` included: a class from another module is unstable unless that
-module also applies the Compose compiler, or a stability configuration file names it — and `:domain`
-does neither, so no report is emitted for `Money` at all. From `<module>_<variant>-composables.txt`:
+Every defect has its line, though only one says `unstable`. `total` does: a class from another module
+is unstable unless that module also applies the Compose compiler, or a stability configuration file
+names it — and `:domain` does neither, so no report is emitted for `Money` at all. `tags` is
+`runtime`, a stability left to the instance at run time, which a `List` never proves. `isOpen` reads
+`stable var`: its type is stable, and the `var` is the defect the class line answers for. From
+`<module>-composables.txt`:
 
 ```
-restartable scheme("[androidx.compose.ui.UiComposable]") fun OrderList(
-  unstable orders: List<OrderRow>
+restartable skippable scheme("[androidx.compose.ui.UiComposable]") fun com.example.orders.OrderList(
+  orders: List<OrderRow>
   stable onClick: Function1<String, Unit>
 )
 ```
 
-`restartable` with no `skippable` next to it is the whole diagnosis: this function will re-execute
-every time its parent does. Read the two files together — the composables file says *which* function
-pays, the classes file says *why*.
+Under strong skipping every restartable function reads `skippable`, so that word diagnoses nothing.
+The parameter lines do: `orders` has no `stable` in front of it, so it is compared by instance
+(`===`), and `OrderList` skips only while the caller hands it the very same list. A parameter marked
+`unstable` — `OrderCard`'s `unstable row: OrderRow` in the same file — is compared the same way. Read
+the two files together: the composables file says *which* parameter pays, the classes file says
+*why*.
 
 ## Stability — The Fix
 
-Each defect has one honest repair.
+Each defect has one honest repair, and together they give the `OrderRow` of `Shared Type`:
 
+1. `var isOpen` → `val`: it never changed after construction, so the mutability was the whole defect.
+   If it must change in place, back it with `mutableStateOf` and mark the class `@Stable`, not
+   `@Immutable`.
+2. `List<String>` → `ImmutableList<String>` from `kotlinx.collections.immutable`.
+3. `Money` → one of the two repairs below.
+
+The list the screen passes takes the same type, so the parameter is stable too:
+
+<!-- compile: android -->
 ```kotlin
-// 1. `var seen` → `val`: it never changed after construction, so the mutability was the whole defect
-//    (if it must change, back it with mutableStateOf and mark the class @Stable, not @Immutable)
-@Immutable
-data class OrderRow(
-    val id: String,
-    val title: String,
-    val total: Money,
-    val tags: ImmutableList<String>,   // 2. kotlinx.collections.immutable
-    val seen: Boolean,
-)
+@Composable
+fun OrderList(orders: ImmutableList<OrderRow>, onClick: (String) -> Unit) {
+    LazyColumn {
+        items(orders, key = { it.id }) { OrderCard(it, onClick) }
+    }
+}
 ```
 
-`@Immutable` is a promise: *no public property of this instance ever changes after construction*.
-Making the fields `val` of stable types is what earns it; the annotation only tells the compiler what
-it could not prove across a module boundary. Use `@Stable` instead when the object does change and
-notifies Compose itself — a state holder, not a value.
+With the three fields repaired the compiler infers `stable class` on its own. `@Immutable` states the
+promise — *no public property of this instance ever changes after construction* — and it is what a
+class needs when the compiler cannot see its fields' types, in a module without the Compose compiler.
+Use `@Stable` instead when the object does change and notifies Compose itself — a state holder, not a
+value.
 
 For the collection, add the dependency and build immutable instances at the edge that produces them:
 
 ```kotlin
-// build.gradle.kts:  implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:<version>")
+// build.gradle.kts:  implementation(libs.kotlinx.collections.immutable)
 val rows: ImmutableList<OrderRow> = orders.map(::toRow).toImmutableList()
 ```
 
@@ -350,9 +397,10 @@ composeCompiler {
 }
 ```
 
-Re-run the report afterwards. `OrderList` should now read `restartable skippable`, and `OrderRow`
-`stable class`. If it does not, the file still names the class the report does — the report is the
-only evidence that counts.
+Re-run the report afterwards. The classes file should now read `stable class
+com.example.orders.OrderRow`, and `OrderList`'s parameter `stable orders: ImmutableList<OrderRow>` —
+compared by `equals` again. If it does not, the file still names the class the report does — the
+report is the only evidence that counts.
 
 ## Strong Skipping
 
@@ -360,11 +408,11 @@ Strong skipping is on by default in the Compose compiler shipped with Kotlin 2.0
 changes two things, and it is worth knowing exactly which.
 
 **1. A composable with unstable parameters becomes skippable**, comparing the unstable ones by
-instance identity (`===`) instead of `equals`. The `OrderList` above skips *if and only if* the caller
-hands it the very same `List` instance.
+instance identity (`===`) instead of `equals`. The naive `OrderList` of `Stability — The Unstable
+Class` skips *if and only if* the caller hands it the very same `List` instance.
 
 ```kotlin
-// `rows: List<OrderRow>` is unstable, so strong skipping compares it with `===`
+// `rows: List<OrderRow>` is not stable, so strong skipping compares it with `===`
 private val _state = MutableStateFlow(OrdersUiState(rows = emptyList()))
 
 // defeats the skip: a fresh list instance on every emission — equal, but not identical
@@ -395,9 +443,9 @@ What it does not change:
 - Nothing about correctness: a `@Immutable` annotation that lies produces a stale screen with or
   without strong skipping.
 
-It can be turned off through the plugin's `featureFlags` —
-`featureFlags.add(ComposeFeatureFlag.StrongSkipping.disabled())` — which is worth knowing only to
-explain a codebase that already did it.
+There is no other mode left to reason about. Kotlin 2.4 deprecates
+`ComposeFeatureFlag.StrongSkipping` at error level, so a build script that still disables it through
+`featureFlags` no longer compiles, and Kotlin 2.5.0 removes the flag.
 
 ## Side Effect Handlers
 
@@ -407,6 +455,7 @@ what it looks like and what the wrong version costs.
 **`LaunchedEffect(key)`** — a coroutine tied to the composition, cancelled and restarted when a key
 changes:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderDetailRoute(orderId: String, viewModel: OrderDetailViewModel = hiltViewModel()) {
@@ -415,13 +464,16 @@ fun OrderDetailRoute(orderId: String, viewModel: OrderDetailViewModel = hiltView
 }
 ```
 
-With `Unit` as the key this loads the first order and never any other, because the navigation library
-reuses the composable when only the argument changes. Key on what the work depends on. The route-level
-composable is the one that may hold a ViewModel — the stateless `OrderDetailScreen` below it takes a
-state and a lambda (`arch-mvvm`).
+With `Unit` as the key this loads the first order and never any other wherever the composable stays
+in place while its argument changes — a detail pane beside the list, a pager page. Navigating to
+another `orderId` in Navigation Compose hides the bug: that is a new back stack entry and a new
+composition, even with `launchSingleTop`, so the effect runs again. Key on what the work depends on.
+The route-level composable is the one that may hold a ViewModel — the stateless `OrderDetailScreen`
+below it takes a state and a lambda (`arch-mvvm`).
 
 **`rememberCoroutineScope()`** — for work started from a *callback*, not from composition:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderScreen(snackbarHostState: SnackbarHostState) {
@@ -438,7 +490,11 @@ means the scope is created on the first composition and the work is started on a
 
 **`DisposableEffect(key)`** — anything with a register/unregister pair:
 
+<!-- compile: android -->
 ```kotlin
+import android.net.ConnectivityManager
+import android.net.Network
+
 @Composable
 fun ConnectivityBanner(connectivity: ConnectivityManager) {
     var online by remember { mutableStateOf(true) }
@@ -459,6 +515,7 @@ The block must end in `onDispose { }` — the compiler enforces it, which is the
 **`SideEffect { }`** — publish committed Compose state to an object that knows nothing about Compose.
 It runs after every successful composition, so it holds an assignment and nothing else:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun Analytics(userId: String, tracker: AnalyticsTracker) {
@@ -471,7 +528,10 @@ An analytics *event* sent from here is sent on every recomposition. Events go in
 
 **`produceState(initial, key)`** — turn a non-Compose source into a `State`:
 
+<!-- compile: android -->
 ```kotlin
+import android.graphics.Bitmap
+
 @Composable
 fun rememberThumbnail(url: String, loader: ImageLoader): State<Bitmap?> =
     produceState<Bitmap?>(initialValue = null, url, loader) {
@@ -486,6 +546,7 @@ screen's data comes from the ViewModel.
 **`snapshotFlow { }`** — the other direction, Compose state out into a `Flow`, emitting only when the
 value read inside actually changes:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun EndlessOrders(listState: LazyListState, onLoadMore: () -> Unit) {
@@ -497,14 +558,17 @@ fun EndlessOrders(listState: LazyListState, onLoadMore: () -> Unit) {
 ```
 
 It must be collected inside a coroutine, which is why it is always paired with a `LaunchedEffect`.
-Reading `listState.firstVisibleItemIndex` directly in a composable body instead makes that composable
-recompose on every scrolled pixel.
+Reading `listState.layoutInfo` or `firstVisibleItemScrollOffset` directly in a composable body instead
+makes that composable recompose on every scroll frame; `firstVisibleItemIndex` read there costs a
+recomposition per row that scrolls past.
 
 ## derivedStateOf — Pays
 
-The input changes on every frame of a fling; the output changes twice a screen. Without the wrapper,
-`OrderScreen` recomposes at 60–120 Hz while the user scrolls, for a boolean that almost never moves.
+The input changes with every row that scrolls past the top; the output changes twice a screen.
+Without the wrapper, `OrderScreen` recomposes once per row scrolled past, for a boolean that almost
+never moves.
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderScreen(orders: ImmutableList<OrderRow>) {
@@ -583,13 +647,14 @@ value freezes at its first computation with no warning.
 
 ## Diagnosing — Compiler Metrics
 
-The compiler already knows which composables cannot skip. Ask it before annotating anything.
+The compiler already knows which parameters it compares by instance. Ask it before annotating
+anything.
 
 ```kotlin
 // feature-orders/build.gradle.kts
 plugins {
-    alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.compose.compiler)     // the Kotlin 2.0+ Compose compiler Gradle plugin
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.compose)       // the Compose compiler Gradle plugin, versioned with Kotlin
 }
 
 composeCompiler {
@@ -602,39 +667,42 @@ Before Kotlin 2.0 the same two destinations were passed as
 `-P plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=…` in `freeCompilerArgs`; the
 report format is identical, so everything below still reads.
 
-Build the variant that ships, because that is the one whose numbers matter:
+Compile only the variant that ships, because that is the one whose numbers matter:
 
 ```
-./gradlew :feature-orders:assembleRelease
+./gradlew :feature-orders:compileReleaseKotlin
 ```
 
 Four files land in the destinations:
 
 | File | What it answers |
 |---|---|
-| `<module>_<variant>-composables.txt` | per function: `restartable`, `skippable`, `readonly`, and each parameter's stability |
-| `<module>_<variant>-classes.txt` | per class: `stable` / `unstable` / `runtime`, with the property responsible |
-| `<module>_<variant>-composables.csv` | the same functions as rows, for sorting and diffing between builds |
-| `<module>_<variant>-module.json` | totals — composables, of which skippable and restartable |
+| `compose_reports/<module>-composables.txt` | per function: `restartable`, `skippable`, `readonly`, and each parameter's stability |
+| `compose_reports/<module>-classes.txt` | per class: `stable` / `unstable` / `runtime`, with each property's line |
+| `compose_reports/<module>-composables.csv` | the same functions as rows, for sorting and diffing between builds |
+| `compose_metrics/<variant>/<module>-module.json` | totals — composables, skippable, restartable, and the unstable counts |
 
-For the build above that is `feature-orders_release-composables.csv` and its three siblings — the
-variant is part of the name, so a debug run does not overwrite a release one.
+With AGP 9 the three report files carry no variant in their name: for the build above they are
+`feature-orders-composables.txt` and its two siblings, and the next debug compile overwrites them.
+Only the metrics file sits in a per-variant directory.
 
 The working loop, in order:
 
-1. **Read `-module.json` first.** `skippableComposables` against `restartableComposables` is the
-   module's headline number and the only thing worth comparing between two builds.
-2. **Grep the composables file for the screen you are profiling**, and find every function that is
-   `restartable` with no `skippable`.
-3. **Take each `unstable` parameter to `-classes.txt`.** The property named there is the actual
+1. **Read `-module.json` first.** Under strong skipping `skippableComposables` tracks
+   `restartableComposables`, so the numbers worth comparing between two builds are
+   `knownUnstableArguments` and `inferredUnstableClasses`.
+2. **Grep the composables file for the screen you are profiling**, and find every parameter with no
+   `stable` in front of it — `unstable`, or bare like `orders: List<OrderRow>`. Each is compared by
+   instance.
+3. **Take each such parameter's type to `-classes.txt`.** The property named there is the actual
    defect (`Stability — The Compiler Report`).
 4. **Fix, rebuild, re-read.** Keep the previous `-composables.csv`; the diff is the evidence that the
    change did something.
 
 Two traps. The reports describe *compilation*, not a run: a `skippable` function still recomposes if
 its arguments genuinely change, and a report is not a substitute for measuring the screen. And the
-files are overwritten per build — copy the baseline out before the fix, or there is nothing to
-compare against.
+files are overwritten per build, whichever variant it compiled — copy the baseline out before the
+fix, or there is nothing to compare against.
 
 ## Diagnosing — recomposeHighlighter
 
@@ -653,8 +721,13 @@ release code. It is written with `Modifier.composed { }`, as the sample is; a mo
 should be a `Modifier.Node`, but this one is debug-only and copied verbatim, so diverging from the
 sample buys nothing.
 
+<!-- compile: android -->
 ```kotlin
 // debug source set only — trimmed from the Compose samples' RecomposeHighlighter
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+
 fun Modifier.recomposeHighlighter(): Modifier = this.then(recomposeModifier)
 
 private val recomposeModifier = Modifier.composed {
@@ -691,8 +764,8 @@ LazyColumn(state = listState) {
 }
 ```
 
-Red borders on rows the user never touched is the same finding as a `restartable` row in the report,
-arriving through the eyes instead of a file — which is why it is worth having both.
+Red borders on rows the user never touched is the same finding as a parameter the report compares by
+instance, arriving through the eyes instead of a file — which is why it is worth having both.
 
 Reading the result honestly:
 

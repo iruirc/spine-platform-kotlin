@@ -44,7 +44,7 @@ the flow operators feeding the screen — `reactive-flow`. Not for what a route 
 | A composable that owns too much, and the same one hoisted | `Hoisting — Before`, `Hoisting — After` |
 | A plain state holder class and its `remember` factory | `State Holder` |
 | Keeping a non-`Bundle`-able type across process death | `Saver for rememberSaveable` |
-| Why a composable never skips, in the compiler's own words | `Stability — The Unstable Class`, `Stability — The Compiler Report` |
+| Which parameters are compared by instance and why, in the compiler's own words | `Stability — The Unstable Class`, `Stability — The Compiler Report` |
 | `@Immutable`, immutable collections, the stability configuration file | `Stability — The Fix` |
 | What strong skipping does and does not change | `Strong Skipping` |
 | One sample of each effect handler, side by side | `Side Effect Handlers` |
@@ -194,8 +194,8 @@ of times. One rule each:
 when its inputs do.
 
 1. **Use it when the input changes much more often than the output.** The canonical case is
-   `listState.firstVisibleItemIndex > 0` driving a scroll-to-top button: the index changes on every
-   frame of a fling, the boolean twice a screen.
+   `listState.firstVisibleItemIndex > 0` driving a scroll-to-top button: the index changes with every
+   row that scrolls past, the boolean twice a screen.
 2. **Do not use it when the output changes as often as the input.** A filtered list derived from a
    query string changes on every keystroke, so the wrapper adds a snapshot observer and an allocation
    and prevents nothing.
@@ -221,10 +221,11 @@ composeCompiler {
 }
 ```
 
-2. **Read the two report files.** `<module>_<variant>-classes.txt` marks every class `stable`,
-   `unstable` or `runtime`, naming the property responsible; `<module>_<variant>-composables.txt`
-   marks each function `skippable`, `restartable` and lists each parameter as `stable` or `unstable`.
-   A hot composable that is not `skippable` is where the work goes.
+2. **Read the two report files.** `<module>-classes.txt` marks every class `stable`, `unstable` or
+   `runtime`, with a line per property; `<module>-composables.txt` lists each function's parameters
+   with their stability. Under strong skipping every restartable function is `skippable`, so a hot
+   composable's parameter with no `stable` in front of it — compared by instance — is where the work
+   goes. The files carry no variant in their name on AGP 9 and each compile overwrites them.
 3. **Confirm on device with Layout Inspector.** Android Studio shows a recomposition count and a skip
    count per composable while the app runs — the count that keeps climbing while nothing changes is
    the bug.
