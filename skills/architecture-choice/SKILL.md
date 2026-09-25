@@ -98,10 +98,12 @@ apply the When in Doubt defaults.
 | Micronaut / Quarkus service | Layered (Hexagonal when domain is rich) | as above | compile-time DI does not change the layering choice |
 | CLI | Layered, thin | command → service | commands are entry points like controllers |
 
-**One row, not a pattern blend.** MVVM in one feature and MVI in the next, or a "Clean-Layered"
-server, is usually neither pattern rather than both. The KMP row is the one **legitimate** mix — one
-shared domain, one presentation pattern per platform: the same pattern across two surfaces, not
-different patterns per feature.
+**One row, not a pattern blend.** Clean in one feature and repositories called straight from the
+ViewModel in the next, or a "Clean-Layered" server, is usually neither pattern rather than both. Two
+mixes are **legitimate**. The KMP row: one shared domain, one presentation pattern per platform —
+the same pattern across two surfaces, not different patterns per feature. And a reducer on the one
+screen whose state machine earns it: MVI is chosen per screen inside an MVVM app, and its store is
+the same `ViewModel` with a reducer inside (`arch-mvi`).
 
 ## Stack Lines
 
@@ -175,9 +177,10 @@ Cross-cutting (always, regardless of pattern):
 
 1. **Picking the most ambitious stack "just in case"** — Clean plus Hexagonal plus six Gradle
    modules for a five-screen utility costs weeks and hides intent behind indirection
-2. **Mixing patterns by feature** — one feature MVVM, the next MVI, a third Clean: nobody joining
-   the project can predict where logic lives. The KMP split (shared domain, per-platform
-   presentation) is **not** this — one pattern per layer, not one per feature
+2. **Mixing patterns by feature** — one feature Clean with use cases, the next calling repositories
+   from its ViewModel, a third layered its own way: nobody joining the project can predict where
+   logic lives. The KMP split (shared domain, per-platform presentation) is **not** this — one
+   pattern per layer, not one per feature — and neither is a reducer on the one screen that earns it
 3. **Choosing without writing it down** — record the choice in `## Stack` through Stack Lines
    so every later task reads one source of truth instead of re-deciding
 4. **Refusing to migrate when the signals appear** — see the signals in `arch-layered`. A stack

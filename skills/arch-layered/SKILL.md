@@ -125,6 +125,7 @@ Seven, and a violation of any one of them is the thing to fix in review:
 **The transaction starts and ends on the service method.** That is the only layer that knows which
 group of writes must succeed together, which is the definition of the boundary.
 
+<!-- compile: spring -->
 ```kotlin
 @Service
 class OrderService(
@@ -139,24 +140,29 @@ class OrderService(
 }
 ```
 
-- **Never on the controller.** The proxy commits when the handler returns, so the boundary covers
-  argument binding and every service the handler calls but not the response body, and the read-only
-  flag, the timeout and the rollback rules end up describing a request rather than an operation
+- **Never on the controller.** The proxy opens the transaction when the handler method is called —
+  after Spring MVC has bound and validated its arguments — and commits when it returns, before the
+  response body is written. What it spans is every service the handler calls, so the read-only flag,
+  the timeout and the rollback rules end up describing a request rather than an operation
   (`persistence-jvm-orm`).
-- **Never on the repository.** Each repository call gets its own transaction, so the two writes above
-  cannot roll back together — the reservation survives an order that failed to save. This is the
-  single most common layering bug that reaches production, because it looks correct in every test
-  that exercises one method at a time.
+- **Never on the repository instead of the service.** Under a transactional service a repository's
+  own `@Transactional` joins the open transaction — the default propagation, `REQUIRED`, does that —
+  so it adds nothing. Without one on the service, each repository call opens and commits its own, and
+  the two writes above cannot roll back together: the reservation survives an order that failed to
+  save. This is the single most common layering bug that reaches production, because it looks correct
+  in every test that exercises one method at a time.
 - **Ktor with Exposed puts it in the same place**, spelled as a function instead of an annotation:
-  `transaction { }` in a blocking service, `newSuspendedTransaction { }` in a `suspend` one — wrapping
-  the service method's body, not each repository call.
+  `transaction { }` in a blocking service, `suspendTransaction { }` in a `suspend` one — wrapping the
+  service method's body, not each repository call. Both live in
+  `org.jetbrains.exposed.v1.jdbc.transactions` on Exposed 1.x.
 
+<!-- compile: ktor -->
 ```kotlin
 class OrderService(
     private val orders: OrderRepository,
     private val stock: StockRepository,
 ) {
-    suspend fun place(command: PlaceOrderCommand): Order = newSuspendedTransaction {
+    suspend fun place(command: PlaceOrderCommand): Order = suspendTransaction {
         val reserved = stock.reserve(command.sku, command.quantity)
         orders.save(Order.from(command, reserved))
     }
@@ -277,15 +283,15 @@ lands there is `arch-hexagonal`, and its domain half is `arch-clean`.
 1. **Business logic in the controller** — a `when` over statuses, a price calculation, or a second
    repository call inside the handler. It works until the scheduler needs the same behaviour and has
    no request to build; then the rule is copied, and the two copies drift within a month.
-2. **`@Transactional` on the repository** — every call gets its own transaction, so a service that
-   writes twice cannot roll back as a unit, and a failure halfway leaves the first write committed.
-   Every single-method test still passes.
-3. **`@Transactional` on the controller** — the boundary now covers argument binding and every
-   service the handler calls, so the read-only flag, the timeout and the rollback rules describe a
-   request rather than an operation. It also hides where the session ends: the proxy commits when the
-   handler returns, and the lazy associations that still resolve while the body is written are
-   resolving through Open Session In View (`spring.jpa.open-in-view`, on by default in Boot), not
-   through your transaction.
+2. **`@Transactional` on the repository and not on the service** — with no transaction open above
+   it, every repository call commits on its own, so a service that writes twice cannot roll back as a
+   unit, and a failure halfway leaves the first write committed. Every single-method test still
+   passes.
+3. **`@Transactional` on the controller** — the boundary now covers every service the handler calls,
+   so the read-only flag, the timeout and the rollback rules describe a request rather than an
+   operation. It also hides where the session ends: the proxy commits when the handler returns, and
+   the lazy associations that still resolve while the body is written are resolving through Open
+   Session In View (`spring.jpa.open-in-view`, on by default in Boot), not through your transaction.
 4. **The persistence entity as the response body** — one `@Entity` class annotated with
    `@JsonProperty` and returned from the controller. The schema is now the public contract: a column
    rename is a breaking change, a new column leaks, and the lazy fields either explode or fetch the

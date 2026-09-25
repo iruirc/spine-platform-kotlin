@@ -22,18 +22,15 @@ The header comment on each block is the module and path the file belongs to. Tha
 in this architecture the path *is* the constraint, because the module a file sits in decides what it
 is allowed to import.
 
-Time types are `kotlin.time.Instant` and `kotlin.time.Clock`: stable since Kotlin 2.3, and available
-from 2.1.20 behind `@ExperimentalTime`. On Kotlin 2.2 or earlier, either add
-`-opt-in=kotlin.time.ExperimentalTime` to the module's compiler options or use
-`kotlinx.datetime.Instant` and `kotlinx.datetime.Clock` and keep `kotlinx-datetime` as a `:domain`
-dependency; nothing else in these files changes. No sample below carries an `@OptIn` annotation —
-that opt-in belongs in the build file, once.
+Time types are `kotlin.time.Instant` and `kotlin.time.Clock`, stable since Kotlin 2.3;
+`kotlinx-datetime` joins `:domain` only for calendar types such as `LocalDate`.
 
 ## Domain — Entity and Repository Port
 
 The innermost module. The entire import list across the three files below is `kotlin.time.Instant`
 and `kotlinx.coroutines.flow.Flow`.
 
+<!-- compile: android -->
 ```kotlin
 // :domain — com/acme/domain/orders/Order.kt
 package com.acme.domain.orders
@@ -69,6 +66,7 @@ data class Order(
 The failure type. It is an `Exception` subclass so it fits `kotlin.Result`'s failure slot, and it is
 `sealed` so a `when` over it is exhaustive at every call site that cares:
 
+<!-- compile: android -->
 ```kotlin
 // :domain — com/acme/domain/orders/OrderError.kt
 sealed class OrderError(message: String? = null, cause: Throwable? = null) :
@@ -84,6 +82,7 @@ sealed class OrderError(message: String? = null, cause: Throwable? = null) :
 The port. Domain vocabulary in the names, domain types in the signatures, and no hint of where the
 data is or how it travels:
 
+<!-- compile: android -->
 ```kotlin
 // :domain — com/acme/domain/orders/OrderRepository.kt
 import kotlinx.coroutines.flow.Flow
@@ -112,6 +111,7 @@ fake in every test would grow a parameter it ignores.
 
 The simple shape first: one collaborator, one public function, one rule.
 
+<!-- compile: android -->
 ```kotlin
 // :domain — com/acme/domain/orders/GetOrders.kt
 class GetOrders(private val repo: OrderRepository) {
@@ -131,6 +131,7 @@ reachable from a ViewModel test any other way:
 `PaymentRepository` below is a second port in the same module, declared the same way — the use case
 is where two of them meet, and that meeting is the reason this layer exists.
 
+<!-- compile: android -->
 ```kotlin
 // :domain — com/acme/domain/orders/CancelOrder.kt
 import kotlin.time.Clock
@@ -176,6 +177,7 @@ Three things this file demonstrates beyond the rule itself:
 The wire model. Every field is nullable and every name matches the payload, because the DTO's job is
 to survive whatever the server actually sends — the shape the rules want is the mapper's problem:
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderDto.kt
 import kotlinx.serialization.SerialName
@@ -204,14 +206,22 @@ review comment. Give every DTO, entity, DAO, API interface and mapper in this mo
 
 Retrofit, on Android or any JVM client:
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderApi.kt
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
+
 internal interface OrderApi {
     @GET("customers/{id}/orders")
     suspend fun orders(
         @Path("id") customer: String,
-        @Query("page") page: Int = 1,
+        @retrofit2.http.Query("page") page: Int = 1,
     ): List<OrderDto>
+
+    @GET("orders/{id}")
+    suspend fun order(@Path("id") id: String): OrderDto
 
     @POST("orders/{id}/cancel")
     suspend fun cancel(@Path("id") id: String): OrderDto
@@ -227,6 +237,8 @@ internal class KtorOrderApi(private val client: HttpClient) {
     suspend fun orders(customer: String, page: Int = 1): List<OrderDto> =
         client.get("customers/$customer/orders") { parameter("page", page) }.body()
 
+    suspend fun order(id: String): OrderDto = client.get("orders/$id").body()
+
     suspend fun cancel(id: String): OrderDto = client.post("orders/$id/cancel").body()
 }
 ```
@@ -240,6 +252,7 @@ are `net-architecture`.
 The schema model. Flat, indexed, keyed, and shaped by what SQLite can store — `Instant` becomes a
 `Long`, the enum becomes a `String`, and the nested lines become a second table:
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderEntity.kt
 @Entity(tableName = "orders", indices = [Index("customer_id")])
@@ -269,6 +282,7 @@ internal data class OrderLineEntity(
 )
 ```
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderDao.kt
 internal data class OrderWithLines(
@@ -306,6 +320,7 @@ disagree is `persistence-architecture`.
 Three families meet in one file, and nothing above `:data` imports it. Wire → domain first, where the
 nullability of the payload collapses into the non-null guarantees the rules were written against:
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderMappers.kt
 internal fun OrderDto.toDomain(): Order = Order(
@@ -336,6 +351,7 @@ private fun String?.toOrderStatus(): OrderStatus = when (this) {
 
 Schema ↔ domain, both directions, because the cache is written as well as read:
 
+<!-- compile: android -->
 ```kotlin
 internal fun OrderWithLines.toDomain(): Order = Order(
     id = OrderId(order.id),
@@ -362,7 +378,11 @@ Failure mapping is mapping too, and it belongs in the same place for the same re
 translation from someone else's vocabulary into the domain's. Two hops, because the transport's
 vocabulary and the domain's are two vocabularies; the families themselves are `error-architecture`'s:
 
+<!-- compile: android -->
 ```kotlin
+import java.io.IOException
+import retrofit2.HttpException
+
 internal fun Throwable.toDataError(): DataError = when (this) {
     is DataError -> this
     is IOException -> DataError.Unreachable(this)
@@ -391,9 +411,10 @@ Three notes:
 
 ## Data — Repository Implementation
 
-The only class in `:data` that is not `internal` — the composition root has to be able to name it —
-and the one place where "which source wins" is decided:
+The one place where "which source wins" is decided, and like everything else in `:data`, nothing
+outside the module can construct it:
 
+<!-- compile: android -->
 ```kotlin
 // :data — com/acme/data/orders/OrderRepositoryImpl.kt
 class OrderRepositoryImpl internal constructor(
@@ -414,26 +435,36 @@ class OrderRepositoryImpl internal constructor(
         }
     }
 
-    override suspend fun refresh(customer: CustomerId): Result<Unit> = try {
+    override suspend fun refresh(customer: CustomerId): Result<Unit> = catching {
         val orders = api.orders(customer.value).map(OrderDto::toDomain)
         dao.replace(orders.map(Order::toEntity), orders.flatMap(Order::toLineEntities))
-        Result.success(Unit)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
-        Result.failure(e.toOrderError())
-    }
+    }.mapFailure { it.toDataError().toOrderError() }
+
+    override suspend fun order(id: OrderId): Result<Order> =
+        catching { api.order(id.value).toDomain() }.mapFailure { it.toDataError().toOrderError() }
+
+    override suspend fun cancel(id: OrderId): Result<Order> =
+        catching { api.cancel(id.value).toDomain() }.mapFailure { it.toDataError().toOrderError() }
 }
 ```
 
-- **`catch (e: CancellationException) { throw e }` before the broad catch.** Without it a screen the
-  user left mid-load produces a `Result.failure`, and the ViewModel renders an error over a screen
-  that is gone. `runCatching` has exactly this bug built in and no way to opt out
-  (`error-architecture`).
-- **`internal constructor` on a public class.** Consumers can hold the type; only `:data` can build
-  it, because building it means naming `OrderApi` and `OrderDao`. The binding —
-  `single<OrderRepository> { OrderRepositoryImpl(get(), get()) }` or its Hilt or Spring equivalent —
-  is a factory function in `:data` or a module in `:app` (`di-koin`, `di-hilt`, `di-spring`).
+The binding ships from `:data` too, because `:data` is the only module that can call that
+constructor; `:app` lists the module and never names the implementation:
+
+<!-- compile: android -->
+```kotlin
+// :data — com/acme/data/orders/DataModule.kt
+val dataModule = module {
+    single<OrderRepository> { OrderRepositoryImpl(get(), get()) }
+}
+```
+
+- **`catching`, not `runCatching` or a hand-written `catch`.** A screen the user left mid-load must
+  not produce a `Result.failure`, or the ViewModel renders an error over a screen that is gone:
+  `error-architecture` → "The runCatching Rule".
+- **`internal constructor` on a public class.** Only `:data` can build it, because building it means
+  naming `OrderApi` and `OrderDao`. The Koin module above, or its Hilt or Spring equivalent, is the
+  one place that does (`di-koin`, `di-hilt`, `di-spring`).
 - **No dispatcher, on purpose:** Room and Retrofit are on the "nothing to switch" rows of
   `concurrency-coroutines` → "Per-Layer Dispatchers".
 
@@ -447,14 +478,9 @@ class JdbcOrderRepository(
     private val io: CoroutineDispatcher = Dispatchers.IO,
 ) : OrderRepository {
 
-    override suspend fun orders(customer: CustomerId): Result<List<Order>> = try {
-        val rows = withContext(io) { transaction(database) { OrderTable.selectFor(customer.value) } }
-        Result.success(rows)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Throwable) {
-        Result.failure(e.toDataError().toOrderError())
-    }
+    override suspend fun orders(customer: CustomerId): Result<List<Order>> = catching {
+        withContext(io) { transaction(database) { OrderTable.selectFor(customer.value) } }
+    }.mapFailure { it.toDataError().toOrderError() }
 
     // observeOrders, refresh, order, cancel elided — same shape.
 }
@@ -468,6 +494,7 @@ Which dispatcher a JDBC pool gets, and what virtual threads change about it:
 The presentation layer's entire view of everything below it is one constructor parameter —
 `GetOrders`. The other two are its own formatters, declared in this module:
 
+<!-- compile: android -->
 ```kotlin
 // :feature:orders — com/acme/feature/orders/OrdersViewModel.kt
 class OrdersViewModel(
@@ -503,10 +530,30 @@ nothing about the repository, the DTO or the database is nameable from this modu
 
 The third mapping boundary lives here, and it is presentation's own:
 
+<!-- compile: android -->
 ```kotlin
 // :feature:orders — domain → what the screen renders. Formatting is a UI concern.
-fun interface DateFormatter { fun medium(at: Instant): String }
-fun interface MoneyFormatter { fun format(amount: Money, currency: String): String }
+import java.math.BigDecimal
+import java.text.NumberFormat
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Currency
+import java.util.Locale
+import kotlin.time.toJavaInstant
+
+class DateFormatter(private val zone: ZoneId) {
+    private val format = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+    fun medium(at: Instant): String = format.format(at.toJavaInstant().atZone(zone))
+}
+
+class MoneyFormatter(private val locale: Locale) {
+    fun format(amount: Money, currency: String): String {
+        val unit = Currency.getInstance(currency)
+        val format = NumberFormat.getCurrencyInstance(locale).apply { this.currency = unit }
+        return format.format(BigDecimal.valueOf(amount.minor, unit.defaultFractionDigits))
+    }
+}
 
 internal fun Order.toRow(dates: DateFormatter, money: MoneyFormatter): OrderRow = OrderRow(
     id = id.value,
@@ -535,6 +582,7 @@ One test per layer, each one allowed to touch exactly what its module is allowed
 `:domain`'s test source set (move it into a `testFixtures` source set once `:data` and presentation
 want it too — `pkg-gradle-modules`):
 
+<!-- compile: android-test -->
 ```kotlin
 // :domain/src/test — FakeOrderRepository.kt
 class FakeOrderRepository(private val stored: List<Order> = emptyList()) : OrderRepository {
@@ -557,8 +605,12 @@ class FakeOrderRepository(private val stored: List<Order> = emptyList()) : Order
 }
 ```
 
+<!-- compile: android-test -->
 ```kotlin
 // :domain/src/test — CancelOrderTest.kt
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+
 class CancelOrderTest {
     private val clock = Clock.System   // replaced per test below
 
@@ -609,14 +661,16 @@ fun toDomain_unknownStatus_mapsToUnknown() {
 
 Against a real engine, one integration test per source is enough to prove the schema and the queries:
 
+<!-- compile: ktor-test -->
 ```kotlin
 // Server: the real database and the real migrations, in a container.
-import org.testcontainers.utility.DockerImageName
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.postgresql.PostgreSQLContainer
 
 @Testcontainers
 class OrderTableTest {
-    // <Nothing> because Kotlin cannot infer Testcontainers' self-referential SELF parameter.
-    @Container val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+    @Container val postgres = PostgreSQLContainer("postgres:16-alpine")
     // Flyway/Liquibase runs against it in @BeforeEach — persistence-migrations.
 }
 ```
@@ -638,14 +692,19 @@ class OrderDaoTest {
 use case over the fake repository — which is usually what you want, since it exercises the rule the
 screen depends on:
 
+<!-- compile: android-test -->
 ```kotlin
 // :feature:orders/src/test — OrdersViewModelTest.kt
+import java.time.ZoneOffset
+import java.util.Locale
+
 @Test
 fun onEvent_offlineFailure_rendersOfflineMessage() = runTest {
     val repo = FakeOrderRepository().apply { failure = OrderError.Offline }
     val viewModel = OrdersViewModel(
         getOrders = GetOrders(repo),
-        dates = { "" }, money = { _, _ -> "" },   // fun interfaces: a lambda is the whole fake
+        dates = DateFormatter(ZoneOffset.UTC),
+        money = MoneyFormatter(Locale.US),
         savedState = SavedStateHandle(mapOf("customerId" to "c-1")),
     )
 
@@ -658,10 +717,9 @@ fun onEvent_offlineFailure_rendersOfflineMessage() = runTest {
 }
 ```
 
-When you do need to stub the outcome directly — a use case that reaches four repositories, or one
-whose own rule already has a long test of its own — declare it in `:domain` as a `fun interface` with
-the class as its only implementation. The fake is then one lambda,
-`GetOrders { Result.failure(OrderError.Offline) }`, and nothing else about the design changes.
+The formatters are real too: concrete classes with nothing to fake. A use case that reaches four
+repositories still gets four fakes here rather than an interface of its own; it earns one only with a
+second implementation: `arch-clean` → "Interfaces and Concrete Classes".
 The `Main` replacement, Turbine and the rest of the harness:
 `arch-mvvm` → "Testing ViewModel"
 
@@ -675,9 +733,6 @@ plugins { kotlin("jvm") }
 
 dependencies {
     implementation(libs.kotlinx.coroutines.core)
-    // Calendar types (LocalDate, TimeZone) need this on every Kotlin version; on 2.2 or earlier
-    // Instant and Clock come from here too, unless the module opts in to kotlin.time.
-    implementation(libs.kotlinx.datetime)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.kotlinx.coroutines.test)
@@ -708,8 +763,7 @@ dependencies {
 ```kotlin
 // :feature:orders/build.gradle.kts — the absent line is the one that matters: project(":data").
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.android.library)   // AGP 9 compiles Kotlin itself: no kotlin-android plugin
     alias(libs.plugins.compose.compiler)
 }
 
@@ -745,7 +799,6 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.datetime)   // calendar types; see the JVM block above
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -755,11 +808,11 @@ kotlin {
 }
 ```
 
-No `androidTarget()` here: that target wants an Android Gradle plugin applied to the module, which is
-precisely what Mistake 5 forbids `:domain`, so Android consumers take the `jvm()` variant. The one
-exception in the whole layout is the Android KMP library plugin
-(`com.android.kotlin.multiplatform.library`), and it belongs on `:data` when a platform driver needs
-an Android API — never on `:domain`.
+No Android target here. On AGP 9 that target is `android { }`, added by the Android KMP library
+plugin (`com.android.kotlin.multiplatform.library`) — an Android plugin on the module, which is
+precisely what Mistake 5 forbids `:domain` — so Android consumers take the `jvm()` variant. That
+plugin is the one exception in the whole layout, and it belongs on `:data` when a platform driver
+needs an Android API — never on `:domain`: `pkg-kmp-source-sets` → "Targets".
 
 `:data` is multiplatform too, and it is the only module allowed an `iosMain` or an `androidMain` —
 for a driver, never for a rule (`pkg-kmp-source-sets`). Two greps keep the whole thing honest in CI,

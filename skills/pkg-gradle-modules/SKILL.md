@@ -99,8 +99,8 @@ outside its row is either the wrong archetype or the graph is wrong.
 | test-fixtures | the `testFixtures` source set of the module it fixtures | fakes, builders, test dispatchers | the module it fixtures |
 
 The `feature → data` edge is in the table because a build may legitimately use it, but a Clean layout
-does not: there a feature depends on interfaces that live in `core` and `:app` binds the
-implementation (`arch-clean`), so the edge belongs only to a build with no separate `:app`-side
+does not: there a feature depends on interfaces that live in `core` and `:app` installs the binding
+`:data` ships (`arch-clean`), so the edge belongs only to a build with no separate `:app`-side
 composition root.
 
 1. **Never feature → feature.** The moment `:feature:cart` names `:feature:checkout`, both rebuild

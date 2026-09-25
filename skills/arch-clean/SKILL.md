@@ -71,12 +71,10 @@ Three layers, two arrows, both pointing at the domain:
 1. **The arrows are Gradle dependencies.** `:domain/build.gradle.kts` contains no
    `implementation(project(":data"))` and no `project(":app")`. That absence is the architecture, and
    it is one grep away in review — which is why it survives a year and a folder convention does not.
-2. **`:domain` is `kotlin("jvm")` or a KMP module**, never `com.android.library`, and it declares one
-   dependency: `kotlinx-coroutines-core`. `kotlin.time.Instant` and `kotlin.time.Clock` are stable
-   since Kotlin 2.3 and available from 2.1.20 behind `@ExperimentalTime`; on 2.2 or earlier either
-   add `-opt-in=kotlin.time.ExperimentalTime` or use `kotlinx.datetime.Instant` and `Clock` and keep
-   `kotlinx-datetime` as a `:domain` dependency — which the calendar types (`LocalDate`, `TimeZone`)
-   need on every version anyway. If a file there needs an import outside `kotlin.*`,
+2. **`:domain` is `kotlin("jvm")` or a KMP module**, never `com.android.library`, and it declares
+   `kotlinx-coroutines-core`, plus `kotlinx-datetime` once a rule needs calendar types (`LocalDate`,
+   `TimeZone`) — nothing else. `kotlin.time.Instant` and `kotlin.time.Clock` are the standard
+   library's, stable since Kotlin 2.3. If a file there needs an import outside `kotlin.*`,
    `kotlinx.coroutines.*`, `kotlinx.datetime.*` and your own packages, either the type is wrong or
    the file is in the wrong module.
 3. **Presentation depends on `:domain` only.** It sees use cases and entities. A ViewModel that can
@@ -113,8 +111,10 @@ settings.gradle.kts
 1. **Three modules is the floor and usually the ceiling.** `:app` + `:domain` + `:data` already
    enforces every arrow in the diagram. Add `:feature:*` when build time or parallel teams ask for
    it, not because the diagram in the article had them (`pkg-gradle-modules`).
-2. **`:app` is the only module that sees everything**, because it is where the graph is assembled:
-   it binds `OrderRepositoryImpl` to `OrderRepository` and nothing else knows both names.
+2. **`:app` is the only module that sees everything**, because it is where the graph is assembled.
+   The binding of `OrderRepositoryImpl` to `OrderRepository` ships from `:data`, the one module that
+   can construct the implementation; `:app` installs it, and no module above `:data` names the
+   implementation.
 3. **Split `:data` per source only when two teams own the sources.** `:data:remote` and `:data:local`
    are two more build files and one more `api` decision to get wrong; the repository implementation
    was already the seam.
@@ -152,9 +152,11 @@ class GetOrders(private val repo: OrderRepository) {
    no owner: two screens read it and neither invalidates it.
 4. **No dispatcher.** A use case that names one has an opinion about a collaborator's cost; where the
    switch goes instead is `concurrency-coroutines` → "Per-Layer Dispatchers".
-5. **No framework import, and no framework annotation either.** `@Service`, `@Singleton`,
-   `@Inject` and `@HiltViewModel` all put a container on `:domain`'s classpath. Constructor
-   parameters are enough; the binding happens in `:app` (`di-hilt`, `di-koin`, `di-spring`).
+5. **No framework import, and no framework annotation either.** `@Service` and `@HiltViewModel` put
+   a container on `:domain`'s classpath. JSR-330's `@Inject` and `@Singleton` are no container, only
+   an annotation jar, but they are still a dependency and a claim about who builds the class.
+   Constructor parameters are enough; the binding happens outside `:domain` (`di-hilt`, `di-koin`,
+   `di-spring`).
 6. **A use case that adds no rule is a file, not a boundary.** Either it is genuinely the seam — two
    repositories, a policy, a decision — or the ViewModel takes the repository interface directly.
    Pick one convention per project and write it in the project guidance file.

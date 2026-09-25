@@ -104,6 +104,7 @@ settings.gradle.kts
 
 ## Port Design
 
+<!-- compile: jvm -->
 ```kotlin
 // :core — inbound. One interface per use case, named for what the actor wants.
 fun interface PlaceOrder {
@@ -148,23 +149,25 @@ fun interface CurrentTime {
 
 ## Where Things Live
 
-**Transactions.** Not in the core as an annotation: `@Transactional` on a use case puts the container
-on `:core`'s classpath, and does nothing at runtime anyway when `:app` constructs the class by hand
-and no proxy exists. Two placements are correct, and a project picks one:
+**Transactions.** Not in the core as an annotation: `@Transactional` on a use case puts Spring on
+`:core`'s classpath, and what it does then depends on how `:app` builds the class. Returned from a
+Spring `@Bean` method it is proxied like any bean — or, being a final Kotlin class under Spring Boot's
+class-based proxies, fails the context at startup; built by Koin or in `main()` it does nothing. Two
+placements are correct, and a project picks one:
 
 | Placement | Use when | Cost |
 |---|---|---|
 | Inside the persistence adapter | one use case writes one aggregate — the port method *is* the unit of work | a use case that must write two aggregates atomically has nowhere to say so |
 | An outbound `UnitOfWork` port the core calls | one use case writes through two ports and they must commit together | the core now names a concept that only exists because a database does |
 
+<!-- compile: ktor -->
 ```kotlin
 // :core — the port, if you need one. No framework word appears in it.
 interface UnitOfWork {
     fun <T> inTransaction(block: () -> T): T
 }
 
-// :adapters:persistence — Exposed. On Spring it is a TransactionTemplate; on Ktor with a
-// suspending core, the port method suspends and the body is newSuspendedTransaction.
+// :adapters:persistence — Exposed 1.x; Spring: TransactionTemplate; a suspending core: suspendTransaction
 class ExposedUnitOfWork : UnitOfWork {
     override fun <T> inTransaction(block: () -> T): T = transaction { block() }
 }
@@ -219,6 +222,7 @@ and the modules that own the frameworks pay for them.
 used — the ports are narrow by construction, so a fake is a class with a map in it, and it can hold
 the invariants a mock cannot (an id that increments, a row that is really there on the next read).
 
+<!-- compile: jvm-test -->
 ```kotlin
 class InMemoryOrders : OrderRepository {
     private val saved = mutableMapOf<OrderId, Order>()
@@ -249,8 +253,9 @@ than a hope.
    over two use cases, or a port is doing too little and two of them are one.
 3. **Keep the container-backed adapter tests off the pull-request lane.** They are the slow ones, and
    a lane that runs them is a lane people learn to ignore.
-4. **`:app` gets one test: the graph builds.** A single startup or `checkModules()` assertion catches
-   the missing binding, which is the only failure mode assembly has.
+4. **`:app` gets one test: the graph builds.** A context that starts, or on Koin the definition walk
+   `di-koin` → "Testing" describes, catches the missing binding, which is the only failure mode
+   assembly has.
 
 ## When Worth It
 
@@ -302,9 +307,10 @@ codebase and read `arch-clean` for the deeper treatment of the domain, not for a
 4. **Ports declared in the adapter** — the interface next to its implementation because they "belong
    together". The compile arrow now points outward and the core depends on the ORM; the layout still
    looks hexagonal in the directory tree.
-5. **`@Transactional` on a use case** — the container arrives on the core's classpath, and the
-   annotation is inert anyway once `:app` constructs the class directly, so the transaction silently
-   does not exist. Put the boundary in the adapter or express it as a `UnitOfWork` port.
+5. **`@Transactional` on a use case** — the container arrives on the core's classpath, and whether the
+   transaction exists is decided by the composition root: a Spring `@Bean` proxies it, Koin or
+   `main()` leaves it inert, and a final class under class-based proxies stops the context from
+   starting. Put the boundary in the adapter or express it as a `UnitOfWork` port.
 6. **Logic in `:app`** — the composition root grows an `if`, a mapping, or a "small" orchestration
    between two ports. It is the one module with no boundary above it and no test below it, so
    whatever lands there is untested by construction. `:app` wires and starts; that is all.

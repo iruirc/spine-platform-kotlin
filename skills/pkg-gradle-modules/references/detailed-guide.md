@@ -492,7 +492,8 @@ dependencies {
    serialization runtime is part of the contract — but the first `project(...)` line it wants is the
    question of whether an implementation has moved in.
 4. `:feature:orders` has no `:data:orders` line even though the archetype table allows one. On a
-   Clean layout it never does: the interface is in `:core:model` and `:app` binds the implementation.
+   Clean layout it never does: the interface is in `:core:model` and `:app` installs the binding
+   `:data:orders` ships.
 5. `alias(libs.plugins.ksp)` names a version and still loads the root's copy, because the root
    declared the same one with `apply false`.
 6. `kotlinx-datetime` is there for `LocalDate` and time zones; `Instant` is `kotlin.time.Instant` in
