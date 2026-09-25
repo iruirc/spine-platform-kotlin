@@ -63,7 +63,7 @@ one is in force that window, not a review queue, is the value core's key takes.
 // build.gradle.kts
 jib {
     from {
-        image = "gcr.io/distroless/java21-debian12"   // or eclipse-temurin:21-jre
+        image = "gcr.io/distroless/java21-debian13"   // or eclipse-temurin:21-jre
         // In CI, pin by digest: "...@sha256:<digest>"
     }
     to { image = "registry.example.com/orders:$imageTag" }   // semver + short sha, immutable
@@ -73,12 +73,15 @@ jib {
         jvmFlags = listOf("-XX:MaxRAMPercentage=75.0")
     }
 }
+tasks.matching { it.name.startsWith("jib") }.configureEach {
+    notCompatibleWithConfigurationCache("Jib 3.5 calls Task.project at execution time")
+}
 ```
 
 The Dockerfile route keeps the same layering by hand: Spring Boot's `bootJar` is already layered, so
-extract it in the build stage — `java -Djarmode=tools -jar app.jar extract --layers` on Boot 3.3+,
-`java -Djarmode=layertools -jar app.jar extract` before that — and `COPY` each layer separately; a
-Ktor build produces the same shape from `installDist` (the `application` plugin) or a `shadowJar`.
+extract it in the build stage — `java -Djarmode=tools -jar app.jar extract --layers` — and `COPY`
+each layer separately; a Ktor build produces the same shape from `installDist` (the `application`
+plugin) or a `shadowJar`.
 
 1. **Pin the base image by digest, not by tag.** `eclipse-temurin:21-jre` is a moving target, and a
    rebuild of one commit that produces a different runtime cannot reproduce an incident.
@@ -90,6 +93,10 @@ Ktor build produces the same shape from `installDist` (the `application` plugin)
    every commit; a single fat-jar layer re-pushes 80 MB for a one-line fix.
 5. **The tag is immutable and carries the commit** (`release-ops` → "Versioning") — that is what
    makes "roll back" a deploy of a tag that still exists.
+6. **Jib's tasks are marked, the configuration cache stays on.** Jib 3.5.4 fails a cached build with
+   "Invocation of 'Task.project' by task ':jibBuildTar' at execution time is unsupported with the
+   configuration cache"; the `notCompatibleWithConfigurationCache` block above scopes that to the
+   builds that run Jib (`pkg-gradle-modules` → "Common Mistakes").
 
 ## Probes
 
@@ -166,15 +173,17 @@ ready.set(schema != null && schema >= MigrationVersion.fromVersion(EXPECTED_SCHE
 The order is **SIGTERM → stop accepting new work → drain in-flight → close pools and clients → exit.**
 
 ```properties
-# Spring Boot
-server.shutdown=graceful
-spring.lifecycle.timeout-per-shutdown-phase=30s
+# Spring Boot: graceful is the default, so only the drain window is set
+spring.lifecycle.timeout-per-shutdown-phase=20s
 ```
 
-Ktor stops the engine explicitly — `embeddedServer(...).stop(gracePeriodMillis, timeoutMillis)` from
-a shutdown hook, with the `ShutDownUrl` plugin only where an operator-triggered stop is wanted. On
-Kubernetes, `terminationGracePeriodSeconds` must exceed the drain window, and a `preStop` sleep of a
-few seconds covers the gap between the pod leaving the endpoints list and the load balancer noticing.
+Spring Boot shuts the server down gracefully unless `server.shutdown=immediate` says otherwise, and
+waits 30 s per lifecycle phase by default. Ktor's `start()` registers a JVM shutdown hook that stops
+the engine with `shutdownGracePeriod` and `shutdownTimeout` from the engine configuration — 1 s and
+5 s by default, set under `ktor.deployment` or in `embeddedServer`'s `configure` block; the
+`ShutDownUrl` plugin is only for an operator-triggered stop. On Kubernetes,
+`terminationGracePeriodSeconds` must exceed the drain window, and a `preStop` sleep of a few seconds
+covers the gap between the pod leaving the endpoints list and the load balancer noticing.
 
 1. **The grace period is a budget the platform enforces.** When the drain outlasts
    `terminationGracePeriodSeconds` the process is SIGKILLed mid-request — set the platform's number
@@ -265,8 +274,10 @@ distribution, not to the deploy.
    deployment, and the restart storm outlasts the hiccup by an order of magnitude.
 3. **Configuration baked into the image**, one image per environment. The artifact tested in staging
    is then not the artifact that runs in production, which was the point of building an image.
-4. **No graceful shutdown.** Every deploy drops the in-flight requests, and the error spike on the
-   dashboard is read as "deploys are risky" rather than as a missing `preStop` and thirty seconds.
+4. **A drain window nobody sized.** `server.shutdown=immediate`, Ktor's five-second
+   `shutdownTimeout` under slower requests, or no `preStop`: every deploy drops the in-flight
+   requests, and the error spike on the dashboard is read as "deploys are risky" rather than as a
+   missing `preStop` and an unsized timeout.
 5. **`-Xmx` guessed, or no heap setting at all.** The container's limit and the JVM's heap disagree,
    and the pod is OOM-killed under exactly the load it was sized for.
 6. **A mutable tag — `latest`, or a branch name.** Rollback resolves to whatever was pushed last, so

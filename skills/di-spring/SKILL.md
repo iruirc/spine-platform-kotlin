@@ -43,7 +43,10 @@ Not for the persistence mapping (`persistence-jvm-orm`) and not for the layering
 sole constructor without `@Autowired` since 4.3, so a Kotlin bean has no DI annotation on it beyond
 its stereotype:
 
+<!-- compile: spring -->
 ```kotlin
+import java.time.Clock
+
 @Service
 class OrderService(
     private val orders: OrderRepository,
@@ -80,9 +83,9 @@ Two ways for a type to enter the graph, and the split is by ownership:
   `DataAccessException` hierarchy), `@RestController` for HTTP entry points, `@Component` for the
   rest. Component scanning finds them under the `@SpringBootApplication` class's package, which is
   why that class sits at the root of the package tree and not beside the controllers.
-- **`@Bean` methods in a `@Configuration` class for types you do not own.** An `ObjectMapper`, a
-  `RestClient`, a `DataSource`, a `Clock`, a third-party client. You cannot annotate their classes,
-  so a factory method names them:
+- **`@Bean` methods in a `@Configuration` class for types you do not own.** A `RestClient`, a
+  `DataSource`, a `Clock`, a third-party SDK client. You cannot annotate their classes, so a factory
+  method names them:
 
 ```kotlin
 @Configuration(proxyBeanMethods = false)
@@ -169,8 +172,10 @@ Three mechanisms that look alike and answer different questions.
 **One typed class per configuration prefix, bound in the constructor.** A `@ConfigurationProperties`
 class is where `@Value` strings stop spreading:
 
+<!-- compile: spring -->
 ```kotlin
 import java.time.Duration          // not kotlin.time.Duration — Spring binds the java.time one
+import org.springframework.validation.annotation.Validated
 
 @ConfigurationProperties(prefix = "orders")
 @Validated
@@ -187,9 +192,9 @@ orders:
   timeout: 30s
 ```
 
-- **Constructor binding is implicit since Boot 3** when the class has exactly one constructor, which
-  a `data class` does. `@ConstructorBinding` is only needed to pick a constructor when there is more
-  than one, and it goes on the constructor, not the class.
+- **Constructor binding is implicit** when the class has exactly one constructor, which a `data class`
+  has. `@ConstructorBinding` is only needed to pick a constructor when there is more than one, and it
+  goes on the constructor, not the class.
 - **Register it once**: `@EnableConfigurationProperties(OrdersProperties::class)` on the configuration
   that uses it, or `@ConfigurationPropertiesScan` on the application class for all of them. A
   `@ConfigurationProperties` class is not a `@Component` and is not found by component scanning.
@@ -198,9 +203,10 @@ orders:
   binds from `30s`, `2m`, `PT30S`; `DataSize` from `10MB`. `kotlin.time.Duration` is not a binding
   target, and a property declared with it fails to convert at startup.
 - **`@Validated` plus `jakarta.validation` constraints fail the context at startup** with the property
-  path in the message. Constraints go on the field via `@field:` — the annotation would otherwise
-  land on the constructor parameter, where nothing reads it. This is the difference between a bad
-  config failing at deploy and failing at the first request that used it.
+  path in the message. The validator reads the field. An annotation with no use-site target on a
+  constructor `val` lands on both the parameter and the field, so `@NotBlank val baseUrl` is checked
+  too; `@field:` says where it must arrive. This is the difference between a bad config failing at
+  deploy and failing at the first request that used it.
 - **`kapt("org.springframework.boot:spring-boot-configuration-processor")`** generates the metadata
   that makes these keys autocomplete in an editor. It is the one place kapt is still the answer,
   because the processor is a Java annotation processor with no KSP equivalent.
@@ -209,11 +215,12 @@ orders:
 
 ## Kotlin Specifics
 
-Kotlin classes and members are `final` by default; Spring's proxies are subclasses. Without help,
-`@Transactional` on a Kotlin `@Service` either fails to start the context, or — where the bean
-implements an interface — falls back to a JDK interface proxy, and injecting the concrete class then
-fails with `BeanNotOfRequiredTypeException`. Both are loud. Advice reached through the interface
-still applies; what fails silently is a self-call or a `private` method (see Common Mistakes).
+Kotlin classes and members are `final` by default; Spring's proxies are CGLIB subclasses. Boot sets
+`spring.aop.proxy-target-class=true`, so a bean that implements an interface is subclassed too — there
+is no fallback to a JDK interface proxy. Without help, `@Transactional` on a Kotlin `@Service` fails
+the context at startup with `Cannot subclass final class`, and a `@Configuration` class with
+`proxyBeanMethods` left on fails with `@Configuration class '…' may not be final`. Both are loud; what
+fails silently is a self-call or a `private` method (see Common Mistakes).
 
 ```kotlin
 plugins {
@@ -228,14 +235,13 @@ plugins {
    `@Async`, `@Transactional`, `@Cacheable` and `@SpringBootTest`. It opens the class and its members
    so CGLIB can subclass them, and it opens nothing else. `@Entity` is a different problem with a
    different plugin: `persistence-jvm-orm` owns that half.
-2. **`kotlin-reflect` must be on the runtime classpath.** Spring reads Kotlin metadata for
-   nullability, default parameter values and named `@Bean` parameters; without it, defaults are
-   ignored and nullable parameters stop being optional. The Boot starters pull it in for a Kotlin
-   project — check it survives a dependency exclusion.
-3. **`jackson-module-kotlin` for any JSON `data class`.** Jackson otherwise needs a no-arg constructor
-   and ignores Kotlin nullability, so a missing JSON field becomes a `null` in a non-null property
-   and the failure surfaces two layers later. Boot registers the module automatically when it is on
-   the classpath.
+2. **`kotlin-reflect` must be on the runtime classpath, and no Boot starter brings it** — declare
+   `org.jetbrains.kotlin:kotlin-reflect` in the build yourself. Spring reads Kotlin metadata through
+   it: without it a nullable constructor parameter becomes a required bean, and binding a
+   `data class` `@ConfigurationProperties` fails at startup with
+   `NoClassDefFoundError: kotlin/reflect/jvm/ReflectJvmMapping`.
+3. **JSON `data class`es depend on Kotlin metadata the same way, on Jackson's side** — the module and
+   its Boot 4 artifact are `net-http-clients` → "Serializer".
 4. **`@Bean` functions live on a top-level `@Configuration` class, not in a `companion object`.** A
    companion member is compiled onto the `Companion` class, which the container never parses, so the
    bean silently does not exist. `@JvmStatic` makes it register as a static `@Bean`, which is the
@@ -261,9 +267,34 @@ The context is expensive, so the question in every test is how little of it to b
 | Serialization of one type | `@JsonTest` |
 | One HTTP client and its bindings | `@RestClientTest` with `MockRestServiceServer` |
 | The whole application wired together | `@SpringBootTest`, with `webEnvironment = RANDOM_PORT` when a real port is needed |
-| Replace one bean with a mock | `@MockkBean` (or `@SpykBean`) from `com.ninja-squad:springmockk`, the MockK-based pair to `@MockitoBean` — which ships in Spring Framework 6.2's `spring-test` and which Boot 3.4 adopts, deprecating its own Mockito-based `@MockBean` |
+| Replace one bean with a mock | `@MockkBean` (or `@MockkSpyBean`) from `com.ninja-squad:springmockk` 5, the MockK-based pair to `spring-test`'s `@MockitoBean` and `@MockitoSpyBean` |
 | Add a bean only tests need | a `@TestConfiguration` class, brought in with `@Import(...)`; it is not picked up by component scanning, which is the point |
-| Point the context at a container or a fake server | `@ServiceConnection` on a Testcontainers field (Boot 3.1+), or `@DynamicPropertySource` for anything it does not cover |
+| Point the context at a container or a fake server | `@ServiceConnection` on a Testcontainers field, or `@DynamicPropertySource` for anything it does not cover; the database it starts is `persistence-jvm-orm` → "Testing" |
+
+**Each slice ships in the module of the technology it slices.** `spring-boot-starter-test` brings
+`@SpringBootTest`, `@JsonTest` and `@TestConfiguration`; `@WebMvcTest` comes with
+`spring-boot-starter-webmvc-test`, `@WebFluxTest` with `spring-boot-starter-webflux-test`,
+`@DataJpaTest` with `spring-boot-starter-data-jpa-test`, `@RestClientTest` with
+`spring-boot-starter-restclient-test` — each under its own package, such as
+`org.springframework.boot.webmvc.test.autoconfigure`:
+
+<!-- compile: spring-test -->
+```kotlin
+import com.ninjasquad.springmockk.MockkBean
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+
+@WebMvcTest(OrderController::class)
+class OrderControllerTest(@Autowired private val mvc: MockMvc) {
+
+    @MockkBean
+    private lateinit var service: OrderService
+
+    @Test
+    fun get_malformedId_returnsBadRequest() {
+        mvc.get("/orders/not-a-number").andExpect { status { isBadRequest() } }
+    }
+}
+```
 
 Two facts govern how fast this suite runs. **`@SpringBootTest` loading the context is itself an
 assertion** — a missing bean, an ambiguous one, an invalid property all fail there, which is the
@@ -271,6 +302,15 @@ Spring equivalent of `di-koin`'s `verify()`, and one such test is worth having. 
 cached by configuration**: every distinct set of mock beans, properties or active profiles builds a
 new one. That is why a slice with two mocks is cheap and twelve `@SpringBootTest` classes with
 different `@MockkBean` sets are a minutes-long suite that mostly starts Spring.
+
+### Migrating from Spring Boot 3
+
+- `@MockBean` and `@SpyBean` are removed: `@MockitoBean` and `@MockitoSpyBean` from
+  `org.springframework.test.context.bean.override.mockito` replace them; springmockk 4's `@SpykBean`
+  is `@MockkSpyBean` in 5.
+- A slice's annotation moved with its module and needs that module's test starter:
+  `org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest` is
+  `org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest`.
 
 ## Common Mistakes
 
@@ -283,9 +323,10 @@ different `@MockkBean` sets are a minutes-long suite that mostly starts Spring.
    class whose `@Bean` methods call each other, it silently builds a second instance of a bean the
    rest of the app treats as a singleton — two connection pools, two caches. Take dependencies as
    `@Bean` method parameters, then `false` is always safe.
-3. **`@Transactional` on a class the all-open plugin did not open.** Only the annotations
-   `kotlin("plugin.spring")` knows are opened; a `final` helper the annotation was moved onto, or a
-   `private` method, gets no proxy and no warning. Where the boundary belongs once the class is
+3. **`@Transactional` on a class the all-open plugin did not open.** The plugin opens a class by its
+   class-level annotations; a helper declared through a `@Bean` method, with `@Transactional` only on
+   its methods, stays `final` and fails the context with `Cannot subclass final class`. A `private`
+   method is the silent case: no proxy and no warning. Where the boundary belongs once the class is
    proxyable — and why a self-call defeats it — is `arch-layered` → "Transaction Boundary".
 4. **A `data class` as a `@Component` or `@Service`.** `equals`/`hashCode` compare injected
    collaborators, `toString()` prints them into logs — credentials included — and `copy()` hands out

@@ -1,0 +1,3 @@
+interface OrderRepository
+
+interface StockRepository

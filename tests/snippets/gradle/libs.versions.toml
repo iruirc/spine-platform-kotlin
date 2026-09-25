@@ -38,6 +38,7 @@ junit-jupiter = "5.14.4"
 junit4 = "4.13.2"
 kotest = "6.2.5"
 mockk = "1.14.11"
+springmockk = "5.0.1"
 turbine = "1.2.1"
 robolectric = "4.17"
 androidx-test = "1.7.0"
@@ -157,6 +158,7 @@ junit4 = { module = "junit:junit", version.ref = "junit4" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
 kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+springmockk = { module = "com.ninja-squad:springmockk", version.ref = "springmockk" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 testcontainers-junit-jupiter = { module = "org.testcontainers:testcontainers-junit-jupiter", version.ref = "testcontainers" }
