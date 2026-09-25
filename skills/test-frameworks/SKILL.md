@@ -128,7 +128,9 @@ assertions.
 `tasks.withType<Test>().configureEach { useJUnitPlatform() }`. On Android, unit tests need the
 same two dependencies and `testOptions { unitTests.all { it.useJUnitPlatform() } }`, or the
 `de.mannodermaus.android-junit` plugin, which does the wiring for every variant; the plugin is also
-what runs JUnit5 in `androidTest` (`## Forced by surface`).
+what runs JUnit5 in `androidTest` (`## Forced by surface`). A module that also holds a Robolectric
+or Compose-rule test adds `testRuntimeOnly("org.junit.vintage:junit-vintage-engine")`: without it
+the platform skips those JUnit4 tests, and the task still passes.
 
 JUnit 6 keeps the `org.junit.jupiter` API of this section: it needs Java 17, deprecates
 `junit-vintage-engine`, and runs a `suspend fun` test method itself — without a virtual clock, so

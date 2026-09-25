@@ -111,7 +111,10 @@ fun AppNavHost(navController: NavHostController) {
 
 The same two screens under Navigation 3, where keys are `NavKey` and the stack is yours. The key
 never reaches the entry's `SavedStateHandle`, so rule 6 does not carry over: the ViewModel takes the
-id from its factory — an assisted factory under `di-hilt`, `parametersOf` under `di-koin`:
+id from its factory — an assisted factory under `di-hilt`, `parametersOf` under `di-koin`. A
+ViewModel per entry needs `rememberViewModelStoreNavEntryDecorator()` from
+`lifecycle-viewmodel-navigation3`: `NavDisplay`'s default decorators keep saved state only, so without
+it every `OrderDetail` shares the Activity's ViewModel, built for the first id:
 
 ```kotlin
 // the same family, with `NavKey` on the interface: `sealed interface Route : NavKey`
@@ -119,6 +122,10 @@ val backStack = rememberNavBackStack(Route.Home)
 NavDisplay(
     backStack = backStack,
     onBack = { backStack.removeLastOrNull() },
+    entryDecorators = listOf(
+        rememberSaveableStateHolderNavEntryDecorator(),
+        rememberViewModelStoreNavEntryDecorator(),
+    ),
     entryProvider = entryProvider {
         entry<Route.Home> { HomeRoute(onOpenOrder = { backStack.add(Route.OrderDetail(it)) }) }
         entry<Route.OrderDetail> { key ->

@@ -418,7 +418,7 @@ android {
 
 dependencies {
     implementation(project(":feature:orders"))
-    implementation(project(":data:orders"))       // bound to the domain interfaces here, nowhere else
+    implementation(project(":data:orders"))       // installs the binding :data:orders ships
     implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
     implementation(platform(libs.androidx.compose.bom))
@@ -428,7 +428,7 @@ dependencies {
 
 ```kotlin
 // :feature:orders/build.gradle.kts — the absent lines are project(":feature:cart") and
-// project(":data:orders"): the repository interface lives in :core:model and :app binds it.
+// project(":data:orders"): the repository interface lives in :core:model, and :data:orders ships its binding.
 plugins { id("orders.android.feature") }
 
 android { namespace = "com.example.feature.orders" }

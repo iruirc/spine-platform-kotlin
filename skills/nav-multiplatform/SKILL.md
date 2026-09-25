@@ -41,7 +41,7 @@ into a destination: `nav-deeplinks` owns that end.
 | Model | `NavController` + `NavHost`, the same API as Android's | a back stack the app holds, drawn by `NavDisplay` — Android's Navigation 3 | a tree of components, each with a `ComponentContext`; `childStack` driven by `StackNavigation` | screens as objects, held in a `Navigator`'s list |
 | Typed destinations | `@Serializable` routes, exactly as in `nav-compose` | `@Serializable` `NavKey`s, as in `nav-compose` | a `@Serializable` sealed `Config` per stack | the `Screen` object carries its own arguments |
 | Needs Compose | yes | yes | no — the component tree is plain Kotlin, a UI is attached to it | yes |
-| Lifecycle & retention | Compose's, plus the multiplatform `ViewModel` | Compose's, plus a `ViewModel` scoped per entry | its own: `Lifecycle`, `StateKeeper`, `InstanceKeeper`, `BackHandler` (Essenty) | `ScreenModel`, retained by the `Navigator` |
+| Lifecycle & retention | Compose's, plus the multiplatform `ViewModel` | Compose's, plus a `ViewModel` scoped per entry by the ViewModel-store decorator (`nav-compose` → "Routes as Types") | its own: `Lifecycle`, `StateKeeper`, `InstanceKeeper`, `BackHandler` (Essenty) | `ScreenModel`, retained by the `Navigator` |
 | Nested / parallel stacks | nested graphs, one active stack | as many lists as the app keeps | native to the model: a component owns children | one `Navigator` per nesting level |
 | Maturity | stable; iOS and web support still maturing | stable, and the newest of the four | mature and steadily released | simplest to adopt; maintenance cadence is slower than the others |
 
