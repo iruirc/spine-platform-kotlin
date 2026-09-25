@@ -22,9 +22,9 @@
 
 Two chains over one domain: the client chain from an `IOException` to a message on a screen, the
 server chain from a domain error to an `application/problem+json` body on four frameworks. The four
-server handler sections all read `toProblem()` from `Server — Problem Details` and the
-`ProblemDetails` type declared in `Server — Ktor StatusPages`, and the client chain's `isRetryable`
-is `SKILL.md`'s. The shared type is `data class Order(val id: String, val total: Long)`, packages are
+server handler sections all read `toProblem()` from `Server — Problem Details`; Ktor and Quarkus
+share the `ProblemDetails` type declared in `Server — Ktor StatusPages`, and the client chain's
+`isRetryable` is `SKILL.md`'s. The shared type is `data class Order(val id: String, val total: Long)`, packages are
 `com.acme`, and the shared discipline is that no mapper below ever sees a `CancellationException`.
 
 ## The catching Helper
@@ -36,6 +36,7 @@ reaches a mapper, which is true only while that helper is the one in use.
 The chain needs one more helper, because `kotlin.Result` has `mapCatching` for the success side and
 nothing for the failure side:
 
+<!-- compile: net -->
 ```kotlin
 inline fun <T> Result<T>.mapFailure(transform: (Throwable) -> Throwable): Result<T> =
     fold(onSuccess = { Result.success(it) }, onFailure = { Result.failure(transform(it)) })
@@ -99,8 +100,11 @@ No `withContext` around the call: Retrofit is on the "nothing to switch" row of
 The domain family is `arch-clean`'s: a `sealed class` extending `Exception`, because it rides in
 `kotlin.Result`.
 
+<!-- compile: net -->
 ```kotlin
 // :domain — com/acme/domain/orders/OrderError.kt
+import kotlin.time.Duration
+
 sealed class OrderError(message: String? = null, cause: Throwable? = null) :
     Exception(message, cause) {
 
@@ -120,6 +124,7 @@ trace points at the class loader and not at any failure — which is why `Unexpe
 The boundary itself lives in `:data`, where the repository implementation is: `:domain` declares the
 port and never imports `DataError`.
 
+<!-- compile: net -->
 ```kotlin
 // :data — the last line at which DataError exists
 internal fun DataError.toOrderError(): OrderError = when (this) {
@@ -212,7 +217,12 @@ means "the table is wrong".
 The mappers are pure functions over closed families, so the test is a list. Adding a case to
 `DataError` breaks the mapper's `when`; adding a row here is what makes the new case *deliberate*.
 
+<!-- compile: net-test -->
 ```kotlin
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments.arguments
+import org.junit.jupiter.params.provider.MethodSource
+
 internal class DataErrorMappingTest {
     @ParameterizedTest(name = "{0} becomes {1}")
     @MethodSource("cases")
@@ -238,7 +248,10 @@ Equality works because the domain cases are `data object`s and `data class`es. `
 `Throwable`, whose equality is identity, so it gets its own assertion — which is also where the
 "keep the original as a cause" rule is checked:
 
+<!-- compile: net-test -->
 ```kotlin
+import kotlin.test.assertIs
+
 @Test
 fun toOrderError_unmappedStatus_becomesUnexpectedWithOriginal() {
     val mapped = DataError.Http(418, null).toOrderError()
@@ -248,9 +261,11 @@ fun toOrderError_unmappedStatus_becomesUnexpectedWithOriginal() {
 }
 ```
 
-The one test nobody writes by hand: the bug it catches shows up as a screen flashing an error the
-moment the user leaves it.
+The two tests nobody writes by hand: the bug they catch shows up as a screen flashing an error the
+moment the user leaves it. The second is the library that catches our `CancellationException` and
+throws its own — the case only the general arm's `ensureActive()` turns back into a cancellation.
 
+<!-- compile: jvm-test -->
 ```kotlin
 @Test
 fun catching_cancelled_rethrowsInsteadOfFailure() = runTest {
@@ -262,6 +277,21 @@ fun catching_cancelled_rethrowsInsteadOfFailure() = runTest {
 
     assertNull(result)   // runCatching would have left Result.failure(CancellationException) here
 }
+
+@Test
+fun catching_librarySwallowsCancellation_rethrowsInsteadOfFailure() = runTest {
+    var result: Result<Int>? = null
+
+    val job = launch {
+        result = catching {
+            try { awaitCancellation() } catch (e: CancellationException) { throw IllegalStateException("closed") }
+        }
+    }
+    runCurrent()
+    job.cancelAndJoin()
+
+    assertNull(result)
+}
 ```
 
 On the state side, assert the *emissions* — `vm.state.test { }` with Turbine — not `state.value` at
@@ -272,8 +302,11 @@ the end, which cannot see an `Error` that appeared and was replaced (`reactive-f
 The core's own vocabulary: no status codes, no framework import, nothing an adapter would recognise
 (`arch-hexagonal`). Each case carries what a caller might branch on and nothing else.
 
+<!-- compile: ktor -->
 ```kotlin
 // :core — com/acme/orders/OrderError.kt
+import kotlin.time.Instant
+
 sealed class OrderError(message: String? = null) : Exception(message) {
     data class NotFound(val id: OrderId) : OrderError("order ${id.value} not found")
     data object Forbidden : OrderError()
@@ -298,6 +331,7 @@ SQLState) and returns this instead, so a duplicate is the 409 the client can act
 One table, in the web adapter, read by every handler below. RFC 9457 (obsoleting RFC 7807) fixes the
 members `type`, `title`, `status`, `detail` and `instance`, and lets you add your own beside them.
 
+<!-- compile: ktor -->
 ```kotlin
 // :adapters:web — com/acme/web/Problems.kt
 const val BASE = "https://api.acme.com/problems"
@@ -366,9 +400,10 @@ class OrderErrorHandler {
 `ProblemDetail` is built into Spring 6 and already serializes as `application/problem+json`; a
 hand-rolled body beside it is a second vocabulary for the same thing. Two more things finish the job:
 
-1. **`server.error.include-stacktrace=never` and `server.error.include-message=never`** in the
-   properties — the defaults have changed across Boot versions, and a `trace` member in production
-   is the leak this section exists to prevent.
+1. **`server.error.include-stacktrace` and `server.error.include-message` stay at `never`**, their
+   default in Boot 4, for the failures that bypass the advice and reach the `/error` fallback. A
+   profile that sets either to `always` for a debugging session and ships is the leak this section
+   exists to prevent.
 2. **Extend `ResponseEntityExceptionHandler`** rather than writing a bare advice class, so the
    framework's own failures — `MethodArgumentNotValidException`, `HttpMessageNotReadableException` —
    come back in *your* shape instead of making the client parse two vocabularies. Its cheaper half
@@ -378,13 +413,20 @@ hand-rolled body beside it is a second vocabulary for the same thing. Two more t
 
 ## Server — Ktor StatusPages
 
+<!-- compile: ktor -->
 ```kotlin
+import io.ktor.server.plugins.callid.callId
+import kotlinx.serialization.json.Json
+
 @Serializable
 data class ProblemDetails(
     val type: String, val title: String, val status: Int,
     val detail: String? = null, val instance: String? = null,
-    val requestId: String? = null, val errors: List<Violation>? = null,
+    val requestId: String? = null, val errors: List<FieldError>? = null,
 )
+
+@Serializable
+data class FieldError(val field: String, val code: String)
 
 suspend fun ApplicationCall.problem(body: ProblemDetails, status: HttpStatusCode) =
     respondText(Json.encodeToString(body), ContentType.Application.ProblemJson, status)
@@ -395,7 +437,7 @@ fun Application.installErrorHandling() {
             val (status, type, title) = e.toProblem()
             val body = ProblemDetails(
                 type, title, status, e.message, call.request.path(), call.callId,
-                errors = (e as? OrderError.Invalid)?.violations,
+                errors = (e as? OrderError.Invalid)?.violations?.map { FieldError(it.field, it.code) },
             )
             call.problem(body, HttpStatusCode.fromValue(status))
         }
@@ -412,18 +454,25 @@ fun Application.installErrorHandling() {
 }
 ```
 
-`respondText` with an explicit `ContentType` is what gets the media type RFC 9457 asks for, and
-`call.respond(body)` negotiates `application/json` — the right body under the wrong label, which is
-why every arm goes through the one helper. `exception<T>` covers only what a handler threw, so the
-`status` block is what stops an unmatched route answering with an empty body and no `type`; and the
-cancellation arm is not optional either, because without the rethrow every closed tab is an `error`
-line and a 500 nobody receives.
+`FieldError` is the wire twin of `Violation`: the domain value stays free of the serialization
+plugin, and the adapter that owns the format owns the annotation. `call.callId` is the `CallId`
+plugin's (`ktor-server-call-id`), the same id the log line carries. `respondText` with an explicit
+`ContentType` is what gets the media type RFC 9457 asks for, and `call.respond(body)` negotiates
+`application/json` — the right body under the wrong label, which is why every arm goes through the
+one helper. `exception<T>` covers only what a handler threw, so the `status` block is what stops an
+unmatched route answering with an empty body and no `type`; and the cancellation arm is not optional
+either, because without the rethrow every closed tab is an `error` line and a 500 nobody receives.
 
 ## Server — Micronaut and Quarkus
 
 ```kotlin
 // Micronaut — one bean per domain family; @Error(global = true) on a controller method is the
 // other form, for a mapping that needs the request
+@Serdeable
+data class ProblemBody(
+    val type: String, val title: String, val status: Int, val detail: String?, val instance: String?,
+)
+
 @Produces
 @Singleton
 class OrderErrorHandler : ExceptionHandler<OrderError, HttpResponse<*>> {
@@ -431,7 +480,7 @@ class OrderErrorHandler : ExceptionHandler<OrderError, HttpResponse<*>> {
         val (status, type, title) = e.toProblem()
         return HttpResponse.status<Any>(HttpStatus.valueOf(status))
             .contentType("application/problem+json")
-            .body(ProblemDetails(type, title, status, e.message, request.path))
+            .body(ProblemBody(type, title, status, e.message, request.path))
     }
 }
 
@@ -448,9 +497,12 @@ class OrderErrorMapper : ExceptionMapper<OrderError> {
 }
 ```
 
-Both pick the most specific handler for the thrown type, so one per sealed family is enough and a
-second for a subclass splits the mapping in two. Both also ship a default body for unmapped
-throwables — replace it before the first deploy, not after the first leak.
+Micronaut Serialization, the JSON layer a generated Micronaut project uses, encodes only a type
+annotated `@Serdeable` (or imported with `@SerdeImport`), so the Micronaut body is its own
+`@Serdeable` class rather than the Ktor one. Both pick the most specific handler for the thrown
+type, so one per sealed family is enough and a second for a subclass splits the mapping in two.
+Both also ship a default body for unmapped throwables — replace it before the first deploy, not
+after the first leak.
 
 ## Server — Testing the Error Path
 
@@ -472,8 +524,11 @@ fun getOrder_forbidden_answers403ProblemWithoutMessage() {
 }
 ```
 
+<!-- compile: ktor-test -->
 ```kotlin
 // Ktor — testApplication, the route throwing what the service would
+import kotlinx.serialization.json.Json
+
 @Test
 fun getOrder_invalid_answers422WithFieldList() = testApplication {
     val invalid = OrderError.Invalid(listOf(Violation("quantity", "must-be-positive")))

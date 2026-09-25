@@ -190,10 +190,10 @@ extension members alongside them.
    carry the per-field list as an extension member — `errors: [{ "field": …, "code": … }]`. A
    validation response with one flattened sentence forces the client to parse English.
 4. **Never leak a stack trace, an SQL fragment, a class name, an internal id or an upstream URL.**
-   That means turning off what the framework does by default: Spring's
-   `server.error.include-stacktrace=never` and `include-message=never`, Quarkus' dev-mode exception
-   page, and the `e.message` that every `StatusPages` sample puts in the body. A 5xx body says
-   nothing beyond its `type`, its `title` and a correlation id.
+   Spring Boot already defaults `server.error.include-stacktrace` and `include-message` to `never`;
+   the leak is a profile that flips them, Quarkus' dev-mode exception page facing real users, and the
+   `e.message` that every `StatusPages` sample puts in the body. A 5xx body says nothing beyond its
+   `type`, its `title` and a correlation id.
 5. **`instance` identifies this occurrence — usually the request path — and a `requestId`
    extension member carries the correlation id that is also in the log line.** That is the whole
    support protocol: the user quotes one opaque string, the operator finds the MDC entry with it.
