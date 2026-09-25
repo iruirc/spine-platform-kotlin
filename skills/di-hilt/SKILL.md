@@ -14,7 +14,7 @@ the whole root.
 
 > **Related skills:**
 > - `di-composition-root` — where the root lives, what may run in it, and the three scopes Hilt's components implement
-> - `di-koin` — the alternative, and the only option once the module has to compile for KMP
+> - `di-koin` — the alternative, and the container a module takes once it has to compile for KMP
 > - `arch-mvvm` — ViewModel design, `UiState` and `SavedStateHandle` use; this skill only covers how one is constructed
 > - `nav-compose` — what `hiltViewModel(parentEntry)` is actually scoping to on a nested graph
 > - `compose-state` — where the ViewModel a Hilt factory built sits among the other places state can live
@@ -62,9 +62,9 @@ Not for the assembly decision itself (`di-composition-root`) and not for ViewMod
 | Targets | Android only | any JVM (Android included) | JVM, Android, KMP — including iOS and native |
 | Resolution | compile time | compile time | runtime |
 | Components | generated, tied to the Android lifecycles | you write every `@Component` and `@Subcomponent` | none — a container of definitions |
-| Codegen | KSP (or kapt) | KSP (or kapt) | none; Koin Annotations adds an optional KSP layer |
-| A missing binding | a build error naming the type and the component | a build error | a runtime failure, unless `verify()` runs in tests |
-| Build cost | annotation processing on every module with a module or an entry point | the same | zero |
+| Codegen | KSP (or kapt) | KSP (or kapt) | none; the optional Koin Compiler Plugin adds annotations and a build-time graph check |
+| A missing binding | a build error naming the type and the component | a build error | a runtime failure, unless the Compiler Plugin or a `verify()` test catches it |
+| Build cost | annotation processing on every module with a module or an entry point | the same | zero without the Compiler Plugin |
 
 Which one a build takes: `di-composition-root` → "Choosing the Container". Hilt *is* Dagger
 underneath, so the two are not a mix: a Hilt app that needs a plain Dagger component in a
@@ -112,6 +112,7 @@ module holding `@Binds` is an `abstract class` or an `interface`. Mixing both in
 `companion object` for the `@Provides` half, which is legal and slightly ugly — two modules read
 better.
 
+<!-- compile: android -->
 ```kotlin
 @Module
 @InstallIn(SingletonComponent::class)
@@ -138,10 +139,12 @@ where it cannot accidentally become the app's third analytics client.
 
 ## ViewModels
 
-`@HiltViewModel` puts a ViewModel in the graph; `hiltViewModel()` in Compose retrieves it, scoped to
-the nearest `ViewModelStoreOwner` — which on a Navigation Compose graph is the back stack entry, not
-the Activity (`nav-compose`).
+`@HiltViewModel` puts a ViewModel in the graph; `hiltViewModel()` in Compose, from
+`androidx.hilt:hilt-lifecycle-viewmodel-compose`, retrieves it, scoped to the nearest
+`ViewModelStoreOwner` — which on a Navigation Compose graph is the back stack entry, not the Activity
+(`nav-compose`).
 
+<!-- compile: android -->
 ```kotlin
 @HiltViewModel
 class OrderDetailViewModel @Inject constructor(
@@ -153,28 +156,40 @@ class OrderDetailViewModel @Inject constructor(
 }
 ```
 
-`SavedStateHandle` is injectable in any `@HiltViewModel` with no declaration of your own, and it is
-how a route argument reaches the ViewModel — which is why most screens need nothing else.
+`SavedStateHandle` is injectable in any `@HiltViewModel` with no declaration of your own, and under
+Navigation Compose it is how a route argument reaches the ViewModel — which is why most screens need
+nothing else.
 
 **Assisted injection is for the value the graph cannot know**: something computed at the call site, a
 value from a callback, an id that is not a route argument. Mark it `@Assisted`, add an
 `@AssistedFactory` interface, and pass the factory call to `hiltViewModel`:
 
+<!-- compile: android -->
 ```kotlin
-@HiltViewModel(assistedFactory = OrderViewModel.Factory::class)
-class OrderViewModel @AssistedInject constructor(
+@HiltViewModel(assistedFactory = OrderEditViewModel.Factory::class)
+class OrderEditViewModel @AssistedInject constructor(
     private val orders: OrderRepository,
-    @Assisted private val orderId: OrderId,
+    @Assisted private val draft: OrderDraft,
 ) : ViewModel() {
-    @AssistedFactory interface Factory { fun create(orderId: OrderId): OrderViewModel }
+    @AssistedFactory interface Factory { fun create(draft: OrderDraft): OrderEditViewModel }
 }
 
-// Compose call site, Hilt 2.49+ with hilt-navigation-compose 1.2.0+
-val vm = hiltViewModel<OrderViewModel, OrderViewModel.Factory> { it.create(orderId) }
+@Composable
+fun OrderEditScreen(draft: OrderDraft) {
+    val viewModel = hiltViewModel<OrderEditViewModel, OrderEditViewModel.Factory> { it.create(draft) }
+    // ...
+}
 ```
 
-If the value **is** a route argument, use `SavedStateHandle` instead — assisted injection there buys
-nothing and loses process-death survival.
+An assisted parameter cannot be a value class such as `OrderId`: Kotlin mangles the name of a
+function that takes one (`create-<hash>`), and the factory Hilt generates for it does not compile.
+Pass the underlying value, or a class that wraps it.
+
+If the value **is** a Navigation Compose route argument, use `SavedStateHandle` instead. Assisted
+injection there buys nothing: the call site has to read the route to pass the value in, which
+`SavedStateHandle` already did. Under Navigation 3 the key never reaches the handle, and assisted
+injection is the way in (`nav-compose` → "Routes as Types"). Process death is not the difference: when the ViewModel is recreated, the factory runs again
+with whatever the call site passes then.
 
 ## Multibindings
 
@@ -186,9 +201,11 @@ startup tasks, interceptors — each contributes its own element and nobody owns
 - `@Multibinds` on an `abstract fun` declares a set or map that may legitimately be **empty** — without
   it, a collection nobody contributes to is a missing binding.
 
-The trap is the injection site. Kotlin generates Java wildcards for generic parameters, so the
+The trap is the injection site. Kotlin compiles a `Set<T>`, `List<T>` or `Map<K, T>` parameter to a
+Java wildcard (`Set<? extends T>`) whenever `T` is open — an interface or an open class — so the
 requested type stops matching the bound one:
 
+<!-- compile: android -->
 ```kotlin
 class Analytics @Inject constructor(
     private val sinks: Set<@JvmSuppressWildcards AnalyticsSink>,
@@ -196,8 +213,9 @@ class Analytics @Inject constructor(
 ```
 
 Without `@JvmSuppressWildcards` the constructor asks for `Set<? extends AnalyticsSink>` and Hilt
-reports a missing binding for a type that is visibly right there. Every multibound collection needs
-it; nothing else does.
+reports a missing binding for a type that is visibly right there. The rule follows the type, not the
+multibinding: a `List<AnalyticsSink>` from a plain `@Provides` needs the annotation just the same,
+and a multibound `Set<String>` needs none, because Kotlin writes no wildcard for a final type.
 
 ## Entry Points
 
@@ -206,6 +224,7 @@ Hilt injects into classes it knows: `@AndroidEntryPoint` on an Activity, Fragmen
 finishes), a manifest-registered receiver you do not control, a third-party callback, a JobService
 from another library — reaches the graph through an `@EntryPoint` interface:
 
+<!-- compile: android -->
 ```kotlin
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -213,8 +232,9 @@ interface OrdersEntryPoint {
     fun orderRepository(): OrderRepository
 }
 
-// Inside the non-Hilt class:
-val orders = EntryPointAccessors.fromApplication<OrdersEntryPoint>(context).orderRepository()
+// Called from the non-Hilt class, with the Context the framework handed it.
+fun ordersFrom(context: Context): OrderRepository =
+    EntryPointAccessors.fromApplication<OrdersEntryPoint>(context).orderRepository()
 ```
 
 `EntryPointAccessors` has one accessor per component (`fromApplication`, `fromActivity`,
@@ -226,8 +246,9 @@ from there.
 Field injection belongs to a class the framework constructs, and to nothing else. An
 `@AndroidEntryPoint` Activity, Fragment, View, Service or receiver, and a `@HiltAndroidTest` class,
 cannot take constructor parameters, so `@Inject lateinit var` is how the graph reaches them. Every
-class Hilt or your code constructs — a ViewModel, a repository, a use case, a `@HiltWorker` — takes
-an `@Inject` constructor, so its dependencies stay in its signature and a unit test builds it without
+class Hilt or your code constructs takes its dependencies through the constructor — `@Inject` on a
+ViewModel or a repository, `@AssistedInject` on a `@HiltWorker`, whose `Context` and
+`WorkerParameters` are `@Assisted` — so they stay in its signature and a unit test builds it without
 Hilt.
 
 ## KSP Setup
@@ -244,7 +265,7 @@ plugins {
 dependencies {
     implementation("com.google.dagger:hilt-android:<version>")
     ksp("com.google.dagger:hilt-android-compiler:<version>")
-    implementation("androidx.hilt:hilt-navigation-compose:<version>")   // hiltViewModel()
+    implementation("androidx.hilt:hilt-lifecycle-viewmodel-compose:<version>")   // hiltViewModel()
 }
 
 hilt { enableAggregatingTask = true }
@@ -254,7 +275,7 @@ Four things that decide build time and correctness:
 
 1. **The Gradle plugin is required, not optional.** `com.google.dagger.hilt.android` runs the
    bytecode transform that makes `@AndroidEntryPoint` work; the annotation processor alone is not
-   enough.
+   enough. From Hilt 2.59.1 it needs AGP 9, and AGP 9 needs Gradle 9.1.
 2. **`enableAggregatingTask = true`** makes the aggregating step incremental, so a change in one
    module stops reprocessing the app's whole classpath. It is the default in recent versions and
    worth asserting anyway.
@@ -262,8 +283,9 @@ Four things that decide build time and correctness:
    plugin does not propagate across module boundaries. A `:domain` module should declare none of
    those and therefore needs neither (`pkg-gradle-modules`).
 4. **`androidx.hilt` artifacts are versioned separately** from `com.google.dagger` ones:
-   `androidx.hilt:hilt-navigation-compose` for `hiltViewModel()`, `androidx.hilt:hilt-work` plus
-   `androidx.hilt:hilt-compiler` for `@HiltWorker`.
+   `androidx.hilt:hilt-lifecycle-viewmodel-compose` for `hiltViewModel()` (its package is
+   `androidx.hilt.lifecycle.viewmodel.compose`; the `hilt-navigation-compose` copy is deprecated),
+   `androidx.hilt:hilt-work` plus `androidx.hilt:hilt-compiler` for `@HiltWorker`.
 
 ## Testing
 
@@ -305,12 +327,14 @@ reaching for the graph instead of taking parameters.
 4. **Everything in `SingletonComponent`.** It always compiles, so it becomes the default, and the
    component that should have documented lifetime documents nothing. Install in the narrowest
    component that can see what it needs.
-5. **A multibound collection without `@JvmSuppressWildcards`.** Hilt reports a missing binding for
-   `Set<? extends T>` while the bindings are visibly present. Add the annotation at the injection
-   site; there is no other fix.
-6. **Hilt annotations in the domain module.** `@Inject` on a use case puts Dagger on `:domain`'s
-   classpath and undoes the reason the module exists. The `@Binds` that names it lives in `:app`
-   (`arch-clean`).
+5. **A collection of an open type injected without `@JvmSuppressWildcards`.** Hilt reports a missing
+   binding for `Set<? extends T>` or `List<? extends T>` while the binding is visibly present. Add the
+   annotation at the injection site.
+6. **Hilt annotations in the domain module.** `@Inject` on a use case is JSR-330 (`javax.inject`),
+   not Dagger, but it still moves a decision `:app` owns into `:domain` (`arch-clean` → "Use Cases").
+   Without it `@Binds` cannot name the use case — Dagger reports `[Dagger/MissingBinding]`, having no
+   `@Inject` constructor to call — so `:app` builds it in a `@Provides`:
+   `fun placeOrder(orders: OrderRepository) = PlaceOrder(orders)`.
 7. **`EntryPointAccessors` used as a general accessor.** It works from anywhere with a `Context`,
    which is why it spreads. Every call is a service locator; keep them at framework boundaries that
    genuinely cannot be constructed, and pass dependencies down from there.

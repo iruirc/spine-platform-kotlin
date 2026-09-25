@@ -28,22 +28,24 @@ class OrderRepositoryImpl @Inject constructor(
 
 ## Gradle and KSP Setup
 
-Versions in the catalog, aliases in the build files. The KSP version's Kotlin prefix must match the
-project's Kotlin version — a mismatch fails the build with a version message, the good case.
+Versions in the catalog, aliases in the build files. Since KSP 2.3 its version is its own rather
+than `<kotlin>-<ksp>`, and a KSP release is no longer tied to one Kotlin release. The Hilt Gradle plugin needs AGP 9
+from 2.59.1 on, and AGP 9 needs Gradle 9.1.
 
+<!-- compile: catalog -->
 ```toml
 # gradle/libs.versions.toml
 [versions]
-hilt = "2.56.2"
-androidxHilt = "1.2.0"
-ksp = "2.1.21-2.0.1"          # <kotlin>-<ksp>
+hilt = "2.60.1"
+androidx-hilt = "1.4.0"
+ksp = "2.3.12"
 
 [libraries]
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "androidxHilt" }
-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidxHilt" }
-androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidxHilt" }
+androidx-hilt-lifecycle-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "androidx-hilt" }
+androidx-hilt-work = { module = "androidx.hilt:hilt-work", version.ref = "androidx-hilt" }
+androidx-hilt-compiler = { module = "androidx.hilt:hilt-compiler", version.ref = "androidx-hilt" }
 hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
 
 [plugins]
@@ -63,10 +65,10 @@ plugins {
 dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    implementation(libs.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)   // hiltViewModel()
 
     // @HiltWorker needs both compilers: androidx generates the worker factory entry.
-    implementation(libs.hilt.work)
+    implementation(libs.androidx.hilt.work)
     ksp(libs.androidx.hilt.compiler)
 
     androidTestImplementation(libs.hilt.android.testing)
@@ -94,6 +96,7 @@ classpath of the module whose point was not having one.
 
 The root is the annotation. There is nothing to call, and nothing to hold.
 
+<!-- compile: android -->
 ```kotlin
 @HiltAndroidApp
 class OrdersApp : Application(), Configuration.Provider {
@@ -113,6 +116,7 @@ also remove `androidx.work.WorkManagerInitializer` from `androidx.startup.Initia
 `@AndroidEntryPoint` marks each framework class that may receive injections. It is required on an
 Activity before any Fragment inside it can use it, and on a Fragment's host before the Fragment.
 
+<!-- compile: android -->
 ```kotlin
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -127,6 +131,8 @@ class MainActivity : ComponentActivity() {
 @AndroidEntryPoint
 class SyncService : Service() {
     @Inject lateinit var sync: OrderSync
+
+    override fun onBind(intent: Intent?): IBinder? = null
 }
 ```
 
@@ -139,13 +145,14 @@ nowhere else. A `WorkManager` worker takes a constructor instead: `@HiltWorker` 
 Three modules split by kind rather than by feature — interface bindings, third-party constructions,
 qualified values — all in `SingletonComponent`, because everything they build lives for the process.
 
+<!-- compile: android -->
 ```kotlin
 @Module
 @InstallIn(SingletonComponent::class)
 interface RepositoryModule {
 
     @Binds fun bindOrderRepository(impl: OrderRepositoryImpl): OrderRepository
-    @Binds fun bindAnalytics(impl: RemoteAnalytics): Analytics
+    @Binds fun bindOrderSync(impl: WorkManagerOrderSync): OrderSync
 }
 ```
 
@@ -153,7 +160,18 @@ interface RepositoryModule {
 `OrderRepositoryImpl`, so the binding is a rename in the generated component. `@Provides` is for a
 type you cannot annotate — a builder result, a library singleton, a value:
 
+<!-- compile: android -->
 ```kotlin
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
+import kotlinx.serialization.json.Json
+import okhttp3.Cache
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import retrofit2.create
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -187,6 +205,7 @@ closes over are already `@Singleton`. Scope what is expensive, not what is conve
 `dagger.hilt.android.qualifiers`; your own are annotations, and are how two bindings of one type
 stop colliding:
 
+<!-- compile: android -->
 ```kotlin
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class IoDispatcher
 
@@ -210,6 +229,7 @@ than two modules. Prefer two.
 
 ## ViewModels
 
+<!-- compile: android -->
 ```kotlin
 @HiltViewModel
 class OrderDetailViewModel @Inject constructor(
@@ -227,13 +247,15 @@ class OrderDetailViewModel @Inject constructor(
 
 `SavedStateHandle` needs no binding of its own — Hilt provides it in `ViewModelComponent`, populated
 from the back stack entry's arguments, and it survives process death; `toRoute()` turns those
-arguments back into the typed route object (`nav-compose`). At the call site:
+arguments back into the typed route object (`nav-compose`). At the call site, `hiltViewModel()` from
+`androidx.hilt:hilt-lifecycle-viewmodel-compose`:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderDetailScreen(viewModel: OrderDetailViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    OrderDetailContent(state, onRetry = viewModel::retry)
+    OrderDetailContent(state)
 }
 ```
 
@@ -250,6 +272,7 @@ anything another screen might also want.
 Use it when a constructor parameter is known only at the call site and is **not** a route argument —
 a callback value, an object the graph has no way to build.
 
+<!-- compile: android -->
 ```kotlin
 @HiltViewModel(assistedFactory = OrderEditViewModel.Factory::class)
 class OrderEditViewModel @AssistedInject constructor(
@@ -264,9 +287,9 @@ class OrderEditViewModel @AssistedInject constructor(
 }
 ```
 
-The Compose call site takes both type arguments and a creation callback — Hilt 2.49+ with
-`androidx.hilt:hilt-navigation-compose` 1.2.0+:
+The Compose call site takes both type arguments and a creation callback:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrderEditScreen(draft: OrderDraft) {
@@ -277,17 +300,25 @@ fun OrderEditScreen(draft: OrderDraft) {
 }
 ```
 
-The same `@AssistedInject` + `@AssistedFactory` pair works outside ViewModels — it is what
-`@HiltWorker` uses for its `Context` and `WorkerParameters`, and what any class needing a runtime
-value plus graph dependencies should use. Inject the `Factory`, not the class.
+The same `@AssistedInject` + `@AssistedFactory` pair works outside ViewModels, for any class needing
+a runtime value plus graph dependencies: inject the `Factory`, not the class. A `@HiltWorker` takes
+`@AssistedInject` too, for its `Context` and `WorkerParameters`, and `androidx.hilt:hilt-compiler`
+writes its factory.
 
-If the assisted value is a route argument, delete all of this and read `SavedStateHandle`: it
-survives process death and assisted injection does not.
+An assisted parameter cannot be a value class: Kotlin mangles the name of a function taking one
+(`create-<hash>`), and the factory Hilt generates for it does not compile. Pass the underlying value,
+or a class that wraps it.
+
+If the assisted value is a Navigation Compose route argument, delete all of this and read
+`SavedStateHandle`: the call site would only read the route to pass it in. A Navigation 3 key never
+reaches the handle, so there the factory stays. Process death is not the reason — when the ViewModel is
+recreated, the `creationCallback` runs again with whatever the call site passes then.
 
 ## Multibindings
 
 A set of analytics sinks, each contributed by the module that owns it, with nobody holding the list:
 
+<!-- compile: android -->
 ```kotlin
 interface AnalyticsSink { fun track(event: AnalyticsEvent) }
 
@@ -305,6 +336,7 @@ interface AnalyticsModule {
 A build-variant module contributes its own `@Provides @IntoSet` and nothing else changes. The
 consumer asks for the set — and this is the line that goes wrong:
 
+<!-- compile: android -->
 ```kotlin
 @Singleton
 class Analytics @Inject constructor(
@@ -313,11 +345,14 @@ class Analytics @Inject constructor(
 ```
 
 Without `@JvmSuppressWildcards`, Kotlin compiles the parameter to `Set<? extends AnalyticsSink>` and
-Dagger reports a missing binding for a type that is visibly bound two files away. The annotation is
-required on every multibound collection and on nothing else.
+Dagger reports a missing binding for a type that is visibly bound two files away. The wildcard comes
+from the element type, not from the multibinding: Kotlin writes one for any open type in a `Set`,
+`List` or `Map` value parameter, so a `List<AnalyticsSink>` from a plain `@Provides` needs the
+annotation too, and a multibound `Set<String>` needs none.
 
 Maps work the same way, keyed by an annotation — the right shape for a registry dispatched by a value:
 
+<!-- compile: android -->
 ```kotlin
 @Module
 @InstallIn(SingletonComponent::class)

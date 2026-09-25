@@ -109,6 +109,7 @@ There is no third job.
 
 The smallest honest root is a class with `val`s:
 
+<!-- compile: jvm -->
 ```kotlin
 class AppGraph(private val config: Config) {
     val http: HttpClient by lazy { newHttpClient(config.baseUrl, config.timeouts) }
@@ -170,7 +171,7 @@ Three lifetimes cover almost everything. Anything else is one of these three und
 |---|---|---|---|---|---|
 | **app** | the whole process | `@Singleton` in `SingletonComponent` | `single { }` | `singleton` — the default | `single { }` |
 | **ViewModel or screen** | one screen, across configuration changes, until the back stack entry goes | `@ViewModelScoped` in `ViewModelComponent` | `viewModel { }` | n.a. — a server has no screen | n.a. |
-| **request or session** | one HTTP call, or one signed-in user | n.a. — Android has no request; a user session is a scope you build, not one Hilt names | `scope<UserSession> { scoped { } }` | `@RequestScope`, `@SessionScope` | a Koin scope created and closed per call in a plugin |
+| **request or session** | one HTTP call, or one signed-in user | n.a. — Android has no request; a user session is a scope you build, not one Hilt names | `scope<UserSession> { scoped { } }` | `@RequestScope`, `@SessionScope` | `requestScope { scoped { } }`, which `koin-ktor` opens and closes per call as `call.scope` |
 
 The `n.a.` cells are honest, not gaps. Android's per-user state is the one that catches people: there
 is no built-in scope whose lifetime is "until logout", so either the holder is app-scoped and
@@ -237,23 +238,26 @@ resolves.** What that looks like per framework:
 | Framework | The test |
 |---|---|
 | Hilt | a `@HiltAndroidTest` that injects and asserts, with `@TestInstallIn` replacing the network module for the whole test source set |
-| Koin | `verify()` — walks every definition and fails on a missing one, with no app run (`di-koin`) |
+| Koin | the Koin Compiler Plugin's build-time check, or a `verify()` test — either walks every definition and fails on a missing one, with no app run (`di-koin` → "Testing") |
 | Spring | `@SpringBootTest` loading the context **is** the assertion: it fails on a missing or ambiguous bean |
 | Manual `AppGraph` | construct it with a test `Config` and touch every public `val` |
 
+<!-- compile: jvm-test -->
 ```kotlin
 @Test
 fun appGraph_testConfig_resolvesEveryDependency() {
     val graph = AppGraph(Config.forTests(dbPath = ":memory:"))
 
+    assertNotNull(graph.http)
     assertNotNull(graph.orders)
     assertNotNull(graph.placeOrder)
     assertSame(graph.orders, graph.orders)   // app scope really is one instance
 }
 ```
 
-Two things this catches that nothing else does: a `by lazy` cycle (which deadlocks or overflows the
-first time both sides are touched) and an app-scoped `val` that quietly became a `get()` and is now
+Two things this catches that nothing else does: a `by lazy` cycle, which overflows the stack the
+first time a `val` on it is touched — so the test has to touch every public `val`, or the cycle it
+missed waits for the first user — and an app-scoped `val` that quietly became a `get()` and is now
 handing out a new instance per call.
 
 ## When You Do Not Need One
@@ -282,8 +286,10 @@ In every other case the root pays for itself the first time an implementation ha
 4. **One root per feature** — `OrdersGraph`, `ProfileGraph`, each constructing its own client and
    cache. Features contribute bindings to the single root; they do not own roots.
 5. **A container annotation in the domain** — `@Inject`, `@Singleton` or `@Component` on a use case.
-   The container is now on the classpath of the module whose entire point was not needing one
-   (`arch-clean`, `arch-hexagonal`).
+   `@Component`, Spring's stereotype, puts Spring on the classpath of the module whose entire point was not needing one;
+   `@Inject` and `@Singleton` are JSR-330 (`javax.inject`), not Dagger, but they still decide in the
+   domain how and for how long a class is built, which is the root's job (`arch-clean`,
+   `arch-hexagonal`).
 6. **App scope by default** — `@Singleton` or `single { }` on everything, because it is the shortest
    thing to write. The first symptom is stale data surviving a logout; the second is a test that
    passes alone and fails in a suite.

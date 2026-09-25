@@ -28,6 +28,7 @@ dependencies {
     implementation(libs.flyway.core)
     implementation(libs.flyway.database.postgresql)
     implementation(libs.koin.ktor)
+    implementation(libs.koin.logger.slf4j)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
     testImplementation(libs.ktor.server.test.host)

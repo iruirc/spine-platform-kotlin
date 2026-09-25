@@ -8,6 +8,7 @@ kotlin.test.assertFalse
 kotlin.test.assertIs
 kotlin.test.assertNotNull
 kotlin.test.assertNull
+kotlin.test.assertSame
 kotlin.test.assertTrue
 kotlinx.coroutines.test.*
 app.cash.turbine.*

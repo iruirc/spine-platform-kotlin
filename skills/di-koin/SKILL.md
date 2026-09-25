@@ -1,14 +1,16 @@
 ---
 name: di-koin
-description: "Use when the DI is Koin — on KMP, Compose Desktop, Ktor or Android. Covers modules and definitions (single, factory, viewModel, scope), constructor DSL, KMP setup with platform modules, Koin Annotations, the Ktor plugin, verifying the graph in tests, and Koin vs Hilt on Android."
+description: "Use when the DI is Koin — on KMP, Compose Desktop, Ktor or Android. Covers modules and definitions (single, factory, viewModel, scope), constructor DSL, KMP setup with platform modules, Koin Annotations and the Koin Compiler Plugin, the Ktor plugin, verifying the graph in tests, and Koin vs Hilt on Android."
 ---
 
 # Koin
 
 Koin is a container of lambdas: a module lists how to build each type, the container resolves by type
-at runtime, and there is no code generation between the declaration and the object. That makes it the
-one DI framework that compiles for every Kotlin target, and it moves the cost of a missing binding
-from the build to the first resolve — which is why `verify()` in the test suite is not optional here.
+at runtime, and there is no code generation between the declaration and the object. That lets one
+graph compile for every Kotlin target with no processor in the build — Metro and kotlin-inject reach
+KMP too, through a compiler plugin and KSP — and it moves the cost of a missing binding from the build
+to the first resolve, which is why a Koin graph needs a check before its users are the check: the Koin
+Compiler Plugin at build time, or a `verify()` test.
 Where the graph is assembled at all is `di-composition-root`; this skill covers what goes into the
 modules once Koin is the answer.
 
@@ -74,6 +76,7 @@ Four modifiers do the rest of the work:
 whatever a build module or a feature owns, so that adding a feature adds a file rather than editing
 a shared one:
 
+<!-- compile: android -->
 ```kotlin
 // data/di/DataModule.kt
 val dataModule = module {
@@ -128,16 +131,23 @@ those entries lives is `di-composition-root`; the source-set placement is `pkg-k
 `fun platformModule(): Module` reads the same and is the better form when the module needs an
 argument.
 
-### Koin Annotations
+### Koin Annotations and the Compiler Plugin
 
-`io.insert-koin:koin-annotations` plus the `koin-ksp-compiler` KSP processor replace the module
-bodies with `@Single`, `@Factory`, `@KoinViewModel` and `@Scope` on the classes themselves, gathered
-by an `@Module @ComponentScan` class or by the generated `defaultModule`. It pays on a large graph,
-where the modules had become a second copy of the constructor list and drifted from it, and the KSP
-option `KOIN_CONFIG_CHECK=true` buys back some of what runtime resolution gave away by making a
-missing binding a build failure. It costs a KSP round on every module carrying an annotation — the
-build time Koin was chosen to avoid — so it is a decision for the graph as a whole, not per feature,
-and hand-written modules stay a fine answer.
+The Koin Compiler Plugin — a Kotlin compiler plugin, Gradle id `io.insert-koin.compiler.plugin` —
+replaces the `koin-ksp-compiler` processor and its `KOIN_CONFIG_CHECK` option. It does two jobs:
+
+- **It checks the graph at build time.** In a compilation that calls `startKoin` or `koinApplication`,
+  or declares `@KoinApplication`, every module assembled there is validated together, the plain DSL
+  included, and a missing definition fails the build (`[Koin][KOIN-D001] Missing dependency: …`).
+  A module no entry point reaches is not checked; a test that calls `koinApplication { modules(…) }`
+  is an entry point.
+- **It processes `io.insert-koin:koin-annotations`**: `@Single`, `@Factory`, `@KoinViewModel` and
+  `@Scope` on the classes themselves, gathered by an `@Module @ComponentScan` class. That pays on a
+  large graph, where the modules had become a second copy of the constructor list and drifted from it.
+
+It runs inside `compileKotlin` rather than as a KSP round, and it moves with the Kotlin compiler, so
+its version has to support the project's Kotlin. Annotations are a decision for the graph as a whole,
+not per feature; hand-written modules stay a fine answer, with or without the plugin.
 
 ## Scopes
 
@@ -186,6 +196,7 @@ resolving one outside a `ViewModelStoreOwner` has nothing to hold it.
 Two functions cover almost every call site, from `koin-androidx-compose` on Android and
 `koin-compose` plus `koin-compose-viewmodel` on Compose Multiplatform:
 
+<!-- compile: android -->
 ```kotlin
 @Composable
 fun OrdersScreen(
@@ -210,17 +221,24 @@ fun OrderDetailScreen(orderId: OrderId) {
 - **`koinInject()`** resolves anything else — a formatter, an image loader, a clock — for a
   composable that genuinely needs it and has no ViewModel. It is a service locator call, so keep it
   at the screen's edge and pass the result down as a parameter.
-- **Previews and desktop entry points need a container.** Outside an Android `Application` nothing
-  called `startKoin`, so wrap the tree in `KoinApplication(application = { modules(previewModule) }) { … }`,
-  or in `KoinContext { … }` when an instance already exists and only needs publishing into the
-  composition. Fake definitions in a preview keep it from needing a database.
+- **Previews and desktop entry points need a container.** A desktop `main()` that calls `startKoin`
+  before `application { }` needs nothing more: the composition finds the started container, and the
+  `KoinContext { … }` wrapper Koin once asked for is deprecated. A tree that starts its own wraps
+  itself in `KoinApplication(configuration = koinConfiguration { modules(appModule) }) { … }`; a
+  preview uses `KoinApplicationPreview(application = { modules(previewModule) }) { … }`, which builds
+  an isolated container and never touches the global one. Fake definitions in a preview keep it from
+  needing a database.
 
 ## Ktor Plugin
 
 `koin-ktor` installs the container into the `Application`, which makes `Application.module()` the
 composition root a Ktor service otherwise lacks:
 
+<!-- compile: ktor -->
 ```kotlin
+import org.koin.ktor.plugin.scope
+import org.koin.logger.slf4jLogger
+
 fun Application.module() {
     install(Koin) {
         slf4jLogger()               // koin-logger-slf4j
@@ -252,24 +270,41 @@ fun Route.orderRoutes() {
 
 ## Testing
 
-Runtime resolution means the graph is only as correct as the last thing that resolved it. **One test
-must walk every definition**, and on a Koin project that test is not optional.
+Runtime resolution means the graph is only as correct as the last thing that resolved it. **Something
+must walk every definition before a user does**, and on a Koin project that check is not optional:
+the Compiler Plugin at build time (see Koin Annotations and the Compiler Plugin), or one `verify()`
+test.
 
 | Need | Mechanism |
 |---|---|
-| Prove every definition can be built | `appModule.verify()` from `koin-test`, in a plain JVM unit test — it walks each definition's constructor and fails naming the type and the definition that wanted it, with nothing started |
+| Prove every definition can be built | `appModule.verify()` from `koin-test`, in a plain JVM unit test — it walks each definition's constructor and fails naming the type and the definition that wanted it, with nothing started. Its signature names the experimental `ParameterTypeInjection`, so the call warns until the test opts in to `@KoinExperimentalAPI` |
 | Verify a type the graph does not declare — `SavedStateHandle`, a `Context` | `appModule.verify(extraTypes = listOf(SavedStateHandle::class))` |
 | Resolve inside a test | implement `KoinTest`, then `by inject()`; start the container with `KoinTestRule.create { modules(appModule) }` (`koin-test-junit4`) or `KoinTestExtension.create { … }` (`koin-test-junit5`) |
-| Replace one binding for one test | `declare { single<OrderRepository> { FakeOrderRepository() } }` inside the test, or a small override module listed after the real one — later definitions win by default |
+| Replace one binding for one test | `declare<OrderRepository> { FakeOrderRepository() }` inside the test, or a small override module listed after the real one — later definitions win by default |
 | A mock rather than a fake | `declareMock<OrderRepository>()`, with a `MockProviderRule` naming the mocking library |
 | Tear down | `stopKoin()` after any test that started a container; the rule and the extension do it for you |
+
+<!-- compile: android-test -->
+```kotlin
+import org.koin.core.annotation.KoinExperimentalAPI
+import org.koin.test.verify.verify
+
+@OptIn(KoinExperimentalAPI::class)
+class AppModuleTest {
+    @Test
+    fun verify_appModule_buildsEveryDefinition() {
+        appModule.verify(extraTypes = listOf(SavedStateHandle::class))
+    }
+}
+```
 
 `verify()` reaches only what a reflective constructor walk can see: `single { }` bodies that call
 `get()` inside a conditional, or a definition built from a `parametersOf` value, are checked as far
 as their signature goes and no further. That is still the highest-value test in a Koin project,
 because it catches the failure Koin actually has — a `bind<>()` nobody wrote, a module nobody
 included — before a screen does. `checkModules { }` was the earlier form of the same idea and is
-deprecated; new code uses `verify()`.
+deprecated; new code uses `verify()`, or the Compiler Plugin, which also sees the bodies `verify()`
+cannot.
 
 Everything below the root needs none of this. A ViewModel, a use case and a repository are ordinary
 classes with ordinary constructors — construct them with fakes and never start a container. If a unit
@@ -280,7 +315,7 @@ taking parameters, which is the first mistake below.
 
 On Android both work, and the axis is not preference: **Hilt resolves at compile time and Koin at
 runtime**, so a missing binding is a build error with Hilt and a first-resolve crash with Koin unless
-`verify()` runs in CI; Hilt generates components wired to the Android lifecycles, while Koin gives
+the Compiler Plugin or a `verify()` test catches it; Hilt generates components wired to the Android lifecycles, while Koin gives
 you `viewModel { }` for the one lifecycle Android actually owns and `scope<T>` for the rest; and Hilt
 costs an annotation-processing round in every module that declares a binding, which Koin does not.
 Which one a build takes: `di-composition-root` → "Choosing the Container". Hilt does not leave the
@@ -318,8 +353,9 @@ JVM+Android world, so an Android app that will share a `commonMain` graph pays f
    the call site puts the call site back in charge of construction and moves the failure to whichever
    caller forgot an argument. `parametersOf` is for values the graph cannot know — an id, a
    user-entered string, a value from a callback.
-7. **No `verify()` in the suite.** Runtime resolution with nothing exercising the modules means the
-   first user to open the one screen nobody tested is the check. One JVM test, one line.
+7. **Nothing checks the graph.** Runtime resolution with neither the Compiler Plugin nor a `verify()`
+   test exercising the modules means the first user to open the one screen nobody tested is the
+   check. One JVM test, one line.
 8. **`named("…")` strings written twice.** The qualifier is a string on both sides and nothing
    compares them, so a typo is a runtime "no definition found" for a type that plainly exists. Keep
    qualifiers as constants in one file, or give the two things distinct types and delete the
