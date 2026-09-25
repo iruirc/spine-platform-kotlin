@@ -18,8 +18,11 @@
 
 The domain side belongs to no engine:
 
+<!-- compile: ktor -->
 ```kotlin
 // :domain — nothing below this block appears in it.
+import java.time.Instant
+
 data class Order(
     val id: OrderId, val customerId: CustomerId, val placedAt: Instant,
     val status: OrderStatus, val lines: List<OrderLine>,
@@ -58,7 +61,11 @@ runtime. `plugin.jpa` synthesises the no-arg constructor Hibernate instantiates 
 `plugin.spring` opens container-managed classes so `@Transactional` can be proxied. `allOpen` is
 separate: without it Hibernate cannot subclass an entity, so a lazy `@ManyToOne` loads eagerly.
 
+<!-- compile: spring -->
 ```kotlin
+import java.time.Instant
+import java.util.UUID
+
 @Entity
 @Table(name = "orders")
 class OrderEntity(
@@ -76,9 +83,7 @@ class OrderEntity(
         line.order = this                                  // both sides, or the FK stays null
     }
 
-    // Id assigned at construction: equality is by id for the whole lifetime and the hash never
-    // changes. With a database-generated id, return a constant hash and compare ids only when
-    // both are non-null.
+    // Assigned id: stable hash. A generated id needs a constant hash and non-null ids in equals.
     override fun equals(other: Any?) = this === other || (other is OrderEntity && id == other.id)
     override fun hashCode() = id.hashCode()
 }
@@ -110,7 +115,11 @@ spring.jpa.open-in-view=false
 
 ## JPA — Repository and the Read Path
 
+<!-- compile: spring -->
 ```kotlin
+import org.springframework.data.jpa.repository.EntityGraph
+import org.springframework.data.jpa.repository.Query
+
 interface OrderJpaRepository : JpaRepository<OrderEntity, UUID> {
 
     // One statement: parent and lines together. Without it, one query per order for the lines.
@@ -132,11 +141,11 @@ constructor expression, or a projection interface, is the read that needs no ent
 collection fetch joins in one query are a cartesian product — so one per query, `@BatchSize(size =
 50)` on the other.
 
+<!-- compile: spring -->
 ```kotlin
 @Repository
 class JpaOrderRepository(private val jpa: OrderJpaRepository) : OrderRepository {
-    // No @Transactional here: the boundary is the service method (arch-layered), and this class
-    // runs inside the caller's transaction.
+    // No @Transactional: it runs inside the service method's transaction (arch-layered).
     override fun byCustomer(customer: CustomerId) =
         jpa.findByCustomerWithLines(customer.value).map { it.toDomain() }
     override fun byId(id: OrderId) = jpa.findById(id.value).orElse(null)?.toDomain()
@@ -157,9 +166,13 @@ intent, not a permission check.
 
 ## JPA — @DataJpaTest with Testcontainers
 
+<!-- compile: spring-test -->
 ```kotlin
+import java.time.Instant
+import org.assertj.core.api.Assertions.assertThat
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
+
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 class OrderJpaRepositoryTest(
     @Autowired private val jpa: OrderJpaRepository,
@@ -167,13 +180,13 @@ class OrderJpaRepositoryTest(
 ) {
     companion object {
         // Static: started once for the whole class. A non-static @Container restarts per test.
-        @Container @ServiceConnection @JvmStatic          // Boot 3.1+ wires url, user, password
-        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+        @Container @ServiceConnection @JvmStatic          // wires url, user, password
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
     }
 
     @Test
     fun findByCustomerWithLines_orderWithLines_readsInOneQuery() {
-        val order = OrderEntity(customerId = CUSTOMER, placedAt = Instant.now(), status = NEW)
+        val order = OrderEntity(customerId = CUSTOMER, placedAt = Instant.now(), status = OrderStatus.NEW)
         order.addLine(OrderLineEntity(sku = "SKU-1", quantity = 2, unitPriceCents = 1_500))
         em.persist(order)
         em.flush()
@@ -190,11 +203,13 @@ Four things this test does that a slice against H2 would not:
 - **Real Postgres**, so types, casing, `ON CONFLICT`, partial indexes and array columns behave as
   they will in production.
 - **Real migrations.** `@DataJpaTest` runs Flyway or Liquibase before the slice starts, so the test
-  proves the migrated schema and the mapping agree — as `ddl-auto=validate` does at startup.
+  proves the migrated schema and the mapping agree — as `ddl-auto=validate` does at startup. The
+  Boot 4 starter that brings Flyway into the slice: `persistence-migrations` → "Flyway and Liquibase".
 - **`flush()` then `clear()`.** The slice wraps each test in a transaction that rolls back: without
   the flush nothing reached the database, without the clear the read never becomes SQL.
-- **`PostgreSQLContainer<Nothing>`** — self-typed for Java's builder chaining, so `<Nothing>` is
-  Kotlin's way of saying there is no subclass.
+- **The container is the datasource.** `@ServiceConnection` hands its URL to the slice, whose
+  default leaves a test database in place instead of swapping in an embedded one — so there is no
+  `@AutoConfigureTestDatabase` and no H2 on the classpath.
 
 For a suite, hoist that companion into a shared base class and turn on reuse (`withReuse(true)`
 plus `testcontainers.reuse.enable=true`) so local runs do not pay one startup per class.
@@ -202,20 +217,27 @@ plus `testcontainers.reuse.enable=true`) so local runs do not pay one startup pe
 ## Exposed — Tables and DSL
 
 `org.jetbrains.exposed:exposed-core` and `exposed-jdbc`, plus `exposed-java-time` (or
-`exposed-kotlin-datetime`), `com.zaxxer:HikariCP` and `org.postgresql:postgresql` at runtime.
+`exposed-kotlin-datetime`, whose `timestamp` is a `kotlin.time.Instant`), `com.zaxxer:HikariCP`,
+`org.flywaydb:flyway-core` with `flyway-database-postgresql`, and `org.postgresql:postgresql` at
+runtime. Exposed 1.x lives under `org.jetbrains.exposed.v1`; `uuid()` maps `kotlin.uuid.Uuid`, so a
+`java.util.UUID` column is `javaUUID()`.
 
+<!-- compile: ktor -->
 ```kotlin
+import org.jetbrains.exposed.v1.core.java.javaUUID
+import org.jetbrains.exposed.v1.javatime.timestamp
+
 object Orders : Table("orders") {
-    val id = uuid("id")
-    val customerId = uuid("customer_id").index()
+    val id = javaUUID("id")
+    val customerId = javaUUID("customer_id").index()
     val placedAt = timestamp("placed_at")
     val status = varchar("status", 32)
     override val primaryKey = PrimaryKey(id)
 }
 
 object OrderLines : Table("order_lines") {
-    val id = uuid("id")
-    val orderId = uuid("order_id").references(Orders.id, onDelete = ReferenceOption.CASCADE)
+    val id = javaUUID("id")
+    val orderId = javaUUID("order_id").references(Orders.id, onDelete = ReferenceOption.CASCADE)
     val sku = varchar("sku", 64)
     val quantity = integer("quantity")
     val unitPriceCents = long("unit_price_cents")
@@ -227,7 +249,10 @@ The `object` *describes* a table a migration created; `SchemaUtils.create(Orders
 throwaway tests only, and `references(...)` declares the foreign key for the DSL's benefit — the
 constraint is in the migration. With no lazy loading, the SQL's shape is the code's shape.
 
+<!-- compile: ktor -->
 ```kotlin
+import java.util.UUID
+
 // One mapper, two queries: the same join, a different predicate.
 private fun List<ResultRow>.toOrders(): List<Order> =
     groupBy { it[Orders.id] }.map { (id, rows) ->
@@ -256,6 +281,7 @@ private fun orderById(id: UUID): Order? =
 
 Writes are statements, not state; an update names its own predicate, nothing dirty-checks it:
 
+<!-- compile: ktor -->
 ```kotlin
 private fun insert(order: Order) {
     Orders.insert {
@@ -276,7 +302,12 @@ DSL; take the DAO API only for a reason you can name.
 
 ## Exposed — Repository on Ktor
 
+<!-- compile: ktor -->
 ```kotlin
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import org.flywaydb.core.Flyway
+
 fun Application.configureDatabase(config: DbConfig) {
     val pool = HikariDataSource(HikariConfig().apply {
         jdbcUrl = config.url; username = config.user; password = config.password
@@ -284,13 +315,12 @@ fun Application.configureDatabase(config: DbConfig) {
         isAutoCommit = false
     })
     Flyway.configure().dataSource(pool).load().migrate()   // before any route is installed
-    // Registers the database globally for transaction { }. The URL overload would open a fresh
-    // connection per transaction — a scratch script, not a server.
-    Database.connect(pool)                                 // exactly once per process
+    Database.connect(pool)          // once per process: the URL overload opens a connection per transaction
     monitor.subscribe(ApplicationStopped) { pool.close() }
 }
 ```
 
+<!-- compile: ktor -->
 ```kotlin
 class ExposedOrderRepository : OrderRepository {
     // No transaction here: the caller owns the boundary (arch-layered). These run inside it.
@@ -299,42 +329,51 @@ class ExposedOrderRepository : OrderRepository {
     override fun save(order: Order): Order = order.also(::insert)
 }
 
-class OrderService(private val orders: OrderRepository) {
+class OrderService(
+    private val orders: OrderRepository,
+    private val jdbc: CoroutineDispatcher,   // Dispatchers.IO.limitedParallelism(poolSize), made once
+) {
+    suspend fun place(command: PlaceOrderCommand): Order = withContext(jdbc) {
+        suspendTransaction { orders.save(command.toOrder()) }
+    }
 
-    // The suspending form: the transaction is carried in the coroutine context, so a nested
-    // newSuspendedTransaction joins this one instead of opening a second.
-    suspend fun place(command: PlaceOrderCommand): Order =
-        newSuspendedTransaction(Dispatchers.IO) {
-            orders.save(Order.from(command))
-        }
-
-    suspend fun forCustomer(customer: CustomerId): List<Order> =
-        newSuspendedTransaction(Dispatchers.IO, readOnly = true) {
-            orders.byCustomer(customer)
-        }
+    suspend fun forCustomer(customer: CustomerId): List<Order> = withContext(jdbc) {
+        suspendTransaction(readOnly = true) { orders.byCustomer(customer) }
+    }
 }
 ```
 
 - **`transaction { }` blocks the calling thread** for the whole round trip — in a Ktor handler, an
-  event-loop thread taken out of circulation. Wrap it in `withContext(Dispatchers.IO)`, or use the
-  suspending form (`concurrency-coroutines`).
-- **`newSuspendedTransaction` still needs a dispatcher.** JDBC blocks whichever function opened the
-  transaction; the argument says where, and `Dispatchers.IO` is the answer until virtual threads.
+  event-loop thread taken out of circulation. Use the suspending form, inside `withContext(jdbc)`
+  as above: `persistence-jvm-orm` → "Transaction Boundary".
+- **A nested `suspendTransaction` joins this one.** Had `orders.save` opened its own, it would share
+  `place`'s connection and roll back with it; the deprecated `newSuspendedTransaction` opened a
+  second, top-level transaction whose write survived that rollback. The whole rule, savepoints
+  included: `persistence-jvm-orm` → "Transaction Boundary".
 - **Nothing lazily evaluated may escape the block** — a returned `Query` or `SizedIterable` executes
   against a closed connection, so call `.toList()` or `.map { }` inside.
-- **`rollback()` aborts the block explicitly**, as an exception does. There is no "rollback only on
-  unchecked": there are no checked exceptions to distinguish.
+- **Any exception rolls the block back**, checked or not — Exposed catches `Throwable` — and
+  `rollback()` does it explicitly. Inside a nested block the exception's type decides what is
+  undone and when: `persistence-jvm-orm` → "Transaction Boundary".
 
 ## Exposed — Testcontainers Test
 
 No Spring context, no slice — a plain JUnit 5 test:
 
+<!-- compile: ktor-test -->
 ```kotlin
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
+import org.flywaydb.core.Flyway
+import org.junit.jupiter.api.BeforeAll
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+
 @Testcontainers
 class ExposedOrderRepositoryTest {
     companion object {
         @Container @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
 
         @BeforeAll @JvmStatic
         fun connect() {
@@ -354,7 +393,7 @@ class ExposedOrderRepositoryTest {
         addLogger(StdOutSqlLogger)                 // test-only: prints the statements
         val order = anOrder(lines = 2)
         repository.save(order)
-        assertThat(repository.byId(order.id)?.lines).hasSize(2)
+        assertEquals(2, repository.byId(order.id)?.lines?.size)
         rollback()                                 // leave the database as it was found
     }
 }
@@ -408,13 +447,23 @@ transaction, so jOOQ can sit beside JPA for the queries JPQL cannot express.
 One repository per aggregate root, no session, no lazy loading, no dirty checking: `save()` writes
 the root and its children, and deletes the ones that are gone.
 
+<!-- compile: spring-test -->
 ```kotlin
+import java.time.Instant
+import java.util.UUID
+import org.springframework.data.annotation.Id
+import org.springframework.data.annotation.Version
+import org.springframework.data.jdbc.repository.query.Query
+import org.springframework.data.relational.core.mapping.MappedCollection
+import org.springframework.data.relational.core.mapping.Table
+
 @Table("orders")
 data class OrderRecord(                     // data class is fine here: there are no proxies
     @Id val id: UUID,
     val customerId: UUID, val placedAt: Instant, val status: String,
     @MappedCollection(idColumn = "order_id", keyColumn = "position")
     val lines: List<OrderLineRecord> = emptyList(),
+    @Version val version: Long? = null,     // null marks the assigned id as new: save() inserts
 )
 
 @Table("order_lines")
@@ -429,8 +478,11 @@ interface OrderRecordRepository : CrudRepository<OrderRecord, UUID> {
 - **The child has no back-reference.** `@MappedCollection(idColumn = ...)` names the FK column;
   `keyColumn` makes the list ordered and requires that column in the schema.
 - **`save()` on an existing aggregate deletes and re-inserts the children** — the root owns them.
-- **A new aggregate with a client-assigned `@Id` needs `Persistable.isNew`**, or Spring Data issues
-  an `UPDATE` that matches no row; without an assigned id it infers "new" from a null id.
+- **A client-assigned `@Id` reads as an existing row.** Spring Data infers "new" from a null id, so
+  `save()` of a fresh aggregate issues an `UPDATE` that matches nothing — and without a version
+  nothing checks the count, so the order is never written. A `@Version` that is null until the
+  first save decides "new" instead and adds optimistic locking (the migration adds its column);
+  `Persistable.isNew`, or `JdbcAggregateTemplate.insert`, are the alternatives.
 - **References across aggregates are ids** — `AggregateReference<Customer, UUID>`, never a
   `Customer` field. That constraint is the reason to be here.
 
@@ -439,23 +491,33 @@ interface OrderRecordRepository : CrudRepository<OrderRecord, UUID> {
 The read path returns ten orders and issues eleven queries. Nothing fails; the endpoint is slow at a
 hundred rows and unusable at a thousand.
 
+<!-- compile: spring-test -->
 ```kotlin
+import org.hibernate.SessionFactory
+import org.springframework.test.context.TestPropertySource
+
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 @TestPropertySource(properties = ["spring.jpa.properties.hibernate.generate_statistics=true"])
 class OrderReadPathQueryCountTest(
     @Autowired private val jpa: OrderJpaRepository,
-    @Autowired private val em: EntityManager,
+    @Autowired private val em: TestEntityManager,
 ) {
     companion object {
         @Container @ServiceConnection @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
     }
 
     @Test
-    fun findByCustomerWithLines_linesTouched_preparesOneStatement() {
-        val stats = em.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
+    fun findByCustomerWithLines_tenOrdersWithLines_preparesOneStatement() {
+        repeat(10) { n ->                        // an empty table costs one statement either way
+            val order = OrderEntity(customerId = CUSTOMER, placedAt = Instant.now(), status = OrderStatus.NEW)
+            order.addLine(OrderLineEntity(sku = "SKU-$n", quantity = 1, unitPriceCents = 100))
+            em.persist(order)
+        }
+        em.flush()
+        em.clear()
+        val stats = em.entityManager.entityManagerFactory.unwrap(SessionFactory::class.java).statistics
         stats.clear()
         jpa.findByCustomerWithLines(CUSTOMER).forEach { it.lines.size }   // touch the association
         assertThat(stats.prepareStatementCount).isEqualTo(1)
@@ -463,12 +525,14 @@ class OrderReadPathQueryCountTest(
 }
 ```
 
-Swap `findByCustomerWithLines` for the derived `findByCustomerId` and the assertion reports 11: the
-number is a fact checked by the build, not a judgement about SQL somebody scrolled past. Against
-Exposed or jOOQ the same test counts through a `datasource-proxy` wrapper, there being no
-`SessionFactory` to ask. In production the two settings that matter are
-`…session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50`, which names the slow statement, and the
-`org.hibernate.SQL` logger left at `INFO` so nothing writes SQL to stdout per request.
+Point the same test at a derived query that fetches nothing —
+`fun findByCustomerId(customerId: UUID): List<OrderEntity>` on the repository — and it fails with
+11: one statement for the orders and one per order for its lines. The number is a fact checked by
+the build, not a judgement about SQL somebody scrolled past. Against Exposed or jOOQ the same test
+counts through a `datasource-proxy` wrapper, there being no `SessionFactory` to ask. In production
+the two settings that matter are `spring.jpa.properties.hibernate.log_slow_query=50`, which names
+the slow statement, and the `org.hibernate.SQL` logger left at `INFO` so nothing writes SQL to
+stdout per request.
 
 ## HikariCP Sizing
 

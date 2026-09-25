@@ -60,7 +60,7 @@ adds only what JPA's proxy makes different.
 | Situation | Take | Because |
 |---|---|---|
 | Spring Boot, the team knows JPA, and the model is entity-shaped — real associations, aggregates loaded and mutated | JPA / Hibernate via Spring Data JPA | derived query methods, dirty checking, cascades and `@EntityGraph` are already written; the cost is a session whose rules you must learn, and this skill is mostly about those rules |
-| Ktor or any server without a Spring container, and the team wants Kotlin rather than annotations | Exposed | a Kotlin DSL over SQL with no annotation processor, no proxies and no session: `transaction { }` is the whole lifecycle, and `newSuspendedTransaction` makes it coroutine-shaped |
+| Ktor or any server without a Spring container, and the team wants Kotlin rather than annotations | Exposed | a Kotlin DSL over SQL with no annotation processor, no proxies and no session: `transaction { }` is the whole lifecycle, and `suspendTransaction` makes it coroutine-shaped |
 | SQL *is* the product — reporting, analytics, window functions, CTEs, bulk statements | jOOQ | the schema is generated into typed Kotlin from the real database, so a renamed column is a compile error; you write SQL and get type safety instead of writing objects and getting SQL |
 | Aggregates you load whole and save whole, no lazy loading, no partial updates | Spring Data JDBC | Spring Data's repositories without a persistence context: `save()` writes the aggregate, deletes the removed children, and nothing happens that you did not ask for |
 | A handful of statements and a `RowMapper` would do | `JdbcClient` (Boot 3.2+) or `JdbcTemplate` | an ORM you use for four queries is four queries plus a framework; the migration tool still owns the schema |
@@ -132,10 +132,17 @@ allOpen {
 
 ## Exposed Shape
 
+<!-- compile: ktor -->
 ```kotlin
+import javax.sql.DataSource
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.java.javaUUID
+import org.jetbrains.exposed.v1.javatime.timestamp
+import org.jetbrains.exposed.v1.jdbc.Database
+
 object Orders : Table("orders") {
-    val id = uuid("id")
-    val customerId = uuid("customer_id").index()
+    val id = javaUUID("id")                 // uuid() is kotlin.uuid.Uuid on Exposed 1.x
+    val customerId = javaUUID("customer_id").index()
     val placedAt = timestamp("placed_at")
     val status = varchar("status", 32)
     override val primaryKey = PrimaryKey(id)
@@ -154,11 +161,10 @@ fun Application.configureDatabase(dataSource: DataSource) {
    `Database.connect(url, driver, user, password)` overload builds a connection per transaction:
    fine in a test, where there is one, and never in a server.
 3. **`transaction { }` is blocking.** It borrows a connection from the pool and holds it for the
-   block, so on Ktor's event loop it is a thread you have taken out of circulation: run it inside
-   `withContext(Dispatchers.IO)`, or on a virtual-thread executor.
-4. **`newSuspendedTransaction(Dispatchers.IO) { }` is the suspending form**, and the one a
-   `suspend` service method uses. It carries the transaction through the coroutine context, so a
-   nested call joins the same transaction instead of opening a second one.
+   block, so on Ktor's event loop it is a thread you have taken out of circulation. Which
+   dispatcher it belongs on: Transaction Boundary, below.
+4. **`suspendTransaction { }` is the suspending form**, and the one a `suspend` service method
+   uses; its dispatcher and how a nested call joins it are in Transaction Boundary, below.
 5. **A `ResultRow` does not leave its transaction.** Map to domain inside the block; a lazily
    evaluated `Query` returned from `transaction { }` executes against a closed connection.
 6. **Statements are explicit** — `Orders.insert { }`, `Orders.update({ Orders.id eq id }) { }`,
@@ -171,7 +177,7 @@ fun Application.configureDatabase(dataSource: DataSource) {
 
 **The boundary is the service method — that is `arch-layered` → "Transaction Boundary", and it
 does not change here.** Read it there: never on the controller, never on the repository, and on
-Ktor with Exposed the same placement spelled as `newSuspendedTransaction { }` around the service
+Ktor with Exposed the same placement spelled as `suspendTransaction { }` around the service
 body. `arch-hexagonal` covers the variant where the core may not import the container.
 
 What JPA adds on top of that placement:
@@ -179,9 +185,22 @@ What JPA adds on top of that placement:
 - **`@Transactional` is a proxy, so the class must be `open`** — `kotlin("plugin.spring")` above.
   A `private` method, or one service method calling another through `this`, never reaches the
   proxy and runs with no transaction at all, silently.
-- **Rollback is on unchecked exceptions only.** Kotlin has no checked exceptions, so this bites
-  less often than in Java — but a `@Transactional` method that catches an exception and returns
-  normally commits, and `rollbackFor` is how you say otherwise.
+- **Rollback is on unchecked exceptions only, and Kotlin makes that worse.** Nothing forces a
+  Kotlin method to declare the `IOException` or `SQLException` a Java API throws, so it leaves a
+  `@Transactional` method unannounced and the transaction commits. Switch the default once, as
+  the Spring Javadoc advises for Kotlin — `rollbackFor` is the per-method form. A method that
+  catches an exception and returns normally commits either way.
+
+<!-- compile: spring -->
+```kotlin
+import org.springframework.transaction.annotation.EnableTransactionManagement
+import org.springframework.transaction.annotation.RollbackOn
+
+@Configuration
+@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)
+class TransactionConfig
+```
+
 - **`@Transactional(readOnly = true)` on read paths.** It sets the JDBC connection read-only (which
   a replica router can use), and tells Hibernate to skip dirty-check flushing on every query.
 - **The persistence context is the transaction.** Everything loaded inside is managed and
@@ -192,6 +211,27 @@ What JPA adds on top of that placement:
 - **One transaction, one connection.** A method holding a second transaction on a second datasource
   takes two pool slots per request, and the deadlock that follows under load reads as a pool leak.
 
+What Exposed adds:
+
+- **`suspendTransaction { }` takes no dispatcher**, so the service method wraps it in
+  `withContext(jdbc) { suspendTransaction { } }`, with `jdbc` defined by
+  `concurrency-coroutines` → "On the Server". `newSuspendedTransaction(context)` is its deprecated
+  predecessor.
+- **A nested `suspendTransaction` joins the one in the coroutine context.** It reuses the outer
+  transaction — same connection, no commit of its own — so its writes roll back when the service
+  method fails.
+- **Joined means shared, and what a nested failure undoes depends on the exception.** An
+  `SQLException` — a constraint violation, a deadlock — rolls the shared transaction back on the
+  spot, the outer block's earlier writes included; an outer block that catches it and carries on
+  commits only what it writes afterwards. Any other exception rolls back nothing until it leaves the
+  outermost block, so an outer block that catches it commits what the nested block wrote before
+  it threw. Code that must recover from a nested failure needs savepoints:
+  `DatabaseConfig { useNestedTransactions = true }` makes each nested call one, and a failure
+  rolls back that call alone.
+- **`newSuspendedTransaction` and `inTopLevelSuspendTransaction` never join.** Each opens a
+  top-level transaction on a second connection and commits on its own, so its write survives the
+  outer rollback: Exposed's `REQUIRES_NEW`, for an audit write, never for a repository call.
+
 ## N+1
 
 The read path issues one query for the parents and then one per parent for a lazy association.
@@ -201,7 +241,7 @@ JVM endpoint is slow.
 ```properties
 # application-test.properties — measure, do not read SQL by eye
 spring.jpa.properties.hibernate.generate_statistics=true
-spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50
+spring.jpa.properties.hibernate.log_slow_query=50
 ```
 
 1. **Count statements, do not read them.** `SessionFactory.getStatistics()` with
@@ -210,8 +250,9 @@ spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50
 2. **`spring.jpa.show-sql=true` is a test-only switch.** In production it writes unstructured SQL
    to stdout with no bind parameters and no timing; use the `org.hibernate.SQL` logger, or
    `datasource-proxy` / `p6spy` when you need parameters and durations.
-3. **`LOG_QUERIES_SLOWER_THAN_MS` names the slow statement in production** without turning every
-   statement into a log line.
+3. **`hibernate.log_slow_query` names the slow statement in production**, on the
+   `org.hibernate.SQL_SLOW` logger, without turning every statement into a log line. Hibernate 7
+   still reads the old `session.events.log.LOG_QUERIES_SLOWER_THAN_MS` name, as a deprecated fallback.
 4. **The fix is on the query, not the mapping.** A `join fetch`, an `@EntityGraph` on the
    repository method, or a projection. Turning the association EAGER trades one N+1 for a join on
    every read path in the application, including the ones that did not want the children.
@@ -220,8 +261,9 @@ spring.jpa.properties.hibernate.session.events.log.LOG_QUERIES_SLOWER_THAN_MS=50
 6. **Two collection fetch joins in one query is a cartesian product.** Hibernate refuses more than
    one bag; with `Set` semantics it returns `lines × payments` rows. One collection per query.
 7. **Exposed, jOOQ and Spring Data JDBC have no lazy loading and therefore no ORM N+1** — but a
-   `map { findLinesFor(it.id) }` over a result set is the same bug, written out by hand, and the
-   statistics test above is what catches it there too.
+   `map { findLinesFor(it.id) }` over a result set is the same bug, written out by hand, and a
+   statement count through a `datasource-proxy` wrapper catches it there, with no `SessionFactory`
+   to ask.
 
 ## Connection Pool
 
@@ -252,30 +294,35 @@ HikariCP is the pool Spring Boot configures by default and the one to use on Kto
    types, different `ON CONFLICT` behaviour, different casing rules and no extensions; the bugs it
    hides are exactly the ones that only appear in production. Where Docker is missing, the suite
    is skipped (`@Testcontainers(disabledWithoutDocker = true)`), not moved to H2.
-2. **`@DataJpaTest` + Testcontainers is the standard slice.** Disable the embedded-database
-   replacement, and let `@ServiceConnection` (Boot 3.1+) wire the URL, user and password — no
-   `@DynamicPropertySource` any more:
+2. **`@DataJpaTest` + Testcontainers is the standard slice.** `@ServiceConnection` wires the URL,
+   user and password from the container, and the slice's default `Replace.NON_TEST` leaves a
+   `@ServiceConnection` database in place — no `@AutoConfigureTestDatabase`, no
+   `@DynamicPropertySource`. Which Boot 4 module each slice ships in: `di-spring` → "Testing".
 
+<!-- compile: spring-test -->
 ```kotlin
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
 class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
     companion object {
         @Container @ServiceConnection @JvmStatic
-        val postgres = PostgreSQLContainer<Nothing>(DockerImageName.parse("postgres:16-alpine"))
+        val postgres = PostgreSQLContainer("postgres:16-alpine")
     }
 }
 ```
 
-3. **`PostgreSQLContainer<Nothing>` is the Kotlin form.** The class is self-typed for Java's
-   builder chaining, and `<Nothing>` is how Kotlin says "no subclass" without a raw-type warning.
+3. **The container is `org.testcontainers.postgresql.PostgreSQLContainer`**, from
+   `org.testcontainers:testcontainers-postgresql`, with `testcontainers-junit-jupiter` for
+   `@Testcontainers` and `@Container`. It is not generic. The self-typed
+   `org.testcontainers.containers.PostgreSQLContainer<SELF>` is deprecated in Testcontainers 2, and
+   its Kotlin form `<Nothing>` throws `ClassCastException` once a `with…` call is chained.
 4. **One container per suite, not per test.** A `@JvmStatic` `companion object` `@Container` starts
    once; a member `@Container` restarts per test method. Reuse (`withReuse(true)` plus
    `testcontainers.reuse.enable`) is the next step when local runs still hurt.
 5. **The migration tool runs in the test.** That is a feature: the test proves the schema the
    migrations produce is the schema the mapping expects, which is what `ddl-auto=validate` checks
-   in production (`persistence-migrations`).
+   in production. The Boot 4 starter that runs it:
+   `persistence-migrations` → "Flyway and Liquibase".
 6. **`@DataJpaTest` is transactional and rolls back at the end**, so nothing is flushed unless you
    ask. Call `TestEntityManager.flush()` and `clear()` before asserting a query count or a
    constraint violation — otherwise you are asserting against the first-level cache.
@@ -309,9 +356,9 @@ class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
 7. **`@Transactional` on a private method, or on one reached by self-invocation.** The proxy is
    never entered, so there is no transaction, no rollback and no error: the writes commit
    individually and the failure is a half-applied operation nobody can reproduce.
-8. **`@Transactional` on the repository.** Each call gets its own transaction, so two writes in one
-   service method cannot roll back together — the reservation survives the order that failed to
-   save (`arch-layered`).
+8. **`@Transactional` where the `- Architecture:` skill does not open the transaction** —
+   `arch-layered` → "Transaction Boundary",
+   `arch-hexagonal` → "Where Things Live", `arch-clean` → "On the Server".
 9. **The entity serialized straight out of the controller.** The API contract becomes the table
    layout, a lazy field either throws or triggers a query during serialization, and renaming a
    column is a breaking API change.
@@ -323,5 +370,5 @@ class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
     H2 accepted is the one that fails on deploy.
 12. **`transaction { }` called from a coroutine on Ktor's event loop.** It blocks the thread for
     the whole database round trip; under concurrency the server stops accepting work while every
-    metric still reads healthy. `newSuspendedTransaction(Dispatchers.IO)`, or a virtual-thread
-    dispatcher (`concurrency-coroutines`).
+    metric still reads healthy. The suspending form on its dispatcher is in Transaction Boundary,
+    above.

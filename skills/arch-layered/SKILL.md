@@ -161,10 +161,13 @@ class OrderService(
 class OrderService(
     private val orders: OrderRepository,
     private val stock: StockRepository,
+    private val jdbc: CoroutineDispatcher,   // Dispatchers.IO.limitedParallelism(poolSize), made once
 ) {
-    suspend fun place(command: PlaceOrderCommand): Order = suspendTransaction {
-        val reserved = stock.reserve(command.sku, command.quantity)
-        orders.save(Order.from(command, reserved))
+    suspend fun place(command: PlaceOrderCommand): Order = withContext(jdbc) {
+        suspendTransaction {
+            val reserved = stock.reserve(command.sku, command.quantity)
+            orders.save(Order.from(command, reserved))
+        }
     }
 }
 ```
