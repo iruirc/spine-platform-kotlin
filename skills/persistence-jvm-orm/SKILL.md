@@ -213,10 +213,8 @@ class TransactionConfig
 
 What Exposed adds:
 
-- **`suspendTransaction { }` takes no dispatcher**, so the service method wraps it in
-  `withContext(jdbc) { suspendTransaction { } }`, with `jdbc` defined by
-  `concurrency-coroutines` → "On the Server". `newSuspendedTransaction(context)` is its deprecated
-  predecessor.
+- **The dispatcher around `suspendTransaction { }`** is `concurrency-coroutines` → "On the Server".
+  `newSuspendedTransaction(context)` is its deprecated predecessor.
 - **A nested `suspendTransaction` joins the one in the coroutine context.** It reuses the outer
   transaction — same connection, no commit of its own — so its writes roll back when the service
   method fails.
@@ -356,7 +354,9 @@ class OrderRepositoryTest(@Autowired val orders: OrderRepository) {
 7. **`@Transactional` on a private method, or on one reached by self-invocation.** The proxy is
    never entered, so there is no transaction, no rollback and no error: the writes commit
    individually and the failure is a half-applied operation nobody can reproduce.
-8. **`@Transactional` where the `- Architecture:` skill does not open the transaction** —
+8. **`@Transactional` where the `- Architecture:` skill does not open the transaction.** On the
+   repository, each call commits on its own, and a service method that fails between two writes
+   keeps the first. Where it goes:
    `arch-layered` → "Transaction Boundary",
    `arch-hexagonal` → "Where Things Live", `arch-clean` → "On the Server".
 9. **The entity serialized straight out of the controller.** The API contract becomes the table

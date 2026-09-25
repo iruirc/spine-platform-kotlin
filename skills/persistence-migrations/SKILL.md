@@ -25,7 +25,7 @@ loses a user's data, and a server one takes the service down. Choosing the engin
   released
 - User asks "how do I add a column without downtime", "Room says it cannot verify the schema",
   "what is a `.sqm` file", "Flyway or Liquibase", "why did the deploy fail with a checksum mismatch"
-- Review finds `fallbackToDestructiveMigration()`, `exportSchema = false`, an edited migration
+- Review finds `fallbackToDestructiveMigration(...)`, `exportSchema = false`, an edited migration
   script, `ddl-auto=update`, or a rename in a single deploy
 - A release is about to ship the first schema change since launch, and nobody has a migration test
 - The symptom is `IllegalStateException: Migration didn't properly handle`, a Flyway
