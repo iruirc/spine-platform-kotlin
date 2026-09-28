@@ -35,7 +35,7 @@ Produce output in the sections described in the "Output Structure" section below
 In this order:
 
 1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `[DRIVE_APP]`, `[MANUAL_CHECKS]` and `[DRIVER]` fields.
-2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` or `[DRIVER]` if this task overrides a project default (see "The drive_app switch" and "The driver"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files.
+2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` or `[DRIVER]` if this task overrides a project default (see "The drive_app switch" and "The driver"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files, and so does the owner's directive it carries, on everything it names — the simulator or device included.
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
 5. Project root: locate `settings.gradle(.kts)` / `pom.xml` / `module.yaml`; `- Build:` in `## Stack` says which tool.
@@ -200,7 +200,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 
 ### Emulator lane (Android)
 
-4. Find a device: `adb devices -l`. None → the drive step **cannot run**: FAILED with reason `no device or emulator` (Hard Rule 3), unless `drive_app` resolves to `off`. Do not boot an emulator yourself unless `Plan.md` names the AVD; then `emulator -avd <name> -no-snapshot-load &` and `adb wait-for-device`.
+4. Find a device: `adb devices -l`. A device or emulator the brief's owner's directive names wins over the first one listed: pass its serial as `ANDROID_SERIAL` to every `adb` and Gradle call, and boot one it names as an AVD the way one `Plan.md` names is booted. None → the drive step **cannot run**: FAILED with reason `no device or emulator` (Hard Rule 3), unless `drive_app` resolves to `off`. Do not boot an emulator yourself unless `Plan.md` names the AVD; then `emulator -avd <name> -no-snapshot-load &` and `adb wait-for-device`.
 5. Install: `adb install -r <app>/build/outputs/apk/debug/<app>-debug.apk`. Application id from `<app>/build.gradle.kts` (`applicationId`) or `aapt dump badging`.
 6. Launch: `adb shell am start -n <applicationId>/<launcherActivity>` (or `adb shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`). Confirm with `adb shell pidof <applicationId>`.
 7. Drive, when the driver resolved to `ok` for this surface. Read its `## Procedure` first — it is the author's own words on target selection, tool cost order, and what state to leave the device in. Then, in capabilities: `ui_tree` to read the screen as text, `tap` / `type` / `swipe` to walk the scenario, `find` or `assert` for the key element, one `screenshot` at the success endpoint for the record. Anything the block for `android-emulator` (or `android-device`) does not name, you do not do, and the check it was for becomes a manual case. Logcat stays yours either way: `adb logcat -d -s AndroidRuntime:E` after the run, and an `E/AndroidRuntime` FATAL EXCEPTION is a failure entry of type `crash`.

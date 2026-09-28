@@ -120,3 +120,16 @@ setup() {
   done
   [ -z "$bad" ] || { echo "file chain not subordinate to the brief:$bad"; return 1; }
 }
+
+@test "the owner's directive outranks every validator's files, and picks the device" {
+  # Core puts the owner's words for one run into the brief (spine-toolkit
+  # conventions/stage-dispatch.md → Owner's directive); a device they name must beat the first one
+  # adb lists.
+  bad=""
+  for V in "$ROOT"/agents/kotlin-*-validator.md; do
+    grep -qF "and so does the owner's directive it carries, on everything it names" "$V" || bad="$bad ${V##*/}"
+  done
+  [ -z "$bad" ] || { echo "directive not above the files:$bad"; return 1; }
+  e="$(sed -n '/^### Emulator lane (Android)$/,/^### /p' "$ROOT/agents/kotlin-ui-validator.md")"
+  grep -qF "A device or emulator the brief's owner's directive names wins over the first one listed" <<<"$e" || { echo "emulator lane"; return 1; }
+}
