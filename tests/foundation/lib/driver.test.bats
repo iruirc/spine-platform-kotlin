@@ -130,6 +130,8 @@ setup() {
     grep -qF "and so does the owner's directive it carries, on everything it names" "$V" || bad="$bad ${V##*/}"
   done
   [ -z "$bad" ] || { echo "directive not above the files:$bad"; return 1; }
+  # Only the ui validator has a device for the directive to pick.
+  ! grep -lF 'the simulator or device included' "$ROOT"/agents/kotlin-{jvm,server}-validator.md || return 1
   e="$(sed -n '/^### Emulator lane (Android)$/,/^### /p' "$ROOT/agents/kotlin-ui-validator.md")"
   grep -qF "A device or emulator the brief's owner's directive names wins over the first one listed" <<<"$e" || { echo "emulator lane"; return 1; }
 }

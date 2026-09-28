@@ -35,7 +35,7 @@ Produce output in the sections described in the "Output Structure" section below
 In this order:
 
 1. `CLAUDE-spine-toolkit.md` — project stack, conventions, test layout, and the project's `[DRIVE_APP]` default.
-2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files, and so does the owner's directive it carries, on everything it names — the simulator or device included.
+2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files, and so does the owner's directive it carries, on everything it names — the database and the endpoints to smoke included.
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
 5. Project root: locate `settings.gradle(.kts)` / `pom.xml` / `module.yaml`; `- Build:` in `## Stack` says which tool.
