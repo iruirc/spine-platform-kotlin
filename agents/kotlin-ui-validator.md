@@ -133,8 +133,10 @@ if it were contract: a table of call names is exactly what this contract replace
 in it had stopped existing at a server release and nothing noticed for months.
 
 Plan the drive in capabilities, read off the block for this run's surface: reading the screen needs
-`ui_tree` or `find`, driving a path needs `tap`, `type` or `swipe`, an assertion needs `assert`, and a
-shot for the record needs `screenshot`. A check whose capability the block does not name is a check you
+`ui_tree` or `find`, driving a path needs the input capability that names each step's motion — `tap`,
+`type`, `swipe`, or for a pinch or rotation `gesture` and for a press held while moving `drag`, and a
+`swipe` never stands in for either — an assertion needs `assert`, and a shot for the record needs
+`screenshot`. A check whose capability the block does not name is a check you
 defer — it becomes a case in `ManualChecks.md` with the missing capability as its stated reason.
 
 `launch`, `stop` and `reset_state` are deliberately absent from that list. `adb` and Gradle launch and
@@ -203,7 +205,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 4. Find a device: `adb devices -l`. A device or emulator the brief's owner's directive names wins over the first one listed: pass its serial as `ANDROID_SERIAL` to every `adb` and Gradle call, and boot one it names as an AVD the way one `Plan.md` names is booted. The brief's Device line wins over the first one listed as well, but not over a device the owner's directive names: a serial `adb devices -l` lists goes into `ANDROID_SERIAL`, any other value is an AVD name, booted the same way; step 3's `connectedDebugAndroidTest` runs on it too. None → the drive step **cannot run**: FAILED with reason `no device or emulator` (Hard Rule 3), unless `drive_app` resolves to `off`. Do not boot an emulator yourself unless `Plan.md` names the AVD; then `emulator -avd <name> -no-snapshot-load &` and `adb wait-for-device`.
 5. Install: `adb install -r <app>/build/outputs/apk/debug/<app>-debug.apk`. Application id from `<app>/build.gradle.kts` (`applicationId`) or `aapt dump badging`.
 6. Launch: `adb shell am start -n <applicationId>/<launcherActivity>` (or `adb shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`). Confirm with `adb shell pidof <applicationId>`.
-7. Drive, when the driver resolved to `ok` for this surface. Read its `## Procedure` first — it is the author's own words on target selection, tool cost order, and what state to leave the device in. The target the driver selects is the device step 4 settled — the one the brief's Device line names, when it names one. Then, in capabilities: `ui_tree` to read the screen as text, `tap` / `type` / `swipe` to walk the scenario, `find` or `assert` for the key element, one `screenshot` at the success endpoint for the record. Anything the block for `android-emulator` (or `android-device`) does not name, you do not do, and the check it was for becomes a manual case. Logcat stays yours either way: `adb logcat -d -s AndroidRuntime:E` after the run, and an `E/AndroidRuntime` FATAL EXCEPTION is a failure entry of type `crash`.
+7. Drive, when the driver resolved to `ok` for this surface. Read its `## Procedure` first — it is the author's own words on target selection, tool cost order, and what state to leave the device in. The target the driver selects is the device step 4 settled — the one the brief's Device line names, when it names one. Then, in capabilities: `ui_tree` to read the screen as text, `tap` / `type` / `swipe` / `gesture` / `drag` to walk the scenario, each step by its own motion, `find` or `assert` for the key element, one `screenshot` at the success endpoint for the record. Anything the block for `android-emulator` (or `android-device`) does not name, you do not do, and the check it was for becomes a manual case. Logcat stays yours either way: `adb logcat -d -s AndroidRuntime:E` after the run, and an `E/AndroidRuntime` FATAL EXCEPTION is a failure entry of type `crash`.
 8. Stop: `adb shell am force-stop <applicationId>`. Never `pm clear` or `adb emu kill` unless the task asks.
 
 ### Desktop lane

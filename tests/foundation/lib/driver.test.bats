@@ -135,3 +135,11 @@ setup() {
   e="$(sed -n '/^### Emulator lane (Android)$/,/^### /p' "$ROOT/agents/kotlin-ui-validator.md")"
   grep -qF "A device or emulator the brief's owner's directive names wins over the first one listed" <<<"$e" || { echo "emulator lane"; return 1; }
 }
+
+@test "the UI validator plans a multi-finger or held move as gesture or drag, never as swipe" {
+  # A pinch driven as a swipe passes a step nothing checked; core names both motions.
+  V="$ROOT/agents/kotlin-ui-validator.md"
+  grep -qF '`gesture`' "$V" || { echo "gesture not named"; return 1; }
+  grep -qF '`drag`' "$V" || { echo "drag not named"; return 1; }
+  grep -qF 'never stands in for either' "$V" || { echo "no swipe stand-in rule"; return 1; }
+}
