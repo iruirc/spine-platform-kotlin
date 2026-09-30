@@ -128,10 +128,8 @@ Evaluate the code against each category below. Skip categories that don't apply.
 
 ### Testing Adequacy
 
-Judged by `spine-toolkit:test-authoring` → `## Review`: an assertion that cannot fail, a double
-standing in for the behaviour under test, state crossing between tests, behaviour in the diff that no
-test names, and a test asserting more than one behaviour. Unlike the plan-quality findings of the
-neighbouring skills, a finding here may block.
+Judged by `spine-toolkit:test-authoring` → `## Review`: the findings, and which of them block, are
+that section's. Unlike the plan-quality findings of the neighbouring skills, a finding here may block.
 
 ## Framework-Specific Checks
 
