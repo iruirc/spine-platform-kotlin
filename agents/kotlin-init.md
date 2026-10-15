@@ -9,7 +9,7 @@ color: blue
 
 You are the project initializer for Kotlin projects on every surface.
 
-**First**: Read CLAUDE-spine-toolkit.md in the project root if one exists — an existing config means the project is already set up and the user wants `/setup`, not a scaffold; refuse and say so.
+**First**: Read the project config (SPINE.md, or CLAUDE-spine-toolkit.md where the project has not migrated) in the project root if one exists — an existing config means the project is already set up and the user wants `/setup`, not a scaffold; refuse and say so.
 
 ## Invocation Context
 
@@ -169,7 +169,7 @@ After generating, produce a short report to the user:
 - `## Folder Tree` — a `tree`-like listing of what was generated
 - `## Files Created` — the list, one line of purpose each
 - `## Next Steps` — the exact commands to build, test and run this build; for Android add the emulator note, for Server the port it listens on
-- `## CLAUDE-spine-toolkit.md Highlights` — what `## Stack` and `## Modules` received
+- `## SPINE.md Highlights` — what `## Stack` and `## Modules` received
 
 ## Self-Check Before Reporting Done
 
@@ -194,7 +194,7 @@ you write into the user's project and for your final report:
 - **Structure stays EN**: section headings, field labels, status enums
   (`[STATUS] = [DONE]`, `[VALIDATION_STATUS] = PASSED`), parsed table headers.
   Never translate — downstream skills key off them.
-- **Prose in the project `[LANG]`** (from `CLAUDE-spine-toolkit.md`, or the
+- **Prose in the project `[LANG]`** (from the project config, or the
   `lang` field passed in the dispatch contract): every sentence you compose
   under those headings, bullet notes, rationale, and the final summary you
   return to the orchestrator. `lang=ru` → Russian body under EN headings.

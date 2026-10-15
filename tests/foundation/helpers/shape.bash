@@ -17,7 +17,7 @@ assert_agent_shape() {
   local front; front="$(awk '/^---$/{c++; next} c==1{print}' "$f")"
   ! grep -q '^model:' <<<"$front" || { echo "$f: pins a model, which belongs to the project's [MODELS]"; return 1; }
   ! grep -q '^effort:' <<<"$front" || { echo "$f: pins an effort"; return 1; }
-  grep -q '^\*\*First\*\*: Read CLAUDE-spine-toolkit.md' "$f" \
+  grep -q '^\*\*First\*\*: Read the project config' "$f" \
     || { echo "$f: does not read the project config first"; return 1; }
   local h
   for h in 'Invocation Context' 'Skills Reference (spine-platform-kotlin)' 'Skills Reference (core)' \

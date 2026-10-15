@@ -190,7 +190,7 @@ Cross-cutting (always, regardless of pattern):
 
 ## How to Use This Skill
 
-1. **Find and read the active project guidance file.** Prefer `CLAUDE-spine-toolkit.md` if present,
+1. **Find and read the active project guidance file.** Prefer the project config (`SPINE.md`, or its pre-multi-runtime name) if present,
    otherwise `CLAUDE.md`, otherwise the active task documentation. If its `## Stack` already names an
    architecture and the user isn't refactoring — this skill is done; follow that pattern's skill.
    Read the other lines too: a `- Target:` line answers the target surface axis, and the

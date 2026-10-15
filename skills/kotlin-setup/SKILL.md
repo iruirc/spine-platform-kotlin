@@ -1,7 +1,7 @@
 ---
 name: kotlin-setup
 description: |
-  Platform half of project setup for Kotlin projects. Asks the stack questions of spine-platform-kotlin's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing CLAUDE-spine-toolkit.md. Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
+  Platform half of project setup for Kotlin projects. Asks the stack questions of spine-platform-kotlin's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing project config (SPINE.md, or CLAUDE-spine-toolkit.md where the project has not migrated). Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
   Use when (en): spine-toolkit:setup hands the platform its own config blocks
   Use when (ru): spine-toolkit:setup передаёт платформе её блоки конфига
 ---
@@ -9,7 +9,7 @@ description: |
 # Kotlin Setup
 
 The platform half of `/setup`. `spine-toolkit:setup` owns the config file — it creates
-`CLAUDE-spine-toolkit.md`, writes `[LANG]`, `[WORKFLOW_MODE]`, `[PROGRESS]`, `## Platform` and the
+the project config (`SPINE.md`), writes `[LANG]`, `[WORKFLOW_MODE]`, `[PROGRESS]`, `## Platform` and the
 `CLAUDE.md` import line, then hands this skill the two blocks that are the platform's:
 **`## Stack` and `## Modules`**. This skill touches nothing else in the file and creates no file
 of its own.
@@ -27,7 +27,7 @@ Special case for a delegate: `<lang>` arrives in the input from `spine-toolkit:s
 resolved it before the config existed. Use it and skip steps 1-4. Otherwise, before producing any
 user-facing string:
 
-1. Read `CLAUDE-spine-toolkit.md` from the project root.
+1. Read the project config from the project root (core's task-settings convention → Project config).
 2. Find the `[LANG]` field.
 3. Take the field's value, lowercase and trim it. That is `<lang>`.
 4. If `<lang>` is `en` or `ru`, use it. Otherwise default to `en`.
@@ -47,7 +47,7 @@ question tool, ask numbered options in a regular message and parse the reply. Lo
 ```
 lang        = en | ru                       # resolved by spine-toolkit:setup
 state       = A | B | C | D | E             # its State Detection branch, informational
-config_path = path to CLAUDE-spine-toolkit.md   # already written, core blocks filled
+config_path = path to the project config      # SPINE.md as core's setup writes it; already written, core blocks filled
 stack       = {axis: value, …}              # answers core's caller already collected; usually empty
 ```
 
@@ -176,7 +176,7 @@ the other skills read. The question labels in the locale files are for asking, n
 
 ## What this skill does NOT do
 
-- Does NOT create or rename `CLAUDE-spine-toolkit.md`, `CLAUDE.md`, `Tasks/` or `Docs/` — that is `spine-toolkit:setup`.
+- Does NOT create or rename the project config, `CLAUDE.md`, `Tasks/` or `Docs/` — that is `spine-toolkit:setup`.
 - Does NOT write `[LANG]`, `[WORKFLOW_MODE]`, `[PROGRESS]`, `## Platform` or `## Agents`.
 - Does NOT create a Gradle build, sources, `libs.versions.toml`, lint configs, or `README.md` — that is `@spine-platform-kotlin:kotlin-init`.
 - Does NOT modify Kotlin code or build scripts.

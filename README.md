@@ -28,7 +28,7 @@ they know.
 /setup
 ```
 
-That is spine-toolkit's command: it writes `CLAUDE-spine-toolkit.md`, asks which platform serves
+That is spine-toolkit's command: it writes `SPINE.md` (the project config; a project set up earlier still carries it as `CLAUDE-spine-toolkit.md`, read the same way), asks which platform serves
 this project when more than one is installed, and hands this plugin its two blocks — `## Stack`
 and `## Modules`. The stack questions start with the **target** (Android / Desktop / Server /
 CLI / KMP) and ask only the axes that target needs; a Gradle build's modules land in
