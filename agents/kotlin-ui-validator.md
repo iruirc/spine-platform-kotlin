@@ -88,7 +88,9 @@ there is no procedure in it to follow except the one block that says so.
 1. `## Driver` → `namespace` — one or more prefixes, comma-separated, in the author's order of
    preference. Look in your own tool list for a tool named `mcp__<prefix>__*`, prefix by prefix; the
    first prefix with tools present is the one this session uses. There is no call that lists connected
-   servers — this is you reading your own context, not asking anyone.
+   servers — this is you reading your own context, not asking anyone. Codex CLI replaces every
+   character of the prefix outside `[A-Za-z0-9_]` with `_` in tool names: there, `agent-device` is
+   `mcp__agent_device__*`.
 2. `## Targets` — the surfaces the driver drives. Compare against this run's surface, which the lane
    fixed: `android-emulator` or `android-device` on the emulator lane, `macos` / `windows` / `linux` on
    the desktop lane.

@@ -143,3 +143,9 @@ setup() {
   grep -qF '`drag`' "$V" || { echo "drag not named"; return 1; }
   grep -qF 'never stands in for either' "$V" || { echo "no swipe stand-in rule"; return 1; }
 }
+
+@test "the validator looks a hyphenated prefix up the way Codex names it" {
+  V="$ROOT/agents/kotlin-ui-validator.md"
+  grep -qF '[A-Za-z0-9_]' "$V"
+  grep -qF 'mcp__agent_device__' "$V"
+}
