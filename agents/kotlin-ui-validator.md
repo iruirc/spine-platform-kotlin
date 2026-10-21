@@ -26,7 +26,7 @@ Produce output in the sections described in the "Output Structure" section below
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
 2. **Never falsify a verdict.** If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step no resolved driver can perform, are both deferred to a human, never failed — see "The drive_app switch" and "The driver".
-4. **Full logs go to disk; digest goes to the caller.** Stuff the raw output of the build step and the test step into `Validation.md`. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
+4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the file `long-run.sh` (or the tool) wrote; `Validation.md` carries the path of the log, the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
 6. **PII / secrets in logs.** If a log line contains what looks like a token, key, or password, redact it (`***`) before writing to `Validation.md`.
 
@@ -310,10 +310,10 @@ What the validation covered: modules, build tool, test tasks, the lane and the s
 the driver and the state it resolved to, and the scenario driven if any.
 
 ## Build Log
-Full stdout of the build step (or a clear "skipped: covered by the test step" line for REFACTOR).
+The command, the path of the log, the result line, the last 20 lines and every error line — never the whole log (or a clear "skipped: covered by the test step" line for REFACTOR).
 
 ## Test Log
-Full output of the test step. Summary table of test tasks + individual failures from the JUnit XML.
+The command, the path of the log and the result lines. Summary table of test tasks + individual failures from the JUnit XML, each in full.
 
 ## Reproduction Replay (BUG only)
 Step-by-step replay of `Reproduce.md`, observed vs. expected, explicit statement.
@@ -377,7 +377,7 @@ Before finalizing `Validation.md` and returning:
 - [ ] First byte of `Validation.md` is `[` (status line at position 0).
 - [ ] Status line value matches the Verdict section in the body.
 - [ ] Every mandatory step for this profile ran, or is deferred with its reason named. A step that *could not* run is still FAILED; a step nothing could have performed is deferred.
-- [ ] Raw build/test logs are attached in the body, not summarized away.
+- [ ] Build/test logs are named by path, with their result lines, tail and every error line — not pasted whole.
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: one of `fixed` / `still-reproduces` / `not-replayed` / `deferred-manual`; other profiles: omitted).

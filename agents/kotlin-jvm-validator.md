@@ -26,7 +26,7 @@ Produce output in the sections described in the "Output Structure" section below
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
 2. **Never falsify a verdict.** If a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step there is nothing to perform against, are both deferred to a human, never failed — see "The drive_app switch".
-4. **Full logs go to disk; digest goes to the caller.** Stuff the raw output of the build step and the test step into `Validation.md`. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
+4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the file `long-run.sh` (or the tool) wrote; `Validation.md` carries the path of the log, the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
 6. **PII / secrets in logs.** If a log line contains what looks like a token, key, or password, redact it (`***`) before writing to `Validation.md`.
 
@@ -115,7 +115,7 @@ Structure, the required fields of a case, and the two rules that make a case exe
 ## Tooling Procedure
 
 1. Read `- Build:` from `## Stack`; default to Gradle when the line is absent and `settings.gradle(.kts)` exists.
-2. **Build step**: Gradle `./gradlew --console=plain build -x test` (or `assemble` when the project has no `build` lifecycle task); Maven `mvn -B -DskipTests verify`; Amper `./amper build`. Capture full stdout+stderr into `Validation.md ## Build Log`. Non-zero exit → FAILED; first 3 `e: ` / `error:` lines into the digest.
+2. **Build step**: Gradle `./gradlew --console=plain build -x test` (or `assemble` when the project has no `build` lifecycle task); Maven `mvn -B -DskipTests verify`; Amper `./amper build`. Record it in `Validation.md ## Build Log` — the path of the log, its result line, tail and error lines, never the whole log. Non-zero exit → FAILED; first 3 `e: ` / `error:` lines into the digest.
 3. **Test step**: Gradle `./gradlew --console=plain test` — plus every test task the module declares beyond `test` (`integrationTest`, `allTests`), found with `./gradlew tasks --all | grep -i test`; Maven `mvn -B verify`; Amper `./amper test`. Capture into `## Test Log`; read results per `## Reading Gradle Output`.
 4. **Drive step**: never. Every profile row that calls for driving the app is deferred: the case goes to `ManualChecks.md`, its title to `manual_checks:` in the return, the matching `OpsChecklist.md` item to Pending. For BUG, `reproduction_status: deferred-manual`.
 5. **Environment-bound test tasks**: a task step 3 discovers that needs an environment you do not have — a device or emulator (`connected*AndroidTest`), a Docker daemon (a Testcontainers-backed suite) — is deferred exactly like a drive step, on every profile: reported under `## Scope`, its case written into `ManualChecks.md`, never run to a FAILED.
@@ -214,10 +214,10 @@ Desktop or KMP; spine-platform-kotlin:kotlin-server-validator for Server or CLI)
 What the validation covered (modules, build tool, test tasks) and what it could not — every deferred drive step, by name.
 
 ## Build Log
-Full stdout of the build step (or a clear "skipped: covered by the test step" line for REFACTOR).
+The command, the path of the log, the result line, the last 20 lines and every error line — never the whole log (or a clear "skipped: covered by the test step" line for REFACTOR).
 
 ## Test Log
-Full output of the test step. Summary table of test tasks + individual failures from the JUnit XML.
+The command, the path of the log and the result lines. Summary table of test tasks + individual failures from the JUnit XML, each in full.
 
 ## Reproduction Replay (BUG only)
 The scenario from `Reproduce.md` and the explicit statement that it was deferred to `ManualChecks.md`, not replayed.
@@ -279,7 +279,7 @@ Before finalizing `Validation.md` and returning:
 - [ ] Status line value matches the Verdict section in the body.
 - [ ] `## Summary` opens by naming the deviation (no running instance was driven) and names the driving sibling.
 - [ ] Every mandatory build and test step for this profile actually ran (or the validation is FAILED with the missing step as the reason).
-- [ ] Raw build/test logs are attached in the body, not summarized away.
+- [ ] Build/test logs are named by path, with their result lines, tail and every error line — not pasted whole.
 - [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: `deferred-manual`; other profiles: omitted).
