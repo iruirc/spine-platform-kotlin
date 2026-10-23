@@ -126,8 +126,6 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-ui-tester` — Compose and Android instrumentation tests, when the assertion needs a device or a Compose test rule
 - `spine-platform-kotlin:kotlin-server-tester` — server tests: routes and controllers, framework test slices, Testcontainers
 - `spine-platform-kotlin:kotlin-kmp-tester` — `commonTest` and the per-target runners

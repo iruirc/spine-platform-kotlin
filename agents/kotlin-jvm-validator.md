@@ -164,7 +164,7 @@ For **classification of observed failures only** — never to propose fixes.
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins. You invoke none of them: after a FAILED validation the orchestrator returns control to the profile's Execute/Fix agent, and this list is here so your report names the right one.
+You invoke none of them: after a FAILED validation the orchestrator returns control to the profile's Execute/Fix agent, and this list is here so your report names the right one.
 
 - `spine-platform-kotlin:kotlin-compose-developer` — Execute/Fix for FEATURE and BUG on Android and Desktop
 - `spine-platform-kotlin:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI

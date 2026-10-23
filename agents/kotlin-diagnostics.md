@@ -95,8 +95,6 @@ Bash for Gradle/Maven, adb, jcmd/jstack, curl; the project's driver for UI state
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-architect` — co-reviews root cause in the Diagnose panel
 - `spine-platform-kotlin:kotlin-compose-developer`, `spine-platform-kotlin:kotlin-server-developer`, `spine-platform-kotlin:kotlin-kmp-developer` — apply the fix after approval
 - `spine-platform-kotlin:kotlin-security` — for bugs that turn out to be security defects

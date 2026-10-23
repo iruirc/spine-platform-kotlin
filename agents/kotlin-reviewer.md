@@ -249,8 +249,6 @@ Consult these skills when reviewing code against architectural / framework expec
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-diagnostics` — bug hunting; a finding you can see but cannot trace to a cause is diagnostics follow-up
 - `spine-platform-kotlin:kotlin-security` — the deeper audit when a Security finding needs one: credential handling, storage, transport
 - `spine-platform-kotlin:kotlin-init` — project bootstrapping

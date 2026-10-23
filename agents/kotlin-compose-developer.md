@@ -201,8 +201,6 @@ fun UserCard(
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-ui-tester` — tests for a screen you wrote: ViewModel unit tests and Compose UI tests
 - `spine-platform-kotlin:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
 - `spine-platform-kotlin:kotlin-security` — audits credential handling, storage and transport in what you wrote

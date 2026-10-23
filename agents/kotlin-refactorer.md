@@ -452,8 +452,6 @@ Consult these when the refactoring touches the concern they own — the skill bo
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-jvm-tester` — write the missing tests before a refactor; the fallback when `- Target:` never resolved
 - `spine-platform-kotlin:kotlin-ui-tester` — the same, for the Android or Compose Desktop code you are about to move
 - `spine-platform-kotlin:kotlin-server-tester` — the same, for a JVM server or CLI

@@ -185,8 +185,6 @@ For **classification of observed failures only** — never to propose fixes.
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-server-developer` — Execute/Fix for FEATURE and BUG on Server and CLI
 - `spine-platform-kotlin:kotlin-refactorer` — the Refactor stage for REFACTOR
 - `spine-platform-kotlin:kotlin-server-tester` — the Write stage for TEST on Server and CLI

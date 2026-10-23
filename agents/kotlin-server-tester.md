@@ -235,8 +235,6 @@ When `NEED_TEST = false` in the task, do not generate tests — run the existing
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-server-developer` — writes the routes, services and repositories you cover; hand back the bug, never the fix
 - `spine-platform-kotlin:kotlin-server-validator` — runs the build and the suite for the Validation stage and writes `Validation.md`
 - `spine-platform-kotlin:kotlin-jvm-tester` — pure Kotlin logic with no framework context and no container behind it

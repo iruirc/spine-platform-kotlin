@@ -266,8 +266,6 @@ For **classification of observed failures only** — never to propose fixes.
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-compose-developer` — Execute/Fix for FEATURE and BUG on Android and Desktop
 - `spine-platform-kotlin:kotlin-kmp-developer` — Execute/Fix for FEATURE and BUG on KMP
 - `spine-platform-kotlin:kotlin-refactorer` — the Refactor stage for REFACTOR

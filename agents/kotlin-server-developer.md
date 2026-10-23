@@ -213,8 +213,6 @@ This step is not optional and not satisfied by "I followed the project style" in
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-server-tester` — tests for what you wrote: service unit tests and integration tests that stand the framework up
 - `spine-platform-kotlin:kotlin-diagnostics` — reproduces and roots out a defect you cannot localize
 - `spine-platform-kotlin:kotlin-security` — audits credential handling, storage and transport in what you wrote

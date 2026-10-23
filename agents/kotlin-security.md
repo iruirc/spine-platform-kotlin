@@ -89,8 +89,6 @@ Audit source code, build scripts (build.gradle.kts, libs.versions.toml, gradle.p
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-architect` — folds your lens findings into the analysis it writes at Research and Analyze
 - `spine-platform-kotlin:kotlin-diagnostics` — for bugs that turn out to be security defects
 - `spine-platform-kotlin:kotlin-reviewer` — for general code quality after security patches are applied

@@ -24,8 +24,8 @@ assert_agent_shape() {
            'Related Agents (spine-platform-kotlin)' 'Output Structure' 'What You Never Do' 'Output Language'; do
     grep -q "^## $h" "$f" || { echo "$f: missing ## $h"; return 1; }
   done
-  grep -q 'subagent_type=spine-platform-kotlin:<name>' "$f" \
-    || { echo "$f: Related Agents does not state the namespaced dispatch form"; return 1; }
+  ! grep -q 'subagent_type=' "$f" \
+    || { echo "$f: tells its caller how to dispatch it — the orchestrator reads the manifest"; return 1; }
   ! _body_after_frontmatter "$f" | _has_cyrillic \
     || { echo "$f: cyrillic outside the frontmatter"; return 1; }
   ! grep -q 'kotlin-toolkit' "$f" || { echo "$f: names the retired plugin"; return 1; }

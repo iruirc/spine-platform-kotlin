@@ -139,8 +139,6 @@ the folder layout and the conventions the generated scaffold must match.
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 Once the build is on disk the project is ready for regular work through the spine-toolkit orchestrator, which dispatches these:
 
 - `spine-platform-kotlin:kotlin-architect` — designs features within the generated structure

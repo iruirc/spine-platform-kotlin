@@ -160,8 +160,6 @@ Consult the skill that matches the target and the concern at hand:
 
 ## Related Agents (spine-platform-kotlin)
 
-When invoking via the Task tool, use the fully plugin-prefixed names (`subagent_type=spine-platform-kotlin:<name>`) to avoid collisions with other installed plugins.
-
 - `spine-platform-kotlin:kotlin-security` — co-reviews design-level risks in the FEATURE Research panel
 - `spine-platform-kotlin:kotlin-diagnostics` — co-reviews root cause in the BUG Diagnose panel
 - `spine-platform-kotlin:kotlin-ui-tester` — the other half of the TEST Analyze panel on an Android or Desktop target
