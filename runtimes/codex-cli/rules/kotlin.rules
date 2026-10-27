@@ -1,0 +1,30 @@
+# Written by spine-toolkit's setup for Codex CLI from spine-platform-kotlin, and replaced by it when
+# a new version of the platform changes this file. To undo, delete it: Codex then asks before each
+# build, test run and device call again.
+#
+# Codex's sandbox refuses what an Android or JVM build needs: Gradle writes ~/.gradle, downloads
+# dependencies and keeps a daemon; adb talks to its server on localhost:5037; the emulator starts a
+# virtual device. These rules let them go without a question and outside the sandbox. gradlew runs
+# the project's build logic there — the same trust you give the project's code when you build it in
+# Android Studio — and `adb shell` runs any command on the device.
+prefix_rule(
+    pattern=["gradlew"],
+    decision="allow",
+    justification="Gradle needs ~/.gradle, the network and its daemon, which the sandbox refuses.",
+    match=[["./gradlew", ":app:testDebugUnitTest"], ["gradlew", "--version"]],
+    not_match=[["gradle", "build"]],
+)
+prefix_rule(
+    pattern=["adb"],
+    decision="allow",
+    justification="adb reaches its server on localhost:5037, which the sandbox refuses.",
+    match=[["adb", "devices"], ["adb", "shell", "am", "start", "-n", "a/.B"]],
+    not_match=[["adbx", "devices"]],
+)
+prefix_rule(
+    pattern=["emulator"],
+    decision="allow",
+    justification="The emulator starts a virtual device, which the sandbox refuses.",
+    match=[["emulator", "-avd", "Medium_Phone"], ["emulator", "-list-avds"]],
+    not_match=[["emulatorx", "-avd", "X"]],
+)
