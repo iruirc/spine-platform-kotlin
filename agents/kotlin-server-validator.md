@@ -327,3 +327,8 @@ you write into the user's project and for your final report:
 
 English prose under English headings when `lang=ru`, or translated headings, is
 a defect.
+
+## Toolchain
+
+Before the first `./gradlew`, `adb` or `emulator` call, read `conventions/gradle-toolchain.md` and
+follow it: the JDK the IDE chose for the project, the SDK outside `PATH`, a screenshot without a redirect.
