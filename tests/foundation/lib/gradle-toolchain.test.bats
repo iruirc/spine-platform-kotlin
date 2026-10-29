@@ -23,8 +23,17 @@ setup() {
   done
 }
 
-@test "every agent that runs gradlew or adb points at the convention" {
-  for f in $(grep -lE 'gradlew|\badb\b' "$ROOT"/agents/*.md); do
+@test "every agent that builds, tests or drives the project points at the convention" {
+  for f in $(grep -lE 'gradlew|\badb\b' "$ROOT"/agents/*.md) "$ROOT"/agents/*-developer.md "$ROOT"/agents/*-tester.md \
+           "$ROOT"/agents/*-validator.md "$ROOT"/agents/kotlin-refactorer.md "$ROOT"/agents/kotlin-diagnostics.md; do
     grep -qF 'conventions/gradle-toolchain.md' "$f" || { echo "$(basename "$f"): no pointer"; return 1; }
+  done
+}
+
+# Milestone 7: Espresso 3.6.1 cannot run on an API 37 image; the developer agent downloaded an API 35
+# system image on its own and spent an hour of Execute. Upgrading Espresso was never offered.
+@test "the convention stops at a failure the environment causes instead of installing around it" {
+  for s in 'system image' 'dependency' 'options'; do
+    grep -qF -- "$s" "$C" || { echo "convention lacks: $s"; return 1; }
   done
 }

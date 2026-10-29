@@ -54,3 +54,18 @@ adb -s <serial> pull /sdcard/spine-shot.png <path>.png
 
 Two calls — `screencap` on the device, then `adb pull` — and no redirect: `adb exec-out screencap -p > <file>` writes the same file, but a command with
 `>` is matched by no Codex rule and stops to ask.
+
+## A failure the environment causes
+
+A test that fails before it reaches its own assertions, and fails the same way without your change —
+a test library that cannot run on the device's API level, a JDK the build refuses, a tool missing
+from the SDK — is the environment's failure, not the change's. Do not install your way around it:
+no SDK platform, system image or JDK downloaded, no dependency version raised, no device created.
+Each of those changes the user's machine or the project beyond the task. Stop the step, and return
+the failure — the first error line and the test it stopped — with the options you see, for example:
+
+- another device or API level the user already has;
+- raising the dependency that does not support this one, as a task of its own;
+- a check by hand.
+
+The user picks; you continue with what they picked.
