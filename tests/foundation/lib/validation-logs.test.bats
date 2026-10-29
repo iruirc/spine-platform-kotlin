@@ -21,3 +21,12 @@ setup() {
     grep -qF 'the path of the log' "$f" || { echo "$(basename "$f"): no log path"; return 1; }
   done
 }
+
+# Milestone 7: a Codex validator read "If a tool errored out, the verdict is FAILED" as covering a
+# call it had fixed and rerun — a wrong JDK, a wrong driver action — and wrote FAILED over a green
+# build, green tests and a driven scenario. FAILED is a step that never produced its evidence.
+@test "every validator fails a step that never produced its evidence, not an error a rerun fixed" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    grep -qF 'a rerun that succeeded' "$f" || { echo "$(basename "$f"): no rerun rule"; return 1; }
+  done
+}
