@@ -28,6 +28,12 @@ setup() {
   done
 }
 
+# Final review of milestone 7: on macOS `java` on PATH is /usr/bin/java, a stub with no home to pass.
+@test "on macOS the JDK comes from java_home, not from the java stub on PATH" {
+  grep -qF '/usr/libexec/java_home -V' "$C" || { echo "no java_home step"; return 1; }
+  [ "$(grep -n 'java_home -V' "$C" | cut -d: -f1)" -lt "$(grep -n 'Elsewhere, `java` on `PATH`' "$C" | cut -d: -f1)" ]
+}
+
 @test "the convention finds adb and the emulator outside PATH and screenshots without a redirect" {
   [ -f "$C" ] || { echo "no $C"; return 1; }
   for s in 'ANDROID_HOME' 'sdk.dir' 'local.properties' 'Library/Android/sdk' 'adb pull'; do

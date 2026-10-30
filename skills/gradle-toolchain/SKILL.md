@@ -29,7 +29,9 @@ The first that exists wins:
 2. `org.gradle.java.home` in the project's `gradle.properties` — Gradle reads it by itself; pass
    nothing.
 3. `JAVA_HOME` of the environment.
-4. `java` on `PATH`.
+4. On macOS, `/usr/libexec/java_home -V`: it lists every installed JDK with its home — take the
+   newest the build accepts. `java` on `PATH` is a stub there and gives no home to pass.
+5. Elsewhere, `java` on `PATH`: its home is two levels above the resolved binary.
 
 For an Android build, a JDK whose `release` file carries `GRAALVM_VERSION` is skipped: its `jlink`
 cannot build Android's JDK image. Name each skipped JDK and why in the step's log; with none left,
