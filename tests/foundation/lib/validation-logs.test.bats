@@ -30,3 +30,9 @@ setup() {
     grep -qF 'a rerun that succeeded' "$f" || { echo "$(basename "$f"): no rerun rule"; return 1; }
   done
 }
+
+@test "a rerun excuses only an error in how a step was invoked, never a failing build or test" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    grep -qF 'never a build or test failure' "$f" || { echo "$(basename "$f"): rerun rule too wide"; return 1; }
+  done
+}

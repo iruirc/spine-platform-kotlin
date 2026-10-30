@@ -31,9 +31,10 @@ The first that exists wins:
 3. `JAVA_HOME` of the environment.
 4. `java` on `PATH`.
 
-A JDK whose `release` file carries `GRAALVM_VERSION` cannot build an Android project — its `jlink`
-cannot build Android's JDK image. Skip it and take the next one; with none left, say so as the
-step's cause.
+For an Android build, a JDK whose `release` file carries `GRAALVM_VERSION` is skipped: its `jlink`
+cannot build Android's JDK image. Name each skipped JDK and why in the step's log; with none left,
+the cause is "only GraalVM found (<paths>) — set the project's Gradle JDK in the IDE". A server's
+native build needs GraalVM and keeps it.
 
 Pass the JDK on the command line, so the command still starts with `gradlew`:
 
@@ -72,18 +73,23 @@ Two calls — `screencap` on the device, then `adb pull` — and no redirect: `a
 
 ## A failure the environment causes
 
-A test that fails before it reaches its own assertions, and fails the same way without your change —
-a test library that cannot run on the device's API level, a JDK the build refuses, a tool missing
-from the SDK — is the environment's failure, not the change's. Do not install your way around it:
-no SDK platform, system image or JDK downloaded, no dependency version raised, no device created.
-Each of those changes the user's machine or the project beyond the task. Stop the step, and return
-the failure — the first error line and the test it stopped — with the options you see, for example:
+A test that fails before it reaches its own assertions — a test library that cannot run on the
+device's API level, a JDK the build refuses, a tool missing from the SDK — is the environment's
+failure, not the change's. Do not install your way around it: no SDK platform, system image or JDK
+downloaded, no dependency version raised, no device created. Each of those changes the user's machine
+or the project beyond the task. Stop the step and name the failure — its first error line and the
+test it stopped — with the options you see, for example:
 
 - another device or API level the user already has;
 - raising the dependency that does not support this one, as a task of its own;
 - a check by hand.
 
-The user picks; you continue with what they picked.
+Where they go depends on who stops:
+
+- **A validator** writes `FAILED` with the cause `environment: <first error line>` and puts the
+  options in its return digest; the user picks between stages.
+- **An implementing stage** (developer, tester, refactorer) stops before committing the step and puts
+  the failure and the options in its stage report.
 
 ## Common Mistakes
 

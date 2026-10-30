@@ -155,5 +155,6 @@ a defect.
 ## Toolchain
 
 Before the first `./gradlew`, `adb` or `emulator` call, load the skill
-`spine-platform-kotlin:gradle-toolchain` and follow it: the JDK the IDE chose for the project, the SDK outside `PATH`, a screenshot without a
+`spine-platform-kotlin:gradle-toolchain` — where skills cannot be listed, read its
+`skills/gradle-toolchain/SKILL.md` in the plugin that holds this agent file — and follow it: the JDK the IDE chose for the project, the SDK outside `PATH`, a screenshot without a
 redirect, and a failure the environment causes — stop and ask, never install around it.

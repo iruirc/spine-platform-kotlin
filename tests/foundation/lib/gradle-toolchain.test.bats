@@ -49,3 +49,19 @@ setup() {
     grep -qF -- "$s" "$C" || { echo "convention lacks: $s"; return 1; }
   done
 }
+
+# Final review of milestone 7.
+@test "the pointer names the skill's file, so a Codex agent that cannot list the skill can read it" {
+  for f in $(grep -lF 'spine-platform-kotlin:gradle-toolchain' "$ROOT"/agents/*.md); do
+    grep -qF 'skills/gradle-toolchain/SKILL.md' "$f" || { echo "$(basename "$f"): no file path"; return 1; }
+  done
+}
+
+@test "GraalVM is skipped for an Android build only, not for a native server build" {
+  grep -qF 'For an Android build, a JDK whose' "$C" || { echo "GraalVM rule is not scoped to Android"; return 1; }
+}
+
+@test "a failure the environment causes has a status: FAILED with an environment cause for a validator" {
+  grep -qF 'environment:' "$C" || { echo "no environment: cause"; return 1; }
+  grep -qF 'stage report' "$C" || { echo "implementing stages not told where the options go"; return 1; }
+}

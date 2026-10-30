@@ -24,7 +24,7 @@ Produce output in the sections described in the "Output Structure" section below
 ## Hard Rules
 
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
-2. **Never falsify a verdict.** If a step never produced its evidence because a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. An error that a rerun that succeeded put right — a wrong JDK, a mistyped driver action, a device not yet booted — is not that: the step has its evidence, the first attempt is named in the step's log section, and the verdict is what the evidence says. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
+2. **Never falsify a verdict.** If a step never produced its evidence because a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. An error in how the step was invoked that a rerun that succeeded put right — a wrong JDK, a mistyped driver action, a device not yet booted — is not that: the step has its evidence, the first attempt is named in the step's log section, and the verdict is what the evidence says. That covers the invocation only, never a build or test failure of the change: a test that fails and then passes on a rerun is FAILED, or FLAKY where the profile defines it. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step no resolved driver can perform, are both deferred to a human, never failed — see "The drive_app switch" and "The driver".
 4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the file `long-run.sh` (or the tool) wrote; `Validation.md` carries the path of the log, the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
@@ -415,5 +415,6 @@ a defect.
 ## Toolchain
 
 Before the first `./gradlew`, `adb` or `emulator` call, load the skill
-`spine-platform-kotlin:gradle-toolchain` and follow it: the JDK the IDE chose for the project, the SDK outside `PATH`, a screenshot without a
+`spine-platform-kotlin:gradle-toolchain` — where skills cannot be listed, read its
+`skills/gradle-toolchain/SKILL.md` in the plugin that holds this agent file — and follow it: the JDK the IDE chose for the project, the SDK outside `PATH`, a screenshot without a
 redirect, and a failure the environment causes — stop and ask, never install around it.
