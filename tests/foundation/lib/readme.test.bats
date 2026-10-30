@@ -53,7 +53,7 @@ PY
 }
 
 @test "the README counts the knowledge skills skills/ holds" {
-  n="$(ls "$ROOT/skills" | grep -cvxE 'manifest|kotlin-setup')"
+  n="$(ls "$ROOT/skills" | grep -cvxE 'manifest|kotlin-setup|gradle-toolchain')"
   run readme_counts skills "$n"
   [ "$status" -eq 0 ] && [ -z "$output" ] || { echo "$output"; return 1; }
 }

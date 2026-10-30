@@ -60,7 +60,7 @@ PY
 }
 
 @test "toolkit-driven internal skills require explicit Codex invocation" {
-  for skill in manifest kotlin-setup; do
+  for skill in manifest kotlin-setup gradle-toolchain; do
     metadata="$ROOT/skills/$skill/agents/openai.yaml"
     grep -qx '  allow_implicit_invocation: false' "$metadata" \
       || { echo "$skill: no policy.allow_implicit_invocation: false"; return 1; }
@@ -73,7 +73,7 @@ PY
   missing=""
   for skill in "$ROOT"/skills/*; do
     name="$(basename "$skill")"
-    case "$name" in manifest|kotlin-setup) continue ;; esac
+    case "$name" in manifest|kotlin-setup|gradle-toolchain) continue ;; esac
     metadata="$skill/agents/openai.yaml"
     grep -Fq "\$$name" "$metadata" || missing="$missing $name"
   done

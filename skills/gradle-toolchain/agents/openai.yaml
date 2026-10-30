@@ -1,0 +1,5 @@
+interface:
+  display_name: "Gradle Toolchain"
+  short_description: "Internal: the JDK, SDK and device calls Spine's Kotlin agents make"
+policy:
+  allow_implicit_invocation: false

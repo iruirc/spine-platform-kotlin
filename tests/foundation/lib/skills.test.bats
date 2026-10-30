@@ -44,7 +44,7 @@ setup() {
   [ "$n" -eq 30 ] || { echo "expected 30 topic skills, found $n"; return 1; }
   for d in "$ROOT"/skills/*/; do
     s="$(basename "$d")"
-    case "$s" in manifest|kotlin-setup) continue ;; esac
+    case "$s" in manifest|kotlin-setup|gradle-toolchain) continue ;; esac
     grep -qx "$s" <<<"$topics" || { echo "knowledge skill no Topics row names: $s"; return 1; }
   done
 }
@@ -54,7 +54,7 @@ setup() {
   # a methodology topic — which is fine — but one no agent AND no topic names is dead.
   for d in "$ROOT"/skills/*/; do
     s="$(basename "$d")"
-    case "$s" in manifest|kotlin-setup) continue ;; esac
+    case "$s" in manifest|kotlin-setup|gradle-toolchain) continue ;; esac
     grep -rq "\`$s\`" "$ROOT/agents" || { echo "no agent references skill: $s"; return 1; }
   done
 }

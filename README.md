@@ -7,7 +7,8 @@
 The Kotlin platform plugin for **spine-toolkit**, with native manifests for Claude Code and Codex.
 One plugin for three surfaces — Android, Compose Desktop and JVM servers, with KMP as the way they
 share code — carrying sixteen Claude Code agents, thirty architecture and infrastructure skills,
-and the manifest that declares all of it to the orchestrator.
+and the manifest that declares all of it to the orchestrator. One more internal skill,
+`gradle-toolchain`, tells the agents which JDK, SDK tools and device calls to use before they build.
 
 It is not a standalone toolkit: on its own it has skills you can invoke by hand, but nothing that
 runs a task. spine-toolkit supplies the process; this plugin supplies who does the work and what

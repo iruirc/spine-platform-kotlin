@@ -1,9 +1,24 @@
-# Gradle toolchain: the JDK, the Android SDK, the device
+---
+name: gradle-toolchain
+description: "Use when a step is about to make its first ./gradlew, adb or emulator call in a project that builds in Android Studio or IntelliJ: which JDK to pass to Gradle (the one the IDE chose for the project, never GraalVM), where adb and the emulator are when they are not on PATH, how to take a screenshot with no shell redirect, and what to do when a test fails because of the environment rather than the change — stop and offer options, never install around it."
+---
+
+# Gradle Toolchain
 
 The project builds in the IDE; a terminal is not the IDE. Android Studio and IntelliJ keep the JDK
 they chose for the project in their own files, and the SDK tools are seldom on `PATH`. Every agent
 that runs `./gradlew`, `adb` or `emulator` finds them the way the IDE does, before its first call —
 not after a failed build.
+
+> **Related skills:**
+> - `test-frameworks` — what a test needs from the build to run at all
+> - `release-ops-android` — the SDK and signing setup a release build needs
+
+## When to Use
+
+- Before the first `./gradlew`, `adb` or `emulator` call of a step.
+- When Gradle stops before compiling with only a Java version in "What went wrong".
+- When a test fails before its own assertions on one device or JDK and not on another.
 
 ## The JDK
 
@@ -69,3 +84,13 @@ the failure — the first error line and the test it stopped — with the option
 - a check by hand.
 
 The user picks; you continue with what they picked.
+
+## Common Mistakes
+
+| Mistake | Consequence | Instead |
+|---|---|---|
+| `./gradlew` with whatever `java` is on `PATH` | GraalVM or a newer JDK than the Gradle wrapper supports; the build stops at "What went wrong: 25.0.x" | the JDK in `.gradle/config.properties`, passed as `-Dorg.gradle.java.home=` |
+| The JDK bundled with the IDE (`…/Android Studio.app/Contents/jbr`) | it is the IDE's own runtime, not the project's choice, and may be too new | the project's `java.home` |
+| `JAVA_HOME=… ./gradlew` or `env JAVA_HOME=…` | Codex matches `env`, not `gradlew`: every build stops to ask | `-Dorg.gradle.java.home=` on the command line |
+| `adb exec-out screencap -p > file` | the redirect is matched by no rule | `screencap` on the device, then `adb pull` |
+| Downloading a system image to get past a test library that does not support the device | gigabytes on the user's machine and an hour of the step, no choice offered | stop with the options |

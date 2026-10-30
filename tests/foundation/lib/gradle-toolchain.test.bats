@@ -4,9 +4,21 @@
 # Agents tried two wrong JDKs before the right one. adb and emulator were not on PATH, and a
 # screenshot written with `>` missed Codex's adb rule.
 
+# Milestone 7, Claude Code: the validator looked for conventions/gradle-toolchain.md in spine-toolkit,
+# because a stage agent searches the project, the core root and the folder of a skill it loaded — not
+# the platform root. A platform skill is the channel that reaches an agent in both runtimes.
+
 setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
-  C="$ROOT/conventions/gradle-toolchain.md"
+  C="$ROOT/skills/gradle-toolchain/SKILL.md"
+  . "$ROOT/tests/foundation/helpers/shape.bash"
+}
+
+@test "the toolchain is a skill of this platform, not a convention file an agent cannot reach" {
+  [ ! -e "$ROOT/conventions/gradle-toolchain.md" ] || { echo "conventions/gradle-toolchain.md still exists"; return 1; }
+  assert_skill_shape "$ROOT/skills/gradle-toolchain"
+  grep -qx '  allow_implicit_invocation: false' "$ROOT/skills/gradle-toolchain/agents/openai.yaml" \
+    || { echo "gradle-toolchain is not internal in Codex"; return 1; }
 }
 
 @test "the convention picks the JDK the way Android Studio does" {
@@ -26,7 +38,7 @@ setup() {
 @test "every agent that builds, tests or drives the project points at the convention" {
   for f in $(grep -lE 'gradlew|\badb\b' "$ROOT"/agents/*.md) "$ROOT"/agents/*-developer.md "$ROOT"/agents/*-tester.md \
            "$ROOT"/agents/*-validator.md "$ROOT"/agents/kotlin-refactorer.md "$ROOT"/agents/kotlin-diagnostics.md; do
-    grep -qF 'conventions/gradle-toolchain.md' "$f" || { echo "$(basename "$f"): no pointer"; return 1; }
+    grep -qF 'spine-platform-kotlin:gradle-toolchain' "$f" || { echo "$(basename "$f"): no pointer"; return 1; }
   done
 }
 
