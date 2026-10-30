@@ -97,7 +97,7 @@ the eleven topics here.
 
 ## The manifest
 
-`skills/manifest/SKILL.md` is the contract surface. Six tables, read by invoking the skill:
+`skills/manifest/SKILL.md` is the contract surface. Seven tables, read by invoking the skill:
 
 | Table | Declares |
 |---|---|
@@ -107,6 +107,7 @@ the eleven topics here.
 | `## Topics` | topic → the skills that cover it, for the orchestrator's methodology skills |
 | `## Entrypoints` | `setup = kotlin-setup` — the platform half of installation |
 | `## Driver` | the driver a project gets when it never chose one, and the surfaces its projects run on |
+| `## Build traces` | the folders a build writes on every run — `.kotlin/` — which the leftovers check after each stage leaves out |
 
 The manifest is the only thing spine-toolkit reads here. Everything else in this plugin is reached
 through it, or invoked by name by an agent.
