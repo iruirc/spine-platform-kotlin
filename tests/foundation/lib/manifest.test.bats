@@ -17,6 +17,13 @@ setup() {
   grep -q '^## Driver$' "$M"
 }
 
+# Milestone 7: every build left .kotlin/sessions/*.salive, and the leftovers check asked about it
+# after each stage of a project whose .gitignore predates Kotlin 2.
+@test "the manifest names .kotlin as a build trace, and nothing a user could lose" {
+  grep -q '^## Build traces$' "$M"
+  [ "$(sed -n '/^## Build traces$/,/^## /p' "$M" | grep -E '^dirs[[:space:]]*=')" = 'dirs = .kotlin' ]
+}
+
 @test "the manifest passes spine-toolkit's conformance lint" {
   run "$ROOT/scripts/lint-manifest.sh" "$ROOT"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }

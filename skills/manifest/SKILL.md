@@ -174,3 +174,11 @@ test — a driver fits when its own targets intersect this list.
 
 default  = spine-driver-mobile
 surfaces = android-emulator, android-device, macos, windows, linux
+
+## Build traces
+
+Kotlin 2's Gradle plugin keeps its daemon sessions in `.kotlin/` at the root of every build it
+runs; a project created before Kotlin 2 does not ignore it. The orchestrator leaves it out of the
+leftovers check.
+
+dirs = .kotlin
