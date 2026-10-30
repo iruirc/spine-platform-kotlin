@@ -1,7 +1,7 @@
 ---
 name: kotlin-setup
 description: |
-  Platform half of project setup for Kotlin projects. Asks the stack questions of spine-platform-kotlin's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing project config (SPINE.md, or CLAUDE-spine-toolkit.md where the project has not migrated). Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
+  Platform half of project setup for Kotlin projects. Reads what the build and sources already pin, then asks the stack questions of spine-platform-kotlin's manifest axes — target first, then only the axes that target needs — and writes the ## Stack and ## Modules blocks of an existing project config (SPINE.md, or CLAUDE-spine-toolkit.md where the project has not migrated). Invoked by spine-toolkit:setup, which owns the config file and every other block; not invoked by the user directly.
   Use when (en): spine-toolkit:setup hands the platform its own config blocks
   Use when (ru): spine-toolkit:setup передаёт платформе её блоки конфига
 ---
@@ -88,6 +88,21 @@ axis lines, and the file answers that directly.
    that means the module has no UI, the axis is answered, not asked, and step 4 writes no
    `- UI:` line.
 
+2b. Read the project before asking. For every axis still unresolved, apply the manifest's
+   ## Heuristics rows that pin a value — `token`, `import` and `file` — to the root build
+   scripts, `settings.gradle(.kts)`, `gradle/libs.versions.toml` and the sources under `src/`
+   of the root and of each module. A version catalog entry counts as the token or import its
+   coordinates name: `junit:junit` is `org.junit.Test`, `org.junit.jupiter:*` is
+   `org.junit.jupiter`, `com.google.dagger:hilt-android` is `dagger.hilt`. Exactly one value
+   pinned → that is the axis's answer; it is not asked. A row that reads "unresolved", or two
+   values pinned that no row settles, leave the axis unresolved — step 3 asks it, offering the
+   values seen first. `baseline` has no pinning row: on Android, take the catalog's
+   `API <n>+` with the largest `n` not above the `minSdk` the build sets; elsewhere the
+   `JVM <n>` equal to the `jvmTarget` or toolchain version — and step 3 asks it with that value
+   first, because the value is computed, not read. Render `report_axes_detected` once, with
+   {lines} = the detected axes as `<Line label>: <value>`, comma-separated, and add it to
+   `notes`. Run nothing to detect — no Gradle, no build: read the files.
+
 3. Ask `target` first if it is still unresolved (label `auq_axis_target_label`, options from
    ## Axes). Then ask, for every axis still without a value, ONLY the axes the resolved target
    needs (see Axes by Target). Labels come from locale keys `auq_axis_<axis>_label`; options
@@ -117,7 +132,8 @@ axis lines, and the file answers that directly.
    server in one build) gets its answer without asking twice.
 
 6. Return {stack_lines, notes} to spine-toolkit:setup, which renders the one report. `notes`
-   holds the step-2 `report_axis_renamed` and `report_axis_unknown` lines and the step-5
+   holds the step-2 `report_axis_renamed` and `report_axis_unknown` lines, the step-2b
+   `report_axes_detected` line and the step-5
    `report_modules_written` line,
    already rendered in <lang>, and is empty when there was nothing to report.
 ```
@@ -170,6 +186,8 @@ the other skills read. The question labels in the locale files are for asking, n
 
 - **Not a Kotlin project** → `error_not_kotlin_project`. Return without writing.
 - **AUQ unavailable** → text fallback with numbered options.
+- **The catalog and the sources disagree** (`junit:junit` in the catalog, `org.junit.jupiter`
+  imports in `src/test/`) → two values pinned; step 3 asks, both values first.
 - **Config file absent** → this skill was invoked out of order. Say so and stop; `/setup` creates it.
 - **Both a client and a server plugin in the root build** → `target` unresolved by heuristics; ask
   it (the user names the primary surface), then let step 5's `## Modules` carry the other.

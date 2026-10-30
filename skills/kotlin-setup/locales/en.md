@@ -38,3 +38,6 @@ Wrote {n} module line(s) into `## Modules` — those modules resolve to a differ
 
 ## report_axis_renamed
 Renamed stack line `{old}` to `{new}` — it carried a question's label instead of the axis's; the value is unchanged.
+
+## report_axes_detected
+Read from the project, not asked: {lines}.
