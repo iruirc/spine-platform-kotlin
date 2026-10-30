@@ -41,29 +41,15 @@ the chosen target and writes the toolkit config from the answers it collected.
 
 ### Codex
 
-The repository includes `.codex-plugin/plugin.json`; `skills/`, their references, `scripts/`, and
-`conventions/` are shared with Claude Code. Codex installs a plugin from a marketplace entry whose
-path is relative to the marketplace root: for the personal marketplace,
-`~/.agents/plugins/marketplace.json`, that is `~/plugins/spine-platform-kotlin`. Put a copy of this
-repository there, then install it:
+Install it from the `iruirc` marketplace together with `spine-toolkit` — the commands are in
+[spine-toolkit's README](https://github.com/iruirc/spine-toolkit#codex-cli). Codex gets the whole plugin: `spine-toolkit` dispatches its agents as
+Codex subagents, its knowledge skills are available, and `runtimes/codex-cli/rules/` carries the
+build and device rules `$spine-toolkit:setup` writes into the project. `/kotlin-init` is a Claude Code command; in Codex, start from an existing project.
 
-```bash
-codex plugin add spine-platform-kotlin@personal
-```
-
-Start a new Codex session after installation. What Codex gets is a subset:
-
-- **Works:** the thirty standalone architecture and infrastructure knowledge skills.
-- **Not supported in Codex yet:** the sixteen `agents/` and the `kotlin-init` command are Claude
-  Code components. `spine-toolkit` ships no Codex manifest, so nothing orchestrates tasks, and its
-  internal `manifest` and `kotlin-setup` skills cannot complete their workflows. Codex still
-  permits an explicit `$skill-name` invocation, but `policy.allow_implicit_invocation: false`
-  prevents these two skills from being selected automatically and their UI metadata offers no
-  starter prompt.
-
-Codex caches a plugin by version. To pick up a change, refresh the copy and reinstall; to reinstall
-at an unchanged version, run the `plugin-creator` cachebuster **on the copy**. The suffix it writes
-into `version` is not a release, and the foundation suite fails on a checkout that carries it.
+Codex caches a plugin by version. To pick up a change, refresh the copy and reinstall; to
+reinstall at an unchanged version, run the `plugin-creator` cachebuster **on the copy**. The suffix
+it writes into `version` is not a release, and the foundation suite fails on a checkout that
+carries it.
 
 ## What it provides
 
