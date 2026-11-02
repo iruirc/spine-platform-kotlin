@@ -149,6 +149,17 @@ skill before publishing a release.
 `SPINE_TOOLKIT_CORE` is a checkout of core; the suite falls back to one sitting beside this
 repository, and skips the check when there is none.
 
+`all` leaves out the suite that compiles the marked Kotlin blocks in the Gradle sandbox
+(`tests/snippets`). Run it on its own, with an OpenJDK 17 or newer (not GraalVM) and an Android SDK
+with platform 37; set them for the one command if your default JDK is another:
+
+```
+JAVA_HOME=/path/to/openjdk ANDROID_HOME=/path/to/android-sdk \
+  bats tests/foundation/snippets/compile.test.bats
+```
+
+The first run downloads the sandbox's dependencies and takes a while.
+
 The five scripts under `scripts/` and `conventions/i18n.md` are **adapted forks** of spine-toolkit's,
 not copies: each records the core file it came from and that file's sha256, and CI goes red when the
 original moves, so a human decides whether the change belongs here.
