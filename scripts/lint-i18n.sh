@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/lint-i18n.sh sha256:a106f9fef930d43f8f2a3a4516e8f6fdc5b55759234959f08622b79239758719
+# Adapted from spine-toolkit scripts/lint-i18n.sh sha256:5d0980cb6bf52c730b8a06d236d60f9fe350f6f85106ac475aaae9399f7f283d
 # Adapted from spine-toolkit's lint. Plugins share no code; update both or neither.
 set -euo pipefail
 
