@@ -46,3 +46,14 @@ setup() {
     ! grep -qF 'Logs stay on disk, in the file `long-run.sh`' "$f" || { echo "$(basename "$f"): still the temporary log"; return 1; }
   done
 }
+
+# Final review: Validation.md moves with its task (ACTIVE to DONE) and into _archive/, so a path to
+# the copy from the project root or from the file itself breaks; the template sections named the
+# temporary log.
+@test "every validator names the copy by its path relative to the task folder" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    grep -qF 'relative to the task folder' "$f" || { echo "$(basename "$f"): no path form"; return 1; }
+    n="$(grep -c 'the path of the copied log' "$f")"
+    [ "$n" -ge 2 ] || { echo "$(basename "$f"): $n template lines name the copied log"; return 1; }
+  done
+}
