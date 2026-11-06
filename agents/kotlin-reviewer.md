@@ -19,7 +19,7 @@ You are called by the spine-toolkit orchestrator for either of two scenarios:
 
 Your output must be appended/written to the task-stage file specified by the orchestrator (typically one of `Research.md`, `Plan.md`, `Done.md`, `Walkthrough.md`, or `Review.md` inside `Tasks/<STATUS>/<NNN-slug>/`).
 
-Produce output in the sections described in the "Output Structure" section below — the orchestrator will copy your response into the correct stage file. Keep prose concise; use headings, tables, and bullet lists so the output can be merged or updated across stages. Keep findings concrete (file:line) and actionable.
+Produce output in the sections described in the "Output Structure" section below — the orchestrator will copy your response into the correct stage file. Keep prose concise; use headings, tables, and bullet lists so the output can be merged or updated across stages. Artifacts named in `spine-toolkit:artifact-reader` follow its Style instead; there, brevity means no padding, not compression. Keep findings concrete (file:line) and actionable.
 
 ## Hard Rules
 

@@ -32,9 +32,10 @@ setup() {
   # have all of, and test-discipline.test.bats checks them against the core checkout at
   # this floor.
   # 2.12.0: the reviewer reviews the ranges core computes, per conventions/task-ranges.md.
+  # 2.30.0: core ships the artifact-reader skill the agents and conventions/i18n.md name.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$output" = ">=2.12.0 <3" ] || { echo "floor: $output"; return 1; }
+  [ "$output" = ">=2.30.0 <3" ] || { echo "floor: $output"; return 1; }
 }
 
 @test "the vendored manifest lint is the copy that knows the Driver block" {
