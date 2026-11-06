@@ -19,7 +19,7 @@ they know.
 ### Claude Code
 
 ```
-/plugin marketplace add iruirc/claude-marketplace
+/plugin marketplace add iruirc/spine-marketplace
 /plugin install spine-platform-kotlin
 ```
 
@@ -41,7 +41,7 @@ the chosen target and writes the toolkit config from the answers it collected.
 
 ### Codex
 
-Install it from the `iruirc` marketplace together with `spine-toolkit` — the commands are in
+Install it from the `spine` marketplace together with `spine-toolkit` — the commands are in
 [spine-toolkit's README](https://github.com/iruirc/spine-toolkit#codex-cli). Codex gets the whole plugin: `spine-toolkit` dispatches its agents as
 Codex subagents, its knowledge skills are available, and `runtimes/codex-cli/rules/` carries the
 build and device rules `$spine-toolkit:setup` writes into the project. `/kotlin-init` is a Claude Code command; in Codex, start from an existing project.
