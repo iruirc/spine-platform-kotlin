@@ -89,7 +89,7 @@ Bash for Gradle/Maven, adb, jcmd/jstack, curl; the project's driver for UI state
 
 ## Skills Reference (core)
 
-- `spine-toolkit:manual-checks` — the replay Validation runs is written from your `Reproduce.md`, so a case there must be executable as the skill defines it
+- `spine-toolkit:manual-checks` — the replay Validation runs is written from your `Reproduce.md`, so a case there must follow the skill's case format
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 - `spine-toolkit:test-authoring` — which framework the sketch is written in
 

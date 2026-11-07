@@ -49,7 +49,7 @@ setup() {
 
 # The ManualChecks passage of a validator: from its "### `ManualChecks.md`" heading to the next heading.
 manual_checks_passage() {
-  awk '/^### `ManualChecks\.md`/ { on = 1; print; next } on && /^#{2,3} / { exit } on { print }' "$1"
+  awk '/^### `ManualChecks\.md`/ { on = 1; print; next } on && /^##(#)? / { exit } on { print }' "$1"
 }
 
 @test "every validator's ManualChecks passage names the manual-checks skill and its reader, a tester" {
@@ -57,7 +57,8 @@ manual_checks_passage() {
     p="$(manual_checks_passage "$f")"
     [ -n "$p" ] || { echo "$(basename "$f"): no ManualChecks.md passage found"; return 1; }
     grep -qF 'spine-toolkit:manual-checks' <<<"$p" || { echo "$(basename "$f"): the passage does not name spine-toolkit:manual-checks"; return 1; }
-    grep -qF 'tester' <<<"$p" || { echo "$(basename "$f"): the passage never names the tester as the reader"; return 1; }
+    grep -qF 'The reader is a tester who knows the product but not the code and was not on this task' <<<"$p" \
+      || { echo "$(basename "$f"): the passage does not state its reader: a tester who knows the product but not the code"; return 1; }
   done
 }
 
@@ -98,4 +99,24 @@ manual_checks_passage() {
 @test "the toolkit floor is at least the release that ships artifact-reader" {
   grep -qF '"version": ">=2.30.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
     || { echo "plugin.json floor is not >=2.30.0 <3"; return 1; }
+}
+
+@test "no validator's MANUAL_CHECKS axis row still promises a human a script" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    grep -qF '| `[MANUAL_CHECKS]` | `auto` | whether a tester gets test cases |' "$f" \
+      || { echo "$(basename "$f"): the [MANUAL_CHECKS] axis row does not say 'whether a tester gets test cases'"; return 1; }
+  done
+  if grep -rqF -e 'gets a script' -e 'hand-run script' "$ROOT/agents" "$ROOT/skills" "$ROOT/README.md"; then
+    echo "an agent, skill or the README still says 'gets a script' or 'hand-run script'"; return 1
+  fi
+}
+
+@test "the README and kotlin-diagnostics use the QA test-case wording" {
+  grep -qF 'the checks become test cases' "$ROOT/README.md" || { echo "README: the deferred checks are not test cases"; return 1; }
+  grep -qF 'a tester runs by hand.' "$ROOT/README.md" || { echo "README: no 'a tester runs by hand'"; return 1; }
+  if grep -qF 'executable as the skill defines it' "$ROOT/agents/kotlin-diagnostics.md"; then
+    echo "kotlin-diagnostics still says 'executable as the skill defines it'"; return 1
+  fi
+  grep -qF "must follow the skill's case format" "$ROOT/agents/kotlin-diagnostics.md" \
+    || { echo "kotlin-diagnostics: the case-format wording is missing"; return 1; }
 }

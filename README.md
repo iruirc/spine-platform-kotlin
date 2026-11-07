@@ -118,8 +118,8 @@ through it, or invoked by name by an agent.
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
 - The validators drive Android and desktop apps through the driver the project resolved — the
   manifest's `## Driver` default when it never chose one — and servers with `curl`; a project with
-  none of those available sets `[DRIVE_APP] = [off]` in its config and the checks become a hand-run
-  script.
+  none of those available sets `[DRIVE_APP] = [off]` in its config and the checks become test cases
+  a tester runs by hand.
 - Foundation tests need `bats-core` ≥ 1.10 (`brew install bats-core`).
 
 ## Internationalization

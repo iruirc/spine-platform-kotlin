@@ -53,7 +53,7 @@ Two independent fields, each resolved the same way — `<task_path>/Task.md` fir
 | Field | Default | Governs |
 |---|---|---|
 | `[DRIVE_APP]` | `auto` | whether **you** drive the app |
-| `[MANUAL_CHECKS]` | `auto` | whether **a human** gets a script |
+| `[MANUAL_CHECKS]` | `auto` | whether a tester gets test cases |
 
 - `auto` — the per-profile rules below apply unchanged.
 - `off` — you drive nothing, on any profile, and you do not resolve a driver at all: there is nothing to drive, so pulling a driver's tables into context would buy nothing. The build step and the test step still run in full; build and test evidence is what carries the verdict.
