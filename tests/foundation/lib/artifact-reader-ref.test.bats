@@ -46,3 +46,56 @@ setup() {
   grep -qxF -- "$line2" "$f" || { echo "second example line missing"; return 1; }
   grep -qF '`spine-toolkit:artifact-reader`' "$f" || { echo "i18n.md never names spine-toolkit:artifact-reader"; return 1; }
 }
+
+# The ManualChecks passage of a validator: from its "### `ManualChecks.md`" heading to the next heading.
+manual_checks_passage() {
+  awk '/^### `ManualChecks\.md`/ { on = 1; print; next } on && /^#{2,3} / { exit } on { print }' "$1"
+}
+
+@test "every validator's ManualChecks passage names the manual-checks skill and its reader, a tester" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    p="$(manual_checks_passage "$f")"
+    [ -n "$p" ] || { echo "$(basename "$f"): no ManualChecks.md passage found"; return 1; }
+    grep -qF 'spine-toolkit:manual-checks' <<<"$p" || { echo "$(basename "$f"): the passage does not name spine-toolkit:manual-checks"; return 1; }
+    grep -qF 'tester' <<<"$p" || { echo "$(basename "$f"): the passage never names the tester as the reader"; return 1; }
+  done
+}
+
+@test "every validator's ManualChecks passage says where the visible text of the app lives" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    p="$(manual_checks_passage "$f")"
+    grep -qF 'strings.xml' <<<"$p" \
+      || { echo "$(basename "$f"): the ManualChecks passage never names strings.xml"; return 1; }
+  done
+}
+
+@test "every validator's ManualChecks passage sends the lint findings back to the writer once" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    p="$(manual_checks_passage "$f")"
+    grep -qF 'lint-manual-checks.sh' <<<"$p" || { echo "$(basename "$f"): the passage never names lint-manual-checks.sh"; return 1; }
+    grep -qF 'back to the writer once' <<<"$p" || { echo "$(basename "$f"): the findings do not go back to the writer once"; return 1; }
+  done
+}
+
+@test "no validator still describes ManualChecks in the old format" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    p="$(manual_checks_passage "$f")"
+    for old in 'two rules that make a case executable' 'two rules that decide' 'By eye' 'Scene' 'code reference per case' 'hand-run script' 'a person'; do
+      if grep -qF -- "$old" <<<"$p"; then echo "$(basename "$f"): the ManualChecks passage still says '$old'"; return 1; fi
+    done
+    if grep -qF 'hand-run script' "$f"; then echo "$(basename "$f"): still calls ManualChecks the 'hand-run script'"; return 1; fi
+  done
+}
+
+@test "no validator names the lint by a bare core path" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    if grep -qE '(^|[^[:alnum:]_.-])(\.\./)?(scripts|skills)/(lint-manual-checks|manual-checks|artifact-reader)' "$f"; then
+      echo "$(basename "$f"): names a core path bare"; return 1
+    fi
+  done
+}
+
+@test "the toolkit floor is at least the release that ships artifact-reader" {
+  grep -qF '"version": ">=2.30.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "plugin.json floor is not >=2.30.0 <3"; return 1; }
+}

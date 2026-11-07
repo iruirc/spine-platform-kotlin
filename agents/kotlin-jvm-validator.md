@@ -71,16 +71,16 @@ When `[DRIVE_APP] = [off]` suppresses a step the profile calls mandatory, the ch
 
 For you the switch has one outcome only: with nothing to drive, every profile below reads as `off`, and the deferral above is the whole of your drive behaviour.
 
-### `ManualChecks.md` — the hand-run script
+### `ManualChecks.md` — the test cases a tester runs by hand
 
-A **separate artifact** in the task folder, never a section of `Validation.md`, for the same reason `OpsChecklist.md` is separate: a human opens it after the run, may re-run it on the next build, and it has to survive as a standalone reference from `Done.md`. `Validation.md` is a log dump — nobody finds test steps inside a full Gradle transcript. Leave one pointer line to it under `Validation.md ## Verdict`.
+A **separate artifact** in the task folder, never a section of `Validation.md`, for the same reason `OpsChecklist.md` is separate: a tester opens it after the run, may re-run it on the next build, and it has to survive as a standalone reference from `Done.md`. `Validation.md` is a log dump — nobody finds test steps inside a full Gradle transcript. Leave one pointer line to it under `Validation.md ## Verdict`.
 
 When you write it:
 
 - `[MANUAL_CHECKS] = [auto]` — only when something was deferred to a human, which for you is every drive step a profile calls mandatory. Nothing deferred, no file.
 - `[MANUAL_CHECKS] = [always]` — every run of a UI-bearing task. You drove nothing, so there is no "already covered" list to subtract: the file carries the happy path in full, plus the ground no automation reaches — push, biometrics, camera, real purchases, permission dialogs, backgrounding, low connectivity, multi-device.
 
-Structure, the required fields of a case, and the two rules that make a case executable are core's: apply the `spine-toolkit:manual-checks` skill and follow it. Its input is `Plan.md ## Manual acceptance`. What is yours here is the measuring — when a case's verdict comes from an instrument, the file carries that instrument's exact invocation (the Gradle task, the environment variable, the report path, the parser call) and the field of its output that decides, in the place the skill puts it. Only genuinely deferred cases become `OpsChecklist.md` **Pending**; a case you already verified stays Applicable with its evidence.
+Structure, the twelve fields of a case, the five-column step table and the checks of `lint-manual-checks.sh` are core's: apply the `spine-toolkit:manual-checks` skill and follow it. Its input is `Plan.md ## Manual acceptance`. The reader is a tester who knows the product but not the code and was not on this task: steps, expectations and preconditions use only words from the screen, and code references live only in `**Code:**`. The visible text of the app lives in its string resources: `strings.xml` for an Android or desktop screen, or whatever the command prints or the response carries for a process with no screen. Copy every button, title and message from there for the interface language that Run record names, never from the code that draws it. After writing the file, run `lint-manual-checks.sh` of `spine-toolkit` on it. Its findings go back to the writer once: repair every finding in one pass, run it again, and name what is still open in `## Scope` instead of looping. What is yours here is the measuring — when a case's verdict comes from an instrument, the file carries that instrument's exact invocation (the Gradle task, the environment variable, the report path, the parser call) and the field of its output that decides, in the place the skill puts it. Only genuinely deferred cases become `OpsChecklist.md` **Pending**; a case you already verified stays Applicable with its evidence.
 
 ### FEATURE
 
@@ -158,7 +158,7 @@ For **classification of observed failures only** — never to propose fixes.
 ## Skills Reference (core)
 
 - `spine-toolkit:ops-checklist` — the cross-cutting checklist you produce as `OpsChecklist.md` in the task folder. Mark each item Applicable (with concrete evidence: file path, test name, commit ref), N/A (with reason), or Pending. **Pending is NOT itself a FAILED verdict** — Pending items are surfaced to the Review stage for explicit user accept/defer.
-- `spine-toolkit:manual-checks` — the hand-run script you produce as `ManualChecks.md`. It holds the artifact's structure, the required fields of a case, and the two rules that decide whether a case is executable; it also says what `Plan.md ## Manual acceptance` feeds into it.
+- `spine-toolkit:manual-checks` — the QA test cases a tester runs by hand, which you produce as `ManualChecks.md`. It holds the artifact's structure, the twelve fields of a case, the reader (a tester with no access to the code) and the checks of `lint-manual-checks.sh`; it also says what `Plan.md ## Manual acceptance` feeds into it.
 - `spine-toolkit:feature-landscape` — for the REFACTOR profile, the `## Landscape (current)` vs `## Landscape (target)` sections in Research.md tell you what behavior MUST stay identical and what is allowed to change structurally. A regression against the current landscape is a finding — note it in `Failures`.
 - `spine-toolkit:feature-requirements` — for the BUG profile, the Secondary table in Reproduce.md / Research.md scopes which `spine-toolkit:ops-checklist` categories you re-verify. BUG validation does not require full-checklist coverage — only the categories the bug touched.
 
