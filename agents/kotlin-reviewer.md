@@ -279,7 +279,7 @@ Semantics:
 
 ### Reviewed-commit lines (mandatory, the closing block of Review.md whenever you have a task folder)
 
-The status line stays byte 0 of the file, line 1. The `[REVIEWED_COMMIT]` lines do not follow it: they go in the closing block, the last lines of the file after the body and a blank line, in the order of the `Closing block` convention of `spine-toolkit` (its stage-dispatch convention): the marker lines first, then the Run line, then the Device line, each where the brief names it.
+The status line stays byte 0 of the file, line 1. The `[REVIEWED_COMMIT]` lines do not follow it: they go in the closing block, the last lines of the file after the body and a blank line, in the order of the `Closing block` convention of `spine-toolkit` (its stage-dispatch convention): the marker lines first, then the Run line, then the Device line. Write the Run line and the Device line only when the brief names them.
 
 ```
 [REVIEWED_COMMIT] = .: <sha>
