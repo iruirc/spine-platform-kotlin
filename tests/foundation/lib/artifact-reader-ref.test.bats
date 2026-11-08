@@ -96,9 +96,9 @@ manual_checks_passage() {
   done
 }
 
-@test "the toolkit floor is at least the release that ships artifact-reader" {
-  grep -qF '"version": ">=2.30.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "plugin.json floor is not >=2.30.0 <3"; return 1; }
+@test "the toolkit floor is the release that ships the Impact line and the closing block" {
+  grep -qF '"version": ">=2.31.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "plugin.json floor is not >=2.31.0 <3"; return 1; }
 }
 
 @test "no validator's MANUAL_CHECKS axis row still promises a human a script" {
@@ -119,4 +119,68 @@ manual_checks_passage() {
   fi
   grep -qF "must follow the skill's case format" "$ROOT/agents/kotlin-diagnostics.md" \
     || { echo "kotlin-diagnostics: the case-format wording is missing"; return 1; }
+}
+
+# A named list, not the "Keep prose concise" loop: these agents write or feed a task artifact.
+@test "the agents that write or feed a task artifact name spine-toolkit:artifact-reader" {
+  for a in kotlin-architect kotlin-compose-developer kotlin-diagnostics kotlin-jvm-tester kotlin-kmp-tester \
+           kotlin-jvm-validator kotlin-kmp-developer kotlin-refactorer kotlin-server-developer kotlin-reviewer \
+           kotlin-server-tester kotlin-ui-validator kotlin-server-validator kotlin-ui-tester kotlin-security; do
+    grep -qF 'spine-toolkit:artifact-reader' "$ROOT/agents/$a.md" \
+      || { echo "$a.md never names spine-toolkit:artifact-reader"; return 1; }
+  done
+}
+
+@test "kotlin-reviewer: a finding carries an Impact, and the Self-Verification list checks it" {
+  f="$ROOT/agents/kotlin-reviewer.md"
+  grep -qF '**Impact**' "$f" || { echo "no **Impact** in the Findings description"; return 1; }
+  grep -qF 'Category, Location (`file:line`), Description, **Impact**, Recommendation' "$f" \
+    || { echo "a finding is not described as Category, Location, Description, Impact, Recommendation"; return 1; }
+  grep -qiF 'every finding has an Impact' "$f" || { echo "Self-Verification lacks 'every finding has an Impact'"; return 1; }
+}
+
+@test "kotlin-reviewer: Summary and Previous findings name a finding in words, its ID in brackets" {
+  f="$ROOT/agents/kotlin-reviewer.md"
+  [ "$(grep -cF 'its ID in brackets' "$f")" -ge 2 ] \
+    || { echo "Summary and Previous findings must each say 'its ID in brackets'"; return 1; }
+}
+
+@test "kotlin-reviewer: the reviewed-commit lines are the closing block, the status line stays byte 0" {
+  f="$ROOT/agents/kotlin-reviewer.md"
+  grep -qF 'Reviewed-commit lines (mandatory, the closing block of Review.md whenever you have a task folder)' "$f" \
+    || { echo "the reviewed-commit heading is not the closing-block heading"; return 1; }
+  grep -qF 'byte-position 0' "$f" || { echo "the byte-position-0 status rule is gone"; return 1; }
+  p="$(awk '/^### Reviewed-commit lines/ { on = 1; print; next } on && /^### / { exit } on { print }' "$f")"
+  grep -qF 'byte 0' <<<"$p" || { echo "the heading body does not say the status line stays byte 0"; return 1; }
+  grep -qF 'Closing block' <<<"$p" || { echo "the heading body does not name the Closing block convention"; return 1; }
+  grep -qF '`spine-toolkit`' <<<"$p" || { echo "the heading body does not name spine-toolkit"; return 1; }
+  grep -qF 'Run line' <<<"$p" && grep -qF 'Device line' <<<"$p" \
+    || { echo "the heading body does not order the Run and Device lines after the markers"; return 1; }
+  if grep -qF 'directly under the status line' "$f"; then echo "still says the lines go directly under the status line"; return 1; fi
+}
+
+@test "kotlin-architect: the headings come from the calling stage, not six fixed sections" {
+  f="$ROOT/agents/kotlin-architect.md"
+  if grep -qF 'Your response MUST be structured with these top-level sections' "$f"; then
+    echo "the six mandatory top-level sections are still there"; return 1
+  fi
+  for old in '## Architectural Analysis' '## Proposed Design' '## Alternatives Considered' '## Integration Points' '## Risks & Mitigations' '## Recommendation'; do
+    if grep -qF -- "\`$old\`" "$f"; then echo "still names the old heading $old"; return 1; fi
+  done
+  grep -qF '## Short answer' "$f" || { echo "no ## Short answer"; return 1; }
+  grep -qF 'The headings of the file come from the stage that calls you' "$f" || { echo "the stage-headings sentence is missing"; return 1; }
+  grep -qF 'Write `(none)` for what does not apply.' "$f" || { echo "the (none) rule is gone"; return 1; }
+}
+
+@test "each Kotlin validator's Summary is plain language with no contract field names" {
+  for v in kotlin-jvm-validator kotlin-ui-validator kotlin-server-validator; do
+    f="$ROOT/agents/$v.md"
+    line="$(awk '/^## Summary$/ { getline; print; exit }' "$f")"
+    [ -n "$line" ] || { echo "$v: no ## Summary line found"; return 1; }
+    grep -qF '1-2 sentences in plain language: what was validated and the outcome; no contract field names' <<<"$line" \
+      || { echo "$v: Summary line is: $line"; return 1; }
+    for field in validation_status VALIDATION_STATUS manual_checks_changed; do
+      if grep -qF -- "$field" <<<"$line"; then echo "$v: the Summary line names $field"; return 1; fi
+    done
+  done
 }

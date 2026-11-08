@@ -24,8 +24,8 @@ Produce output in the sections described in the "Output Structure" section below
 `- Target:` in `## Stack` picks the framework: **Android**, **Desktop** and **KMP** use the
 client framework (KMP adds the shared-module questions); **Server** and **CLI** use the server
 framework (CLI skips the HTTP and persistence rows). A monorepo lists both in `## Modules`;
-design each module by its own target and put the boundary between them in
-`## Integration Points`.
+design each module by its own target and put the boundary between them under
+the integration points.
 
 ### Decision Framework for Client Components (Android / Desktop / KMP UI)
 
@@ -154,7 +154,7 @@ Consult the skill that matches the target and the concern at hand:
 - `spine-toolkit:feature-requirements` — Research-stage skill: Primary vs Secondary requirements, designer/backend questions, known unknowns; produces `## Requirements` in Research.md
 - `spine-toolkit:feature-landscape` — Research-stage skill: entity graph + layer map + integration points + work-item decomposition; produces `## Landscape` in Research.md and seeds Plan.md phases
 - `spine-toolkit:feature-estimation` — Plan-stage skill: calibrated day range from work items; produces `## Estimation` in Plan.md
-- `spine-toolkit:ops-checklist` — produced by the validator as `OpsChecklist.md`; design so that feature flags, analytics, deep links, offline behaviour are explicit in `## Proposed Design`, not afterthoughts
+- `spine-toolkit:ops-checklist` — produced by the validator as `OpsChecklist.md`; design so that feature flags, analytics, deep links, offline behaviour are explicit in the proposed design, not afterthoughts
 - `spine-toolkit:docs-route` — at Plan, name the documentation components the design touches so the run can route them
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 
@@ -170,18 +170,7 @@ Consult the skill that matches the target and the concern at hand:
 
 ## Output Structure
 
-The "Output Standards" above enumerate the content your proposal must cover; the sections below specify how that content is organized in your response so the orchestrator can place it into the stage file.
-
-Your response MUST be structured with these top-level sections:
-
-- `## Architectural Analysis` — current-state observations relevant to the task
-- `## Proposed Design` — module structure, package layout, interface definitions, DI wiring
-- `## Alternatives Considered` — at least one viable alternative with trade-offs
-- `## Integration Points` — how the design connects to existing modules
-- `## Risks & Mitigations` — what could go wrong and how to reduce risk
-- `## Recommendation` — one-paragraph summary of the recommended path
-
-If a section is not applicable, write `(none)` explicitly.
+The "Output Standards" above enumerate the content your proposal must cover. The headings of the file come from the stage that calls you (its workflow skill and the `Research.md` section of `spine-toolkit:task-documents`), starting with `## Short answer`. Cover in them, as content: the current state, the proposed design, each alternative with the reason it lost, integration points, risks with mitigations, and a recommendation unless the task already decided it. Write `(none)` for what does not apply.
 
 ## Quality Gate
 
@@ -199,7 +188,7 @@ Before finalizing any recommendation, verify:
 - Write or modify tests.
 - Refactor existing code.
 - Propose a big-bang rewrite.
-- Pick a framework the project does not already use without saying so in `## Alternatives Considered`.
+- Pick a framework the project does not already use without saying so in the alternatives you weigh.
 
 ## Output Language
 

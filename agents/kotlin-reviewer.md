@@ -277,9 +277,9 @@ Semantics:
 - `CHANGES_REQUESTED` — there are concrete changes that must be made before merge / closure. The required items are listed in the body of `Review.md` under **Findings → Critical / Major** and summarized in **Follow-up**.
 - `DISCUSSION` — there are open questions or architectural doubts that require a conversation with the user before a decision can be made. The points are listed in the body of `Review.md` and will be copied by `spine-toolkit:workflow-review` into `Questions.md`.
 
-### Reviewed-commit line (mandatory, directly under the status line whenever you have a task folder)
+### Reviewed-commit lines (mandatory, the closing block of Review.md whenever you have a task folder)
 
-Immediately after the status line:
+The status line stays byte 0 of the file, line 1. The `[REVIEWED_COMMIT]` lines do not follow it: they go in the closing block, the last lines of the file after the body and a blank line, in the order of the `Closing block` convention of `spine-toolkit` (its stage-dispatch convention): the marker lines first, then the Run line, then the Device line, each where the brief names it.
 
 ```
 [REVIEWED_COMMIT] = .: <sha>
@@ -289,14 +289,14 @@ Immediately after the status line:
 Paste the lines the command your task prompt names prints (`task-ranges.sh tips … --kind reviewed`), run right before you finish — one per repository; never assemble them yourself. Omit them only when there is no task folder to write into (an ad hoc PR/diff review).
 
 ### Summary
-Brief overview: scope reviewed, overall quality assessment (1-2 sentences).
+Brief overview: scope reviewed, overall quality assessment (1-2 sentences). Name each finding in words, its ID in brackets: "the total no longer goes below zero (`M1`)", never "`M1` fixed".
 
 ### Scope
 Files/modules/commit range that was reviewed. On a re-review, say explicitly whether this was a full or incremental pass and name the commit range covered. Name each range per repository, as the prompt gave it.
 
 ### Findings
 
-Group by severity, each finding includes Category, Location (`file:line`), Description, Recommendation (with code snippet if clarifying).
+Group by severity, each finding includes Category, Location (`file:line`), Description, **Impact**, Recommendation (with code snippet if clarifying). **Impact** is one sentence with no code: what breaks and for whom.
 
 - **Critical** (blockers, must fix before merge)
 - **Major** (significant bugs / perf / architectural violations)
@@ -307,7 +307,7 @@ Group by severity, each finding includes Category, Location (`file:line`), Descr
 This is the section core calls `## For Done` — core's Done stage closes every item in it; write it at the level of your other sections. Findings that editing files inside the task folder — `Done.md`, `Plan.md`, `Walkthrough.md` — closes without a single code commit. They do not make the status `CHANGES_REQUESTED` on their own; Done closes them. Omit the section when there are none.
 
 ### Previous findings (only on a re-review)
-One line per Critical/Major item from the prior `Review.md`: **Resolved** / **Still open** / **Regressed**, plus a one-line reason. Omit this section entirely on a first pass.
+One line per Critical/Major item from the prior `Review.md`: **Resolved** / **Still open** / **Regressed**, plus a one-line reason. Name each item in words, its ID in brackets, never by the ID alone. Omit this section entirely on a first pass.
 
 ### Strengths
 What the code does well — brief.
@@ -328,6 +328,7 @@ Before finalizing the review:
 - [ ] All files in scope have been reviewed
 - [ ] On a re-review, every prior Critical/Major finding is accounted for in `### Previous findings`
 - [ ] Findings are accurate — no false positives
+- [ ] Every finding has an Impact
 - [ ] Recommendations align with the project's established patterns
 - [ ] Severity levels are calibrated — critical means truly critical
 - [ ] Code examples in recommendations are correct

@@ -114,7 +114,7 @@ through it, or invoked by name by an agent.
 
 ## Requirements
 
-- `spine-toolkit` `>=2.30.0 <3`, declared as a dependency in `plugin.json`. An installed core
+- `spine-toolkit` `>=2.31.0 <3`, declared as a dependency in `plugin.json`. An installed core
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
 - The validators drive Android and desktop apps through the driver the project resolved — the
   manifest's `## Driver` default when it never chose one — and servers with `curl`; a project with

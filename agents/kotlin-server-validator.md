@@ -217,8 +217,8 @@ Semantics:
 
 ```
 ## Summary
-1–2 sentences: what was validated, with which build tool and which tasks, against a booted
-instance or a built command, top-level outcome.
+1-2 sentences in plain language: what was validated and the outcome; no contract field names.
+Say in words which build tool and tasks ran, and whether against a booted instance or a built command.
 
 ## Scope
 What the validation covered (modules, build tool, test tasks, the framework and the port the

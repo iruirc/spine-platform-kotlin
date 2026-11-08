@@ -300,8 +300,8 @@ Semantics:
 
 ```
 ## Summary
-1–2 sentences: what was validated, with which build tool and which tasks, on which
-emulator/device or as a desktop process, top-level outcome.
+1-2 sentences in plain language: what was validated and the outcome; no contract field names.
+Say in words which build tool and tasks ran, and on which emulator/device or as a desktop process.
 
 ## Scope
 What the validation covered: modules, build tool, test tasks, the lane and the surface this run was on,

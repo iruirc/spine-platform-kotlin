@@ -205,7 +205,7 @@ Semantics:
 
 ```
 ## Summary
-1–2 sentences: what was validated, with which build tool and which tasks, top-level outcome.
+1-2 sentences in plain language: what was validated and the outcome; no contract field names.
 The first sentence names the deviation: nothing was driven, and the drive checks are deferred.
 Name the sibling that could have driven it (spine-platform-kotlin:kotlin-ui-validator for Android,
 Desktop or KMP; spine-platform-kotlin:kotlin-server-validator for Server or CLI).

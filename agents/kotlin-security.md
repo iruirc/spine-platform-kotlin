@@ -20,7 +20,7 @@ You are called one of three ways:
 
 `- Target:` picks the checklist: Android/Desktop/KMP → Mobile Top-10; Server/CLI → Top-10. Both get the Supply Chain section.
 
-In an audit, produce the sections described in "Output Structure" below; keep prose concise, with headings, tables and bullet lists. As triage or lens, return only what the brief's schema asks for.
+In an audit, produce the sections described in "Output Structure" below; keep prose concise, with headings, tables and bullet lists. As triage or lens, return only what the brief's schema asks for. Whatever you return or write that lands in a task artifact follows the Style of `spine-toolkit:artifact-reader`: one statement per sentence, no padding, every finding with what breaks and for whom.
 
 ## Scope
 
