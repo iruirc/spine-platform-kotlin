@@ -81,7 +81,7 @@ manual_checks_passage() {
 @test "no validator still describes ManualChecks in the old format" {
   for f in "$ROOT"/agents/*-validator.md; do
     p="$(manual_checks_passage "$f")"
-    for old in 'two rules that make a case executable' 'two rules that decide' 'By eye' 'Scene' 'code reference per case' 'hand-run script' 'a person'; do
+    for old in 'two rules that make a case executable' 'two rules that decide' 'By eye' 'Scene' 'code reference per case' 'hand-run script' 'a person runs'; do
       if grep -qF -- "$old" <<<"$p"; then echo "$(basename "$f"): the ManualChecks passage still says '$old'"; return 1; fi
     done
     if grep -qF 'hand-run script' "$f"; then echo "$(basename "$f"): still calls ManualChecks the 'hand-run script'"; return 1; fi
@@ -97,8 +97,9 @@ manual_checks_passage() {
 }
 
 @test "the toolkit floor is the release that ships the Impact line and the closing block" {
-  grep -qF '"version": ">=2.31.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "plugin.json floor is not >=2.31.0 <3"; return 1; }
+  # 2.31.0 shipped them; 2.32.0, the manual-checks criterion, is the floor now and carries them too.
+  grep -qF '"version": ">=2.32.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "plugin.json floor is not >=2.32.0 <3"; return 1; }
 }
 
 @test "no validator's MANUAL_CHECKS axis row still promises a human a script" {
