@@ -19,3 +19,17 @@ setup() {
   grep -qF '{ "name": "spine-toolkit", "version": ">=2.32.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
     || { echo "the spine-toolkit floor is not >=2.32.0 <3"; return 1; }
 }
+
+@test "the none line names what was covered and each automatable gap" {
+  for a in jvm ui server; do
+    grep -qF 'each automatable gap' "$ROOT/agents/kotlin-$a-validator.md" \
+      || { echo "kotlin-$a-validator: gaps are lost when there is no file"; return 1; }
+  done
+}
+
+@test "a test suite skipped for its environment is a gap, not a hand-run case" {
+  ! grep -qF 'its case written into `ManualChecks.md`' "$ROOT/agents/kotlin-jvm-validator.md" \
+    || { echo "kotlin-jvm-validator: an environment-bound test task still becomes a case"; return 1; }
+  ! grep -qF 'the skipped cases go to `ManualChecks.md`' "$ROOT/agents/kotlin-server-validator.md" \
+    || { echo "kotlin-server-validator: skipped suites still become cases"; return 1; }
+}
