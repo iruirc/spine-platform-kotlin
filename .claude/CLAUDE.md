@@ -61,3 +61,7 @@ this repo deliberately keeps no second copy, because a copy of a contract drifts
 - A Kotlin block that must compile carries `<!-- compile: <module> -->` above its fence (`-test` for the
   module's tests; `catalog` above a TOML block), and `scripts/compile-snippets.sh` builds it — with an
   OpenJDK, never GraalVM. A skill teaches the catalog's major; the previous one only under "Migrating from X".
+- This repository is public, and `spine-ops: leak-guard` checks every commit, commit message, tag
+  and push for absolute local paths and the owner's real project names. Never pass `--no-verify`
+  and never change `core.hooksPath`. When the check stops you, replace the data with a neutral
+  placeholder (`/Users/foo`, `com.example.app`, `MyApp`) instead of working around it.

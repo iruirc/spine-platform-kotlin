@@ -1,0 +1,13 @@
+# Keeps real project data out of this public repo. The check itself lives in
+# spine-ops; the private stoplist arrives as the LEAK_STOPLIST secret.
+name: leak-guard
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+jobs:
+  scan:
+    uses: iruirc/spine-ops/.github/workflows/leak-guard.yml@main
+    secrets: inherit
