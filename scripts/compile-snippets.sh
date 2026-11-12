@@ -196,7 +196,29 @@ if [ -n "$emit" ] || [ "$kotlin" -eq 0 ]; then
 fi
 
 # The toolchain: an OpenJDK 17+ (GraalVM's jlink cannot build Android's JDK image), and an SDK with platform 37.
+# JAVA_HOME is taken as given. Without it, on macOS, the JDKs java_home lists, newest first, the
+# first one 17 or newer that is not GraalVM — the order skills/gradle-toolchain/SKILL.md gives;
+# `java` on PATH is a stub there that runs the newest JDK, GraalVM or not.
+# SNIPPETS_JAVA_HOME_CMD stands in for /usr/libexec/java_home in the tests.
 jdk="${JAVA_HOME:-}"
+java_home_cmd="${SNIPPETS_JAVA_HOME_CMD:-/usr/libexec/java_home}"
+if [ -z "$jdk" ] && [ -x "$java_home_cmd" ]; then
+  skipped=""
+  while IFS= read -r cand; do
+    [ -f "$cand/release" ] || continue
+    cv="$(sed -n 's/^JAVA_VERSION="\([0-9]*\).*/\1/p' "$cand/release")"
+    if grep -q '^GRAALVM_VERSION=' "$cand/release"; then
+      skipped="$skipped $cand (GraalVM)"
+    elif [ -z "$cv" ] || [ "$cv" -lt 17 ]; then
+      skipped="$skipped $cand (${cv:-unreadable})"
+    else
+      jdk="$cand"; break
+    fi
+  done < <("$java_home_cmd" -V 2>&1 >/dev/null | sed -n 's/^ *[0-9][^/]* \(\/.*\)$/\1/p')
+  [ -z "$skipped" ] || echo "compile-snippets: skipped JDK:$skipped" >&2
+  [ -n "$jdk" ] || die "no JDK 17 or newer that is not GraalVM among those java_home lists:$skipped — set JAVA_HOME to an OpenJDK"
+  echo "compile-snippets: JDK $jdk" >&2
+fi
 if [ -z "$jdk" ]; then
   command -v java >/dev/null 2>&1 || die "no JDK: set JAVA_HOME to an OpenJDK 17 or newer"
   jdk="$(java -XshowSettings:properties -version 2>&1 | sed -n 's/^ *java\.home = //p')"

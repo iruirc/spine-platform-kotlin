@@ -100,6 +100,45 @@ fake_jdk() {
   [ "$status" -eq 2 ] && grep -qF 'is GraalVM' <<<"$output" || { echo "status $status: $output"; return 1; }
 }
 
+# A java_home that lists the JDKs it is given, newest first, as `java_home -V` does on stderr.
+fake_java_home() {   # <jdk-dir>...
+  local d n=30 out="$BATS_TEST_TMPDIR/java_home"
+  printf '#!/bin/sh\n{\necho "Matching Java Virtual Machines (%s):"\n' "$#" > "$out"
+  for d in "$@"; do
+    printf 'echo "    %s.0.1 (arm64) \\"Vendor\\" - \\"JDK %s\\" %s"\n' "$n" "$n" "$d" >> "$out"; n=$((n - 1))
+  done
+  printf '} >&2\necho "%s"\n' "$1" >> "$out"; chmod +x "$out"
+}
+
+jdk_at() {   # <dir> <version> [release line]
+  mkdir -p "$1"; printf 'JAVA_VERSION="%s"\n' "$2" > "$1/release"
+  [ -z "${3:-}" ] || echo "$3" >> "$1/release"
+}
+
+@test "without JAVA_HOME the newest listed JDK that is not GraalVM is taken, and GraalVM named" {
+  jdk_at "$BATS_TEST_TMPDIR/graal" 25.0.1 'GRAALVM_VERSION="25.0.1"'
+  jdk_at "$BATS_TEST_TMPDIR/old" 11.0.2
+  jdk_at "$BATS_TEST_TMPDIR/jbr" 21.0.4
+  fake_java_home "$BATS_TEST_TMPDIR/graal" "$BATS_TEST_TMPDIR/old" "$BATS_TEST_TMPDIR/jbr"
+  mkdir -p "$BATS_TEST_TMPDIR/sdk/platforms/android-36"
+  run env -u JAVA_HOME SNIPPETS_JAVA_HOME_CMD="$BATS_TEST_TMPDIR/java_home" \
+    ANDROID_HOME="$BATS_TEST_TMPDIR/sdk" "$SNIP" "$FX/fails"
+  grep -qF "skipped JDK: $BATS_TEST_TMPDIR/graal (GraalVM) $BATS_TEST_TMPDIR/old (11)" <<<"$output" \
+    || { echo "$output"; return 1; }
+  grep -qxF "compile-snippets: JDK $BATS_TEST_TMPDIR/jbr" <<<"$output" || { echo "$output"; return 1; }
+  # The JDK passed; what stops the run is the SDK, the next check.
+  grep -qF 'android-37' <<<"$output" || { echo "$output"; return 1; }
+}
+
+@test "without JAVA_HOME and with only GraalVM listed, the run stops and names it" {
+  jdk_at "$BATS_TEST_TMPDIR/graal" 25.0.1 'GRAALVM_VERSION="25.0.1"'
+  fake_java_home "$BATS_TEST_TMPDIR/graal"
+  run env -u JAVA_HOME SNIPPETS_JAVA_HOME_CMD="$BATS_TEST_TMPDIR/java_home" "$SNIP" "$FX/fails"
+  [ "$status" -eq 2 ] || { echo "status $status: $output"; return 1; }
+  grep -qF "no JDK 17 or newer that is not GraalVM among those java_home lists: $BATS_TEST_TMPDIR/graal (GraalVM)" \
+    <<<"$output" || { echo "$output"; return 1; }
+}
+
 @test "an Android SDK without platform 37 is refused, and the platform named" {
   fake_jdk 21.0.4
   mkdir -p "$BATS_TEST_TMPDIR/sdk/platforms/android-36"
