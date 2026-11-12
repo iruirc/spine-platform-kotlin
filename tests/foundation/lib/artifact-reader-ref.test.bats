@@ -97,9 +97,9 @@ manual_checks_passage() {
 }
 
 @test "the toolkit floor is the release that ships the Impact line and the closing block" {
-  # 2.31.0 shipped them; 2.32.0, the manual-checks criterion, is the floor now and carries them too.
-  grep -qF '"version": ">=2.32.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "plugin.json floor is not >=2.32.0 <3"; return 1; }
+  # 2.31.0 shipped them; 2.36.0, the manual-checks writing rules, is the floor now and carries them too.
+  grep -qF '"version": ">=2.36.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "plugin.json floor is not >=2.36.0 <3"; return 1; }
 }
 
 @test "no validator's MANUAL_CHECKS axis row still promises a human a script" {

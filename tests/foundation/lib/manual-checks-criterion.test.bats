@@ -16,8 +16,8 @@ setup() {
 }
 
 @test "the platform requires the core release that carries the criterion" {
-  grep -qF '{ "name": "spine-toolkit", "version": ">=2.32.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "the spine-toolkit floor is not >=2.32.0 <3"; return 1; }
+  grep -qF '{ "name": "spine-toolkit", "version": ">=2.36.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "the spine-toolkit floor is not >=2.36.0 <3"; return 1; }
 }
 
 @test "the none line names what was covered and each automatable gap" {
@@ -32,4 +32,15 @@ setup() {
     || { echo "kotlin-jvm-validator: an environment-bound test task still becomes a case"; return 1; }
   ! grep -qF 'the skipped cases go to `ManualChecks.md`' "$ROOT/agents/kotlin-server-validator.md" \
     || { echo "kotlin-server-validator: skipped suites still become cases"; return 1; }
+}
+
+@test "every validator writes code references in their own section and leaves measuring to itself" {
+  for a in jvm ui server; do
+    A="$ROOT/agents/kotlin-$a-validator.md"
+    grep -qF '`## Code references`' "$A" || { echo "kotlin-$a-validator: still puts code in the case"; return 1; }
+    ! grep -qF 'live only in `**Code:**`' "$A" || { echo "kotlin-$a-validator: the old Code field is still named"; return 1; }
+    ! grep -qF 'twelve fields' "$A" || { echo "kotlin-$a-validator: the case still has twelve fields"; return 1; }
+    grep -qF '## What a case must prove' "$A" || { echo "kotlin-$a-validator: no pointer to the writing rules"; return 1; }
+    grep -qF 'never an instruction for a person to measure' "$A" || { echo "kotlin-$a-validator: may still hand measuring to a person"; return 1; }
+  done
 }
