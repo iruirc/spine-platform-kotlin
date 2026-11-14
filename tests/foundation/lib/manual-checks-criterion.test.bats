@@ -71,3 +71,25 @@ setup() {
       || { echo "kotlin-$a-validator: a deferred check skips the diff question"; return 1; }
   done
 }
+
+@test "no line outside the criterion pointer routes a deferred check to a case without the criterion" {
+  for a in jvm ui server; do
+    stale="$(grep -n -E 'becomes? (a )?(manual )?cases?|become manual cases' "$ROOT/agents/kotlin-$a-validator.md" | grep -vF '## Does this check need a person?' || true)"
+    [ -z "$stale" ] || { echo "kotlin-$a-validator: stale routing: $stale"; return 1; }
+  done
+}
+
+@test "every closing checklist names the outcome of a check the diff does not change" {
+  for a in jvm ui server; do
+    grep -qE '^- \[ \].*the diff does not change' "$ROOT/agents/kotlin-$a-validator.md" \
+      || { echo "kotlin-$a-validator: the closing checklist has no diff-unchanged outcome"; return 1; }
+  done
+}
+
+@test "the manual-checks paragraph of every validator names the skill, not an ambiguous Its" {
+  for a in jvm ui server; do
+    A="$ROOT/agents/kotlin-$a-validator.md"
+    ! grep -qF 'Its `## What a case must prove`' "$A" || { echo "kotlin-$a-validator: ambiguous Its before the skill's section"; return 1; }
+    ! grep -qF 'Its input is' "$A" || { echo "kotlin-$a-validator: ambiguous Its before the skill's input"; return 1; }
+  done
+}
