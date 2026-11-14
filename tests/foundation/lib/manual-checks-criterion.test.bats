@@ -44,3 +44,30 @@ setup() {
     grep -qF 'never an instruction for a person to measure' "$A" || { echo "kotlin-$a-validator: may still hand measuring to a person"; return 1; }
   done
 }
+
+@test "every validator keeps no instrument in the file and sends measuring to Validation.md" {
+  for a in jvm ui server; do
+    A="$ROOT/agents/kotlin-$a-validator.md"
+    ! grep -qF '**By instrument:**' "$A" || { echo "kotlin-$a-validator: the instrument field is still named"; return 1; }
+    ! grep -qF 'exact invocation' "$A" || { echo "kotlin-$a-validator: the file still carries an instrument invocation"; return 1; }
+    ! grep -qF 'the measuring' "$A" || { echo "kotlin-$a-validator: the measuring is still named"; return 1; }
+    grep -qF 'Measurements you can take yourself go to `Validation.md`' "$A" || { echo "kotlin-$a-validator: measuring does not go to Validation.md"; return 1; }
+  done
+}
+
+@test "every validator's case form follows manual_checks_style and counts no fields" {
+  for a in jvm ui server; do
+    A="$ROOT/agents/kotlin-$a-validator.md"
+    grep -qF 'manual_checks_style' "$A" || { echo "kotlin-$a-validator: the style field is not named"; return 1; }
+    grep -qF '[STYLE]' "$A" || { echo "kotlin-$a-validator: the file's style line is not named"; return 1; }
+    ! grep -qF 'eleven fields' "$A" || { echo "kotlin-$a-validator: the case still has eleven fields"; return 1; }
+    ! grep -qF 'five-column' "$A" || { echo "kotlin-$a-validator: the step table is still counted"; return 1; }
+  done
+}
+
+@test "every validator's deferred check first passes the question about the diff" {
+  for a in jvm ui server; do
+    grep -qF 'Does the diff change this behaviour?' "$ROOT/agents/kotlin-$a-validator.md" \
+      || { echo "kotlin-$a-validator: a deferred check skips the diff question"; return 1; }
+  done
+}
