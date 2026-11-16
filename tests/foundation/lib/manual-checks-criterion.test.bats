@@ -114,3 +114,11 @@ manual_checks_passage() {
     grep -qF '## Marks for a collective pass' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not point at the marks section"; return 1; }
   done
 }
+
+@test "in every validator a Runner agent check stays a case and counts for writing the file" {
+  for a in jvm ui server; do
+    p="$(manual_checks_passage "$ROOT/agents/kotlin-$a-validator.md")"
+    grep -qF 'stays a case of the file' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not keep the Runner agent check a case"; return 1; }
+    grep -qF 'counts as a case when deciding whether the file is written' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not count the Runner agent check for writing the file"; return 1; }
+  done
+}
