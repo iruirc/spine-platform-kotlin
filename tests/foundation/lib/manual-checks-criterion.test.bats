@@ -6,6 +6,11 @@ setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
 }
 
+# The ManualChecks passage of a validator: from its "### `ManualChecks.md`" heading to the next heading.
+manual_checks_passage() {
+  awk '/^### `ManualChecks\.md`/ { on = 1; print; next } on && /^##(#)? / { exit } on { print }' "$1"
+}
+
 @test "every validator applies the criterion before it writes a case" {
   for a in jvm ui server; do
     A="$ROOT/agents/kotlin-$a-validator.md"
@@ -16,8 +21,8 @@ setup() {
 }
 
 @test "the platform requires the core release that carries the criterion" {
-  grep -qF '{ "name": "spine-toolkit", "version": ">=2.36.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "the spine-toolkit floor is not >=2.36.0 <3"; return 1; }
+  grep -qF '{ "name": "spine-toolkit", "version": ">=2.37.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "the spine-toolkit floor is not >=2.37.0 <3"; return 1; }
 }
 
 @test "the none line names what was covered and each automatable gap" {
@@ -91,5 +96,21 @@ setup() {
     A="$ROOT/agents/kotlin-$a-validator.md"
     ! grep -qF 'Its `## What a case must prove`' "$A" || { echo "kotlin-$a-validator: ambiguous Its before the skill's section"; return 1; }
     ! grep -qF 'Its input is' "$A" || { echo "kotlin-$a-validator: ambiguous Its before the skill's input"; return 1; }
+  done
+}
+
+@test "a step a validator cannot perform is deferred, not deferred to a human" {
+  for a in jvm ui server; do
+    ! grep -qF 'deferred to a human' "$ROOT/agents/kotlin-$a-validator.md" \
+      || { echo "kotlin-$a-validator: still defers to a human"; return 1; }
+  done
+}
+
+@test "the manual-checks paragraph of every validator sends a driver-only deferral to the collective pass by name" {
+  for a in jvm ui server; do
+    p="$(manual_checks_passage "$ROOT/agents/kotlin-$a-validator.md")"
+    grep -qF '`manual_checks_pass`' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not name manual_checks_pass"; return 1; }
+    grep -qF '**Runner:** agent' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not name the agent runner"; return 1; }
+    grep -qF '## Marks for a collective pass' <<<"$p" || { echo "kotlin-$a-validator: the paragraph does not point at the marks section"; return 1; }
   done
 }

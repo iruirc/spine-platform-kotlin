@@ -35,9 +35,10 @@ setup() {
   # 2.30.0: core ships the artifact-reader skill the agents and conventions/i18n.md name.
   # 2.31.0: core ships the Impact line, the Review.md closing block and the Research.md Short answer the agents write to.
   # 2.36.0: core ships ## What a case must prove and ## Code references, on top of 2.32.0 ## Does this check need a person?, which the validators apply before they write a case.
+  # 2.37.0: core ships ## Marks for a collective pass, which the validator points at when the epic asks for one.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$output" = ">=2.36.0 <3" ] || { echo "floor: $output"; return 1; }
+  [ "$output" = ">=2.37.0 <3" ] || { echo "floor: $output"; return 1; }
 }
 
 @test "the vendored manifest lint is the copy that knows the Driver block" {
