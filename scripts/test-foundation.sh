@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/test-foundation.sh sha256:866794063f2fc3bd0102d547108f8140f3598822c3d31690bece69c9bee8f43a
+# Adapted from spine-toolkit scripts/test-foundation.sh sha256:511f1a25ea4bb33b90fe459c4a767221a7570eb4ee9ad20a90e51cb34ed17a1f
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
 # Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]]
