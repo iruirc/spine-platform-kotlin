@@ -7,6 +7,7 @@
 > User-project templates live in `spine-toolkit` (NOT here).
 > This file configures the agent working on the plugin itself: Claude Code reads it through
 > `CLAUDE.md`, Codex reads it directly.
+
 ## Language
 
 en
@@ -54,7 +55,7 @@ this repo deliberately keeps no second copy, because a copy of a contract drifts
 ## When working on this repo
 
 - What to run and when, and how to wait for it: `spine-ops/WORKSPACE.md`.
-- After changing a skill, validate it: `${CODEX_HOME:-~/.codex}/skills/.system/skill-creator/scripts/quick_validate.py skills/<name>`.
+- After changing a skill, validate it: `python3 ${CODEX_HOME:-~/.codex}/skills/.system/skill-creator/scripts/quick_validate.py skills/<name>`.
 - Adding a user-facing string: add the key to BOTH `locales/en.md` AND `locales/ru.md`, then
   reference it from the skill body. Parity check must be empty.
 - Adding an agent: bilingual triggers in the `description:` field, a `## Roles` row in
