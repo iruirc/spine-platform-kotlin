@@ -108,7 +108,7 @@ section_cells() {
 }
 
 # A link to another skill's section is `<skill>` → "<H2>" on one line, <H2> an H2 of its SKILL.md.
-LINKED="$(printf '%s\n' skills/*/*.md skills/*/*/*.md agents/*.md commands/*.md README.md .claude/CLAUDE.md)"
+LINKED="$(printf '%s\n' skills/*/*.md skills/*/*/*.md agents/*.md commands/*.md README.md AGENTS.md)"
 
 # Lines outside fences as `file:line:text`, for every file a link may sit in.
 prose() {
