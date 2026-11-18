@@ -46,10 +46,9 @@ Install it from the `spine` marketplace together with `spine-toolkit` — the co
 Codex subagents, its knowledge skills are available, and `runtimes/codex-cli/rules/` carries the
 build and device rules `$spine-toolkit:setup` writes into the project. `/kotlin-init` is a Claude Code command; in Codex, start from an existing project.
 
-Codex caches a plugin by version. To pick up a change, refresh the copy and reinstall; to
-reinstall at an unchanged version, run the `plugin-creator` cachebuster **on the copy**. The suffix
-it writes into `version` is not a release, and the foundation suite fails on a checkout that
-carries it.
+Codex caches a plugin by version. To pick up a change at an unchanged version, refresh the
+marketplace and reinstall: `codex plugin marketplace upgrade`, then
+`codex plugin remove spine-platform-kotlin@spine` and `codex plugin add spine-platform-kotlin@spine`.
 
 ## What it provides
 
@@ -143,8 +142,8 @@ scripts/lint-core-refs.sh . --core "$SPINE_TOOLKIT_CORE"
 The foundation suite also checks that the Claude Code and Codex manifests have the same plugin
 identity and release version, that every skill has Codex UI metadata, and that toolkit-driven
 skills cannot activate implicitly. `spine-ops: scripts/release.sh` moves the version in both
-manifests. Validate the Codex package with the validator bundled with Codex's `plugin-creator`
-skill before publishing a release.
+manifests. Codex no longer bundles a plugin validator; validate each changed skill as
+`AGENTS.md` says.
 
 `SPINE_TOOLKIT_CORE` is a checkout of core; the suite falls back to one sitting beside this
 repository, and skips the check when there is none.
