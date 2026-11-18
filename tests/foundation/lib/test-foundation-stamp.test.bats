@@ -18,7 +18,7 @@ setup() {
   printf '# tests/fixtures/fixture-driver/.claude-plugin/plugin.json\n' >"$R/tests/foundation/lib/driver.test.bats"
   printf '# .claude-plugin/plugin.json\n' >"$R/tests/foundation/lib/manifest.test.bats"
   printf '# names no path\n' >"$R/tests/foundation/lib/other.test.bats"
-  printf '# reads ${SPINE_TOOLKIT_CORE:-$ROOT/../spine-toolkit}\n' >"$R/tests/foundation/lib/toolkit.test.bats"
+  printf '# reads SPINE_TOOLKIT_CORE\n' >"$R/tests/foundation/lib/toolkit.test.bats"
   cat >"$BATS_TEST_TMPDIR/bin/bats" <<'FAKE'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$BATS_TEST_TMPDIR/bats-args"
