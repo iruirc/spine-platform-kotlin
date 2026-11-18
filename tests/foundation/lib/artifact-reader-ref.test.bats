@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # Every agent whose body tells it to keep prose concise also tells it where the
 # exception lives: task artifacts follow the core artifact-reader skill. A platform
 # names a core skill only by its namespaced name.

@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # spine-platform-kotlin's manifest is the five-table contract spine-toolkit documents;
 # these tests check the real manifest against that contract from this side, since
 # core's suite must reach no tree but core's.

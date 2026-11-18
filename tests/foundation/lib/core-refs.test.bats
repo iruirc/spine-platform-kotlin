@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # The vendored copy of core's lint, run against this repository's own tree. `scripts/lint-core-refs.sh`
 # reads the floor from plugin.json itself when no --ref is given, so the floor is never duplicated here.
 

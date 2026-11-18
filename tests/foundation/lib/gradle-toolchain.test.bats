@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # Milestone 7, a project Android Studio built: in a terminal `java` was GraalVM 25, Studio's own JBR
 # was 25, and the JDK Studio chose for the project (JBR 21) was only in .gradle/config.properties.
 # Agents tried two wrong JDKs before the right one. adb and emulator were not on PATH, and a

@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # An agent reads a reference guide one section at a time: the section name comes from the
 # SKILL.md load table, the path from beside the SKILL.md. Table, H2s and Contents must agree.
 

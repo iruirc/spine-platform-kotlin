@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # A Codex validator read "Stuff the raw output into Validation.md" literally and wrote a
 # Validation.md of 105 515 lines. The log stays in the file long-run.sh wrote; Validation.md names
 # that file and carries the result line, the tail and every error line.

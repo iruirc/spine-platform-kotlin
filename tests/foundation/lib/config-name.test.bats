@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # The project config is SPINE.md; CLAUDE-spine-toolkit.md is the name a project may still carry
 # until core's setup renames it. Agents and skills say "the project config" and name the old
 # file only in the one clause that tells a reader where to look in a project not yet migrated.

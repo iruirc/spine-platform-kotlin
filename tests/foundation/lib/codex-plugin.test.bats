@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # Codex and Claude Code share the same skills and release identity. These tests keep the two host
 # manifests aligned and preserve the invocation boundary of toolkit-driven internal skills.
 

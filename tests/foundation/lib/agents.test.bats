@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # One test per agent: the file has the shape Skeleton A prescribes. Content is
 # reviewed by a human; shape is what a grep can hold.
 

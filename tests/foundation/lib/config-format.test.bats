@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # The config's settings live in [FIELD] = [value] lines. A surface still telling a reader to find
 # a `## <Block>` section of that file is a surface that will send them looking for something the
 # file no longer has.

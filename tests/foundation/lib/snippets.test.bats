@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # What scripts/compile-snippets.sh does before Gradle: markers, units, preludes, the catalog, the toolchain.
 # The Gradle build itself runs in tests/foundation/snippets, through `scripts/test-foundation.sh snippets`.
 

@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # A platform plugin ships alone: the only thing it may name across the plugin
 # boundary is a namespaced skill or agent (`spine-toolkit:setup`). A bare relative
 # path resolves under THIS plugin's root, so one that belongs to core finds nothing
@@ -41,16 +42,17 @@ setup() {
   pat='(\.\./(core|spine-toolkit|spine-platform-swift|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
   pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
   pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|spine-platform-swift|spine-platform-kotlin)/)'
-  # Four files are excluded by name: the three suites that look for a sibling checkout
-  # of core (they skip rather than dangle when it is absent) and this one, which
-  # spells the patterns out. The cost is a blind spot inside those four files.
+  # Six files are excluded by name: the three suites that look for a sibling checkout
+  # of core (they skip rather than dangle when it is absent), the runner whose `changed`
+  # mode looks beside it for core's checkout, and this one, which spells the patterns out.
+  # The cost is a blind spot inside those files.
   # .superpowers/ is gitignored scratch that never ships, and a review diff there
   # quotes the very files this scan excludes by name. Core excludes it from its
   # own i18n lint for the same reason.
   # The snippet sandbox's Gradle output is gitignored too, and embeds the absolute checkout path.
   hits="$(grep -rnE --exclude-dir=.git --exclude-dir=.superpowers --exclude-dir=build --exclude-dir=.gradle --exclude-dir=.kotlin \
             --exclude=self-containment.test.bats --exclude=core-refs.test.bats --exclude=forks.test.bats \
-            --exclude=test-discipline.test.bats --exclude=review-scope.test.bats \
+            --exclude=test-discipline.test.bats --exclude=review-scope.test.bats --exclude=test-foundation.sh \
             "$pat" "$ROOT" | grep -vE '/\.claude/plugins/(cache|marketplaces)/' || true)"
   [ -z "$hits" ] || { echo "spine-platform-kotlin reference(s) to the core tree:"; echo "$hits"; return 1; }
 }

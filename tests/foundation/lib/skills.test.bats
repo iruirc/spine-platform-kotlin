@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # One test per knowledge skill: the directory has the shape Skeleton B prescribes.
 
 setup() {
