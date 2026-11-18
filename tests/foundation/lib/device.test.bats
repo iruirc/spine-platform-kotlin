@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # The platform half of core's device setting (spine-toolkit conventions/stage-dispatch.md → Device):
 # the device a brief names outranks the first one adb lists and the project's files, for every
 # agent that builds or tests on one, and the ui validator knows how to hand it to adb and Gradle.

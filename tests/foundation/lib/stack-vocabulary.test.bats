@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep
 # A `## Stack` line is `- <Line label>: <value>` with a value `## Axes` lists; any other
 # label or value is one spine-toolkit:stack-detect never reads, and its axis is asked on every task.
 
