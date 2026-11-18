@@ -18,6 +18,7 @@ setup() {
   printf '# tests/fixtures/fixture-driver/.claude-plugin/plugin.json\n' >"$R/tests/foundation/lib/driver.test.bats"
   printf '# .claude-plugin/plugin.json\n' >"$R/tests/foundation/lib/manifest.test.bats"
   printf '# names no path\n' >"$R/tests/foundation/lib/other.test.bats"
+  printf '# reads ${SPINE_TOOLKIT_CORE:-$ROOT/../spine-toolkit}\n' >"$R/tests/foundation/lib/toolkit.test.bats"
   cat >"$BATS_TEST_TMPDIR/bin/bats" <<'FAKE'
 #!/usr/bin/env bash
 printf '%s\n' "$@" >"$BATS_TEST_TMPDIR/bats-args"
@@ -112,31 +113,46 @@ FAKE
 @test "touched runs the tests that name the files, not the whole lib for a fixture" {
   run --separate-stderr "$R/scripts/test-foundation.sh" touched tests/fixtures/fixture-driver/.claude-plugin/plugin.json
   [ "$status" -eq 0 ]
-  # the manifest test holds the shorter path only, so it is not chosen; other and lib/ are not either
-  [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/driver.test.bats" ]
+  # the manifest test holds the shorter path only, so it is not chosen; other and lib/ are not either;
+  # the test that reads the toolkit checkout is always there
+  [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/driver.test.bats"$'\n'"$R/tests/foundation/lib/toolkit.test.bats" ]
   [[ "$stderr" == *"touched: tests/fixtures/fixture-driver/.claude-plugin/plugin.json -> "* ]]
 }
 
 @test "touched with a shorter path also runs the tests that hold the longer one" {
   run --separate-stderr "$R/scripts/test-foundation.sh" touched .claude-plugin/plugin.json
   [ "$status" -eq 0 ]
-  [ "$(grep -c . "$BATS_TEST_TMPDIR/bats-args")" -eq 2 ]
+  [ "$(grep -c . "$BATS_TEST_TMPDIR/bats-args")" -eq 3 ]
+  [ "$(grep -c 'driver.test.bats' "$BATS_TEST_TMPDIR/bats-args")" -eq 1 ]
+  [ "$(grep -c 'manifest.test.bats' "$BATS_TEST_TMPDIR/bats-args")" -eq 1 ]
 }
 
 @test "touched with several files runs each test once" {
   run --separate-stderr "$R/scripts/test-foundation.sh" touched tests/fixtures/fixture-driver/.claude-plugin/plugin.json .claude-plugin/plugin.json
   [ "$status" -eq 0 ]
-  [ "$(grep -c . "$BATS_TEST_TMPDIR/bats-args")" -eq 2 ]
+  [ "$(grep -c . "$BATS_TEST_TMPDIR/bats-args")" -eq 3 ]
   [ "$(grep -c 'driver.test.bats' "$BATS_TEST_TMPDIR/bats-args")" -eq 1 ]
   [ "$(grep -c 'manifest.test.bats' "$BATS_TEST_TMPDIR/bats-args")" -eq 1 ]
+  [ "$(grep -c 'toolkit.test.bats' "$BATS_TEST_TMPDIR/bats-args")" -eq 1 ]
 }
 
-@test "touched on files no test names runs nothing and passes" {
+@test "touched on a file no test names still runs the tests that read the toolkit checkout" {
+  run --separate-stderr "$R/scripts/test-foundation.sh" touched docs/nothing.md
+  [ "$status" -eq 0 ]
+  [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/toolkit.test.bats" ]
+  [[ "$stderr" == *"touched: docs/nothing.md -> no test names it"* ]]
+  [[ "$stderr" == *"touched: tests that read the spine-toolkit checkout -> toolkit.test.bats"* ]]
+  [[ "$stderr" != *"touched: no test names these files"* ]]
+}
+
+@test "touched on files no test names, with no test reading the toolkit, runs nothing and passes" {
+  rm "$R/tests/foundation/lib/toolkit.test.bats"
   run --separate-stderr "$R/scripts/test-foundation.sh" touched docs/nothing.md
   [ "$status" -eq 0 ]
   [ ! -e "$BATS_TEST_TMPDIR/bats-args" ]
   [[ "$stderr" == *"touched: docs/nothing.md -> no test names it"* ]]
   [[ "$stderr" == *"touched: no test names these files"* ]]
+  [[ "$stderr" != *"tests that read the spine-toolkit checkout"* ]]
 }
 
 @test "touched without files is a usage error" {
