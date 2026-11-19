@@ -76,6 +76,49 @@ runs_the_set_only() {
   each runs_the_set_only
 }
 
+addresses_every_build_the_set_lives_in() {
+  grep -qF ':<included-build>:<module>:<task>' "$V" || { echo "no included-build addressing"; return 1; }
+  grep -qF 'its own `./gradlew`' "$V" || { echo "no run from the checkout's own root"; return 1; }
+  grep -qF "type-safe accessor" "$V" || { echo "dependents only by the literal project(\":x\")"; return 1; }
+  grep -qF 'Amper build' "$V" || { echo "no Amper rule"; return 1; }
+}
+
+@test "the run reaches included builds and sibling checkouts, and every build tool is scoped" {
+  each addresses_every_build_the_set_lives_in
+}
+
+maven_is_scoped() {
+  local bad
+  bad="$(grep -n 'mvn -B' "$V" | grep -v -e '-pl <modules>' || true)"
+  [ -z "$bad" ] || { echo "a Maven form runs the whole reactor: $bad"; return 1; }
+  grep -qF "parent POM" "$V" || { echo "no shared-file rule for Maven"; return 1; }
+  grep -qF 'mvn -B -DskipTests -pl <modules> -amd verify' "$V" || { echo "the build step is not scoped"; return 1; }
+  grep -qF 'mvn -B -pl <modules> -amd verify' "$V" || { echo "the test step is not scoped"; return 1; }
+}
+
+@test "the Maven forms of the jvm and server validators run the set's modules, build and test apart" {
+  for v in kotlin-jvm-validator kotlin-server-validator; do
+    V="$ROOT/agents/$v.md"
+    maven_is_scoped || { echo "$v"; return 1; }
+  done
+}
+
+@test "a re-run carries a BUG replay the commits do not reach, and says which Validation it comes from" {
+  for v in kotlin-server-validator kotlin-ui-validator; do
+    V="$ROOT/agents/$v.md"
+    grep -qF 'the replay is carried from the last green Validation' "$V" || { echo "$v: no carried replay"; return 1; }
+    grep -qF 'otherwise `deferred-manual`' "$V" || { echo "$v: the carried status is not stated"; return 1; }
+  done
+}
+
+no_source_names_its_module() {
+  grep -qF 'FAILED for the module that holds the added tests' "$V"
+}
+
+@test "the TEST profile fails NO-SOURCE only for the module that holds the added tests" {
+  each no_source_names_its_module
+}
+
 @test "the reviewer points at the lint first" {
   grep -qF 'lint-validation-scope.sh' "$R" || { echo "no lint in the reviewer"; return 1; }
   grep -qF '### Regression set' "$R" || { echo "the reviewer does not point at the validator's recipe"; return 1; }
