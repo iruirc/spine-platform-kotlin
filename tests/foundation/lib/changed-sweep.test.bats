@@ -139,3 +139,23 @@ fixture() {   # <name> <mark> [walk-agents]
   printf '# globs workflows/wf_*.json and $ROOT/skills/*\nx=1\n' >"$BATS_TEST_TMPDIR/comment.test.bats"
   [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/comment.test.bats")" ]
 }
+
+@test "a recursive scan of a subdirectory walks its directory" {
+  printf 'x="$(grep -rlE foo "$ROOT/templates/task-md")"\n' >"$BATS_TEST_TMPDIR/sub.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/sub.test.bats")" = templates ]
+  printf 'find "$ROOT/skills/setup" -type f\n' >"$BATS_TEST_TMPDIR/subfind.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/subfind.test.bats")" = skills ]
+  printf 'grep -n foo "$ROOT/skills/setup/SKILL.md"\n' >"$BATS_TEST_TMPDIR/flatsub.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/flatsub.test.bats")" ]
+  printf 'grep -rn foo "$ROOT/skills/setup/SKILL.md"\n' >"$BATS_TEST_TMPDIR/file.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/file.test.bats")" ]
+}
+
+@test "a variable deeper than the first level under a directory walks that directory" {
+  printf 'f="$ROOT/templates/agents-md-stub/$l.md"\n' >"$BATS_TEST_TMPDIR/deep.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/deep.test.bats")" = templates ]
+  printf 'f="${ROOT}/skills/a/b/c-$x/SKILL.md"\n' >"$BATS_TEST_TMPDIR/deeper.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/deeper.test.bats")" = skills ]
+  printf 'f="$ROOT/skills/a/b/SKILL.md"\n' >"$BATS_TEST_TMPDIR/literal.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/literal.test.bats")" ]
+}
