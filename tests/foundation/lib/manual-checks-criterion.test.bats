@@ -22,8 +22,8 @@ manual_checks_passage() {
 }
 
 @test "the platform requires the core release that carries the criterion" {
-  grep -qF '{ "name": "spine-toolkit", "version": ">=2.37.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "the spine-toolkit floor is not >=2.37.0 <3"; return 1; }
+  grep -qF '{ "name": "spine-toolkit", "version": ">=2.39.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "the spine-toolkit floor is not >=2.39.0 <3"; return 1; }
 }
 
 @test "the none line names what was covered and each automatable gap" {
