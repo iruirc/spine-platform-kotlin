@@ -303,11 +303,59 @@ names() {
   grep -qF -- "tests/foundation/lib/other.test.bats -> removed, nothing to run" <<<"$stderr_text"
 }
 
-@test "touched: a helper change selects the whole suite" {
+@test "touched: a helper change selects the tests that load it" {
+  local lib="$R/tests/foundation/lib"
+  printf "load '../helpers/h'\n" >"$lib/uses-h.test.bats"
+  commit "a test that loads h"
   echo more >>"$R/tests/foundation/helpers/h.bash"
   touched
   [ "$status" -eq 0 ]
-  [ "$(names)" = "DIR" ]
+  [ "$(names)" = "uses-h.test.bats" ]
+  grep -qF -- "touched: tests/foundation/helpers/h.bash -> uses-h.test.bats" <<<"$stderr_text"
+}
+
+@test "touched: a helper loaded through another helper selects that helper's tests" {
+  local lib="$R/tests/foundation/lib" hd="$R/tests/foundation/helpers"
+  printf 'load "$BATS_TEST_DIRNAME/../helpers/h"\n' >"$hd/outer.bash"
+  printf 'source "$ROOT/tests/foundation/helpers/outer.bash"\n' >"$hd/outer2.bash"
+  printf "load '../helpers/h'\n" >"$lib/uses-h.test.bats"
+  printf "load '../helpers/outer'\n" >"$lib/uses-outer.test.bats"
+  printf "load '../helpers/outer2'\n" >"$lib/uses-outer2.test.bats"
+  commit "helpers and the tests that load them"
+  echo more >>"$hd/h.bash"
+  touched
+  [ "$status" -eq 0 ]
+  [ "$(names)" = "uses-h.test.bats
+uses-outer.test.bats
+uses-outer2.test.bats" ]
+}
+
+@test "touched: helpers that load each other in a cycle still end" {
+  local lib="$R/tests/foundation/lib" hd="$R/tests/foundation/helpers"
+  printf 'load "../helpers/h"\n' >"$hd/outer.bash"
+  printf 'load "../helpers/outer"\n' >"$hd/h.bash"
+  printf "load '../helpers/outer'\n" >"$lib/uses-outer.test.bats"
+  commit "helpers that load each other"
+  echo more >>"$hd/h.bash"
+  touched
+  [ "$status" -eq 0 ]
+  [ "$(names)" = "uses-outer.test.bats" ]
+}
+
+@test "touched: a helper no test loads runs nothing and says so" {
+  echo more >>"$R/tests/foundation/helpers/h.bash"
+  touched
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  grep -qF -- "touched: tests/foundation/helpers/h.bash -> no test loads it" <<<"$stderr_text"
+}
+
+@test "touched: a helper change given as an argument selects the tests that load it" {
+  printf "load '../helpers/h'\n" >"$R/tests/foundation/lib/uses-h.test.bats"
+  commit "a test that loads h"
+  touched tests/foundation/helpers/h.bash
+  [ "$status" -eq 0 ]
+  [ "$(names)" = "uses-h.test.bats" ]
 }
 
 @test "touched: a fixture change selects the whole suite and no per-file pick" {

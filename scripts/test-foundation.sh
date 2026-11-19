@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/test-foundation.sh sha256:e459c43b85ac35c8f9f3bf12de8e20c27aea706b71c1982be3a25ab39521ac95
+# Adapted from spine-toolkit scripts/test-foundation.sh sha256:a017999b78c730634aad75bfd510cbc7f34a1209b387e239eee7ea33f3bb6f31
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
 # Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|touched [<file>...]]
@@ -15,8 +15,10 @@
 #            no sweep, skills/ or toolkit-beside rules, no diff against a base. With no files it
 #            takes what the next commit would hold, the files that differ from HEAD, staged,
 #            unstaged or untracked; none, and it says so and runs nothing. In both forms a changed
-#            tests/foundation/lib/*.bats runs itself, and a helper or a foundation fixture runs the
-#            whole lib/ directory. It has no --list. Never records the tree.
+#            tests/foundation/lib/*.bats runs itself, a foundation fixture runs the whole lib/
+#            directory, and a helper runs the tests that load it, directly or through another
+#            helper; a helper no test loads is reported and runs nothing. It has no --list.
+#            Never records the tree.
 #            Every lib/ test that mentions SPINE_TOOLKIT_CORE, one that reads the spine-toolkit
 #            checkout beside this repository, is added to the selection whatever was touched,
 #            because the verified tree does not cover that checkout.
@@ -131,16 +133,45 @@ head_files() {
     git -C "$root" -c core.quotePath=false ls-files --others --exclude-standard; } | sort -u
 }
 
+# Prints the lib/*.bats files that load the helper tests/foundation/helpers/<name>.<ext>: the ones
+# holding the text helpers/<name> (that is how load and source spell it), and those holding the
+# text of a helper that itself holds it, down the chain. Each helper is read once, so a cycle ends.
+helper_loaders() {   # <repo-relative helper path>
+  local name todo seen h hn
+  name="${1##*/}"; name="${name%.*}"
+  seen=" $name "; todo="$name"
+  while [ -n "$todo" ]; do
+    name="${todo%% *}"; todo="${todo#"$name"}"; todo="${todo# }"
+    grep -lF -- "helpers/$name" "$lib"/*.bats 2>/dev/null || true
+    for h in "$root"/tests/foundation/helpers/*; do
+      [ -f "$h" ] && grep -qF -- "helpers/$name" "$h" || continue
+      hn="${h##*/}"; hn="${hn%.*}"
+      case "$seen" in *" $hn "*) continue ;; esac
+      seen="$seen$hn "; todo="$todo $hn"
+    done
+  done | sort -u
+}
+
 # Prints the bats arguments for the given files, one per line, and why to stderr. A file is named
-# by a test that holds its path as text; a changed lib/*.bats is its own pick, and a helper or a
-# foundation fixture picks the whole lib/ directory. The selection is sorted and has no repeats.
+# by a test that holds its path as text; a changed lib/*.bats is its own pick, a foundation
+# fixture picks the whole lib/ directory, and a helper picks the tests that load it
+# (helper_loaders). The selection is sorted and has no repeats.
 # Tests that read the spine-toolkit checkout are always in it.
 touched_suites() {   # <file>...
   local f picked core_tests selected="" all=0
   for f in "$@"; do
     case "$f" in
-      tests/foundation/helpers/*|tests/foundation/fixtures/*)
+      tests/foundation/fixtures/*)
         echo "touched: $f -> all of tests/foundation/lib" >&2; all=1; continue ;;
+      tests/foundation/helpers/*)
+        picked="$(helper_loaders "$f")"
+        if [ -z "$picked" ]; then
+          echo "touched: $f -> no test loads it" >&2
+        else
+          echo "touched: $f -> $(printf '%s\n' "$picked" | sed 's|.*/||' | tr '\n' ' ' | sed 's/ $//')" >&2
+          selected="$selected"$'\n'"$picked"
+        fi
+        continue ;;
       tests/foundation/lib/*.bats)
         if [ -f "$root/$f" ]; then
           echo "touched: $f -> itself" >&2
