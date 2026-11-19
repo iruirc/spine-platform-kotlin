@@ -12,9 +12,10 @@
 #            selects tests/foundation/snippets: that is Gradle, run with `snippets`. --list prints
 #            the selection, one path per line, instead of running it.
 #   touched  runs the test files that name any of the given repo-relative files, and nothing else:
-#            no sweep, skills/ or toolkit-beside rules, no diff against a base. With no files it
-#            takes what the next commit would hold, the files that differ from HEAD, staged,
-#            unstaged or untracked; none, and it says so and runs nothing. In both forms a changed
+#            no sweep or toolkit-beside rule, no diff against a base. A file under skills/ is
+#            named by a test that names its skill, as in changed. With no files it takes what the
+#            next commit would hold, the files that differ from HEAD, staged, unstaged or
+#            untracked; none, and it says so and runs nothing. In both forms a changed
 #            tests/foundation/lib/*.bats runs itself, a foundation fixture runs the whole lib/
 #            directory, and a helper runs the tests that load it, directly or through another
 #            helper; a helper no test loads is reported and runs nothing. It has no --list.
@@ -59,9 +60,19 @@ diff_files() {   # <repo> <base>
     git -C "$repo" -c core.quotePath=false ls-files --others --exclude-standard; } | sort -u
 }
 
+# The tests that name the skill a file under skills/ belongs to: skills/<name> followed by
+# anything but [a-z0-9-], so that task-report does not pick the tests of task-report-x. A test that
+# reads "$ROOT/skills/<s>/locales/$l.md" through a variable names the skill, not the file.
+skill_tests() {   # <file under skills/>
+  local name
+  name="${1#skills/}"; name="${name%%/*}"
+  name="$(printf '%s' "$name" | sed 's/[][\\.*^$+?(){}|]/\\&/g')"
+  grep -lE -- "skills/$name([^a-z0-9-]|\$)" "$lib"/*.bats 2>/dev/null || true
+}
+
 # Prints the bats arguments for the changed files, one per line, and why to stderr.
 changed_suites() {
-  local files core core_files f name picked all=0 selected="" sweeps="" where="here" line top
+  local files core core_files f picked all=0 selected="" sweeps="" where="here" line top
   files="$(diff_files "$root" "${TEST_BASE:-main}")" || exit 2
   # Tests under lib/ read the spine-toolkit checkout beside this one, so a change there can turn
   # them red with nothing changed here. A directory that is not a git checkout is ignored.
@@ -99,10 +110,7 @@ changed_suites() {
           echo "changed: $f -> removed, nothing to run" >&2
         fi
         continue ;;
-      skills/*)
-        name="${f#skills/}"; name="${name%%/*}"
-        name="$(printf '%s' "$name" | sed 's/[][\\.*^$+?(){}|]/\\&/g')"
-        picked="$(grep -lE -- "skills/$name([^a-z0-9-]|\$)" "$lib"/*.bats 2>/dev/null || true)" ;;
+      skills/*) picked="$(skill_tests "$f")" ;;
       *)
         picked="$(grep -lF -- "$f" "$lib"/*.bats 2>/dev/null || true)" ;;
     esac
@@ -156,7 +164,8 @@ helper_loaders() {   # <repo-relative helper path>
 }
 
 # Prints the bats arguments for the given files, one per line, and why to stderr. A file is named
-# by a test that holds its path as text; a changed lib/*.bats is its own pick, a foundation
+# by a test that holds its path as text, a file under skills/ by a test that names its skill
+# (skill_tests); a changed lib/*.bats is its own pick, a foundation
 # fixture picks the whole lib/ directory, and a helper picks the tests that load it
 # (helper_loaders). The selection is sorted and has no repeats.
 # Tests that read the spine-toolkit checkout are always in it.
@@ -184,7 +193,10 @@ touched_suites() {   # <file>...
         fi
         continue ;;
     esac
-    picked="$(grep -lF -- "$f" "$lib"/*.bats 2>/dev/null || true)"
+    case "$f" in
+      skills/*) picked="$(skill_tests "$f")" ;;
+      *) picked="$(grep -lF -- "$f" "$lib"/*.bats 2>/dev/null || true)" ;;
+    esac
     if [ -z "$picked" ]; then
       echo "touched: $f -> no test names it" >&2
     else
