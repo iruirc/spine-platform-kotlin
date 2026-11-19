@@ -2,7 +2,8 @@
 # `# changed: sweep <dir>...` in its first 10 lines, naming each directory it walks, and
 # `scripts/test-foundation.sh changed` runs it for a change under one of them.
 #   sweep_expr <dir>      the grep -E expression that finds a walk of <dir> in a test file
-#   sweep_walked <file>   the directories the file walks, in sweep order, one per line. A recursive
+#   sweep_walked <file>   the directories the file walks, in sweep order, one per line. A glob under
+#                         a directory (<dir>/<prefix>*) walks it. A recursive
 #                         grep, a find or an ls-files whose target is the repository root itself
 #                         ("$ROOT", not "$ROOT/<dir>"), and a `git -C ... grep`, walk every directory;
 #                         a recursive grep handed bare directory words walks each of them.
@@ -12,23 +13,34 @@ SWEEP_DIRS="skills agents conventions templates commands"
 
 sweep_expr() {   # <dir>
   local d="$1"
-  printf '%s\n' "$d/\\*|find [^|]*$d|for [a-z_]+ in [^;]*$d/|ROOT\\}?/$d/[^ \"/]*\\\$|ROOT\\}?/$d\""
+  printf '%s\n' "$d/[^ ]*\\*|find [^|]*$d|for [a-z_]+ in [^;]*$d/|ROOT\\}?/$d/[^ \"/]*\\\$|ROOT\\}?/$d\""
 }
 
-# The file with backslash-continued lines joined, so a command split over lines reads as one.
-_sweep_joined() {   # <file>
-  awk '{ if (sub(/\\$/, "")) buf = buf $0 " "; else { print buf $0; buf = "" } } END { if (buf != "") print buf }' "$1"
+# The file's code, comment-only lines dropped: a comment that names workflows/wf_*.json walks nothing.
+_sweep_code() {   # <file>
+  grep -vE '^[[:space:]]*#' "$1" || true
 }
+
+# The same with backslash-continued lines joined, so a command split over lines reads as one.
+_sweep_joined() {   # <file>
+  _sweep_code "$1" | awk '{ if (sub(/\\$/, "")) buf = buf $0 " "; else { print buf $0; buf = "" } } END { if (buf != "") print buf }'
+}
+
+# A recursive grep: the flag may sit in any cluster, `-rn`, `-n -r`, `-R`, or be --recursive.
+_SWEEP_GREP_R='grep( .*)? (-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)( |$)'
+# The repository root itself, "$ROOT", $ROOT or ${ROOT}, and not "$ROOT/<dir>" or "$ROOT"/<dir>.
+_SWEEP_ROOT='\$\{?ROOT\}?("([^/A-Za-z0-9_]|$)|[^/A-Za-z0-9_"]|$)'
 
 sweep_walked() {   # <file>
-  local d joined whole=0
+  local d code joined whole=0
+  code="$(_sweep_code "$1")"
   joined="$(_sweep_joined "$1")"
-  if grep -qE '(grep +-[a-zA-Z]*r|find |ls-files).*\$\{?ROOT\}?"?( |$)|git -C [^ ]+ (grep|ls-files)' <<<"$joined"; then
+  if grep -qE "($_SWEEP_GREP_R|find |ls-files).*$_SWEEP_ROOT|git -C [^ ]+ (grep|ls-files)" <<<"$joined"; then
     whole=1
   fi
   for d in $SWEEP_DIRS; do
-    if [ "$whole" -eq 1 ] || grep -qE "$(sweep_expr "$d")" "$1" ||
-       grep -qE "grep +-[a-zA-Z]*r.* $d( |\$)" <<<"$joined"; then
+    if [ "$whole" -eq 1 ] || grep -qE "$(sweep_expr "$d")" <<<"$code" ||
+       grep -qE "$_SWEEP_GREP_R.* $d( |\$)" <<<"$joined"; then
       printf '%s\n' "$d"
     fi
   done
