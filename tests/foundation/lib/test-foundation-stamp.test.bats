@@ -140,8 +140,8 @@ FAKE
   run --separate-stderr "$R/scripts/test-foundation.sh" touched docs/nothing.md
   [ "$status" -eq 0 ]
   [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/toolkit.test.bats" ]
-  [[ "$stderr" == *"touched: docs/nothing.md -> no test names it"* ]]
-  [[ "$stderr" == *"touched: tests that read the spine-toolkit checkout -> toolkit.test.bats"* ]]
+  grep -qF -- "touched: docs/nothing.md -> no test names it" <<<"$stderr"
+  grep -qF -- "touched: tests that read the spine-toolkit checkout -> toolkit.test.bats" <<<"$stderr"
   [[ "$stderr" != *"touched: no test names these files"* ]]
 }
 
@@ -150,8 +150,8 @@ FAKE
   run --separate-stderr "$R/scripts/test-foundation.sh" touched docs/nothing.md
   [ "$status" -eq 0 ]
   [ ! -e "$BATS_TEST_TMPDIR/bats-args" ]
-  [[ "$stderr" == *"touched: docs/nothing.md -> no test names it"* ]]
-  [[ "$stderr" == *"touched: no test names these files"* ]]
+  grep -qF -- "touched: docs/nothing.md -> no test names it" <<<"$stderr"
+  grep -qF -- "touched: no test names these files" <<<"$stderr"
   [[ "$stderr" != *"tests that read the spine-toolkit checkout"* ]]
 }
 
