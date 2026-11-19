@@ -9,7 +9,10 @@
 #                         grep, a find or an ls-files whose target is the repository root itself
 #                         ("$ROOT", not "$ROOT/<dir>"), and a `git -C ... grep`, walk every directory;
 #                         a recursive grep handed bare directory words walks each of them, and one
-#                         (or a find) handed "$ROOT/<dir>/<sub>" walks <dir>, other than skills (as above).
+#                         (or a find) handed "$ROOT/<dir>/<sub>" walks <dir>; a path with a dot is a
+#                         file, not a subdirectory, and a grep -r (not a find) over skills/<name> is
+#                         exempt as above: find "$ROOT/skills/<name>" still walks skills, which only
+#                         over-selects.
 #   sweep_findings <file> what is wrong with the file's mark, one finding per line; none when right
 
 SWEEP_DIRS="skills agents conventions templates commands"

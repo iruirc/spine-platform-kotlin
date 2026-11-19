@@ -149,6 +149,8 @@ fixture() {   # <name> <mark> [walk-agents]
   [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/flatsub.test.bats")" ]
   printf 'grep -rn foo "$ROOT/skills/setup/SKILL.md"\n' >"$BATS_TEST_TMPDIR/file.test.bats"
   [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/file.test.bats")" ]
+  printf 'grep -rn x "$ROOT/conventions/foo.md"\n' >"$BATS_TEST_TMPDIR/file2.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/file2.test.bats")" ]
 }
 
 @test "a variable deeper than the first level under a directory walks that directory" {
