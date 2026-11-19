@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep skills agents
+# changed: sweep skills agents conventions templates commands
 # The platform half of core's driver contract: what this manifest declares to a
 # driver, and the guarantee that no file here decides for the project which MCP
 # server drives its app.

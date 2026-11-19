@@ -2,7 +2,10 @@
 # `# changed: sweep <dir>...` in its first 10 lines, naming each directory it walks, and
 # `scripts/test-foundation.sh changed` runs it for a change under one of them.
 #   sweep_expr <dir>      the grep -E expression that finds a walk of <dir> in a test file
-#   sweep_walked <file>   the directories the file walks, in sweep order, one per line
+#   sweep_walked <file>   the directories the file walks, in sweep order, one per line. A recursive
+#                         grep, a find or an ls-files whose target is the repository root itself
+#                         ("$ROOT", not "$ROOT/<dir>"), and a `git -C ... grep`, walk every directory;
+#                         a recursive grep handed bare directory words walks each of them.
 #   sweep_findings <file> what is wrong with the file's mark, one finding per line; none when right
 
 SWEEP_DIRS="skills agents conventions templates commands"
@@ -12,10 +15,22 @@ sweep_expr() {   # <dir>
   printf '%s\n' "$d/\\*|find [^|]*$d|for [a-z_]+ in [^;]*$d/|ROOT\\}?/$d/[^ \"/]*\\\$|ROOT\\}?/$d\""
 }
 
+# The file with backslash-continued lines joined, so a command split over lines reads as one.
+_sweep_joined() {   # <file>
+  awk '{ if (sub(/\\$/, "")) buf = buf $0 " "; else { print buf $0; buf = "" } } END { if (buf != "") print buf }' "$1"
+}
+
 sweep_walked() {   # <file>
-  local d
+  local d joined whole=0
+  joined="$(_sweep_joined "$1")"
+  if grep -qE '(grep +-[a-zA-Z]*r|find |ls-files).*\$\{?ROOT\}?"?( |$)|git -C [^ ]+ (grep|ls-files)' <<<"$joined"; then
+    whole=1
+  fi
   for d in $SWEEP_DIRS; do
-    grep -qE "$(sweep_expr "$d")" "$1" && printf '%s\n' "$d"
+    if [ "$whole" -eq 1 ] || grep -qE "$(sweep_expr "$d")" "$1" ||
+       grep -qE "grep +-[a-zA-Z]*r.* $d( |\$)" <<<"$joined"; then
+      printf '%s\n' "$d"
+    fi
   done
   return 0
 }

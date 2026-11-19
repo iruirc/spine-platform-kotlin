@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep skills
+# changed: sweep skills agents commands
 # These phrases promise a release, a command or a skill this plugin never shipped; its reader cannot
 # tell a plan from a feature.
 
