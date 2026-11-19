@@ -4,18 +4,22 @@
 #   sweep_expr <dir>      the grep -E expression that finds a walk of <dir> in a test file
 #   sweep_walked <file>   the directories the file walks, in sweep order, one per line. A glob under
 #                         a directory (<dir>/<prefix>*) walks it, as does a variable anywhere below
-#                         it ("$ROOT/<dir>/<a>/<b>$x"). A recursive
+#                         it ("$ROOT/<dir>/<a>/<b>$x"), except under skills/<name>, which the tests
+#                         naming the skill already cover. A recursive
 #                         grep, a find or an ls-files whose target is the repository root itself
 #                         ("$ROOT", not "$ROOT/<dir>"), and a `git -C ... grep`, walk every directory;
 #                         a recursive grep handed bare directory words walks each of them, and one
-#                         (or a find) handed "$ROOT/<dir>/<sub>" walks <dir>.
+#                         (or a find) handed "$ROOT/<dir>/<sub>" walks <dir>, other than skills (as above).
 #   sweep_findings <file> what is wrong with the file's mark, one finding per line; none when right
 
 SWEEP_DIRS="skills agents conventions templates commands"
 
 sweep_expr() {   # <dir>
-  local d="$1"
-  printf '%s\n' "$d/[^ ]*\\*|find [^|]*$d|for [a-z_]+ in [^;]*$d/|ROOT\\}?/$d/[^ \"]*\\\$|ROOT\\}?/$d\""
+  local d="$1" deep='[^ "]*'
+  # skills/<name>/... is named by the tests that carry the skill name, so only a variable in the
+  # first segment (skills/$s/..., skills/x-$s/...) is a walk of skills.
+  [ "$d" != skills ] || deep='[^ "/]*'
+  printf '%s\n' "$d/[^ ]*\\*|find [^|]*$d|for [a-z_]+ in [^;]*$d/|ROOT\\}?/$d/$deep\\\$|ROOT\\}?/$d\""
 }
 
 # The file's code, comment-only lines dropped: a comment that names workflows/wf_*.json walks nothing.
@@ -34,7 +38,8 @@ _SWEEP_GREP_R='grep( .*)? (-[a-zA-Z]*[rR][a-zA-Z]*|--recursive)( |$)'
 _SWEEP_ROOT='\$\{?ROOT\}?("([^/A-Za-z0-9_]|$)|[^/A-Za-z0-9_"]|$)'
 
 # A path below the directory under the root, "$ROOT/<dir>/<sub>" or "$ROOT"/<dir>/<sub>: a recursive
-# scan of it walks the directory. A file name (a dot in the path) is not a subdirectory.
+# scan of it walks the directory. A file name (a dot in the path) is not a subdirectory. Not for
+# skills: a scan of skills/<name> is named by the tests that carry the skill name.
 _sweep_subdir() {   # <dir>
   printf '%s\n' "\\\$\\{?ROOT\\}?\"?/$1/[^ \".]+(\"|\\)| |\$)"
 }
@@ -49,7 +54,7 @@ sweep_walked() {   # <file>
   for d in $SWEEP_DIRS; do
     if [ "$whole" -eq 1 ] || grep -qE "$(sweep_expr "$d")" <<<"$code" ||
        grep -qE "$_SWEEP_GREP_R.* $d( |\$)" <<<"$joined" ||
-       grep -qE "($_SWEEP_GREP_R|find ).*$(_sweep_subdir "$d")" <<<"$joined"; then
+       { [ "$d" != skills ] && grep -qE "($_SWEEP_GREP_R|find ).*$(_sweep_subdir "$d")" <<<"$joined"; }; then
       printf '%s\n' "$d"
     fi
   done

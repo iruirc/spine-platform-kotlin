@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# changed: sweep skills
 # Milestone 7: kotlin-setup asked every stack axis of a project whose build already said it, and
 # offered JUnit5 first where libs.versions.toml carried junit:junit and the tests imported
 # org.junit.Test. The heuristics that pin those values existed; setup never applied them.

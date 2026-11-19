@@ -154,8 +154,21 @@ fixture() {   # <name> <mark> [walk-agents]
 @test "a variable deeper than the first level under a directory walks that directory" {
   printf 'f="$ROOT/templates/agents-md-stub/$l.md"\n' >"$BATS_TEST_TMPDIR/deep.test.bats"
   [ "$(sweep_walked "$BATS_TEST_TMPDIR/deep.test.bats")" = templates ]
-  printf 'f="${ROOT}/skills/a/b/c-$x/SKILL.md"\n' >"$BATS_TEST_TMPDIR/deeper.test.bats"
-  [ "$(sweep_walked "$BATS_TEST_TMPDIR/deeper.test.bats")" = skills ]
+  printf 'f="${ROOT}/templates/a/b/c-$x/x.md"\n' >"$BATS_TEST_TMPDIR/deeper.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/deeper.test.bats")" = templates ]
   printf 'f="$ROOT/skills/a/b/SKILL.md"\n' >"$BATS_TEST_TMPDIR/literal.test.bats"
   [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/literal.test.bats")" ]
+}
+
+@test "a variable under a named skill, or a scan of one, is not a walk of skills; a variable in place of the skill is" {
+  printf 'f="$ROOT/skills/foo/locales/$l.md"\n' >"$BATS_TEST_TMPDIR/named.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/named.test.bats")" ]
+  printf 'f="${ROOT}/skills/foo/a/b/$l.md"\n' >"$BATS_TEST_TMPDIR/namedeep.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/namedeep.test.bats")" ]
+  printf 'x="$(grep -rqF foo "$ROOT/skills/foo")"\n' >"$BATS_TEST_TMPDIR/scan.test.bats"
+  [ -z "$(sweep_walked "$BATS_TEST_TMPDIR/scan.test.bats")" ]
+  printf 'f="$ROOT/skills/$s/locales/en.md"\n' >"$BATS_TEST_TMPDIR/var.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/var.test.bats")" = skills ]
+  printf 'f="$ROOT/skills/foo-$s/locales/en.md"\n' >"$BATS_TEST_TMPDIR/prefix.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/prefix.test.bats")" = skills ]
 }
