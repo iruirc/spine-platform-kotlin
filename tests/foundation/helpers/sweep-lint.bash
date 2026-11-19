@@ -49,9 +49,10 @@ sweep_walked() {   # <file>
 
 sweep_findings() {   # <file>
   local f="$1" line words w d walked
-  line="$(head -10 "$f" | grep -E '^# changed: sweep( |$)' | head -1 || true)"
+  line="$(head -10 "$f" | grep -E '^# changed: sweep([[:blank:]]|$)' | head -1 || true)"
   walked="$(sweep_walked "$f")"
   if [ -n "$line" ]; then
+    case "$line" in *$'\t'*) echo "the mark has a tab: separate the directories with spaces" ;; esac
     words="${line#\# changed: sweep}"
     # shellcheck disable=SC2086
     set -- $words

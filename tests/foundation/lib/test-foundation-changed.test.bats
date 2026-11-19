@@ -100,6 +100,16 @@ names() {
   grep -qF -- "templates/task.md -> no test names it" <<<"$stderr_text"
 }
 
+@test "a tab in a sweep mark is read as a space, so the sweep is still selected" {
+  # ignored by git, so the diff does not name the file and only its mark can select it
+  echo 'tests/foundation/lib/sweep-tab.test.bats' >>"$R/.git/info/exclude"
+  printf '#!/usr/bin/env bats\n# changed: sweep agents\tconventions\n' >"$R/tests/foundation/lib/sweep-tab.test.bats"
+  echo more >>"$R/conventions/layout.md"
+  changed
+  [ "$status" -eq 0 ]
+  [ "$(names)" = $'sweep-skills.test.bats\nsweep-tab.test.bats' ]
+}
+
 @test "a conventions file selects the skills sweep, whose mark names it" {
   echo more >>"$R/conventions/layout.md"
   changed

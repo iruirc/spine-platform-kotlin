@@ -65,6 +65,11 @@ fixture() {   # <name> <mark> [walk-agents]
   [ "$output" = "the mark names commands, which the file never walks" ]
 }
 
+@test "a tab in the mark is a finding, though the words are right" {
+  run sweep_findings "$(fixture tabbed $'# changed: sweep skills\tagents' a)"
+  [ "$output" = "the mark has a tab: separate the directories with spaces" ]
+}
+
 @test "an unknown word in the mark is a finding" {
   run sweep_findings "$(fixture unknown '# changed: sweep skills workflows')"
   grep -qF -- "unknown word 'workflows'" <<<"$output"
