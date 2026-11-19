@@ -155,10 +155,10 @@ FAKE
   [[ "$stderr" != *"tests that read the spine-toolkit checkout"* ]]
 }
 
-@test "touched without files is a usage error" {
+@test "touched without files on a clean tree runs nothing and passes" {
   run --separate-stderr "$R/scripts/test-foundation.sh" touched
-  [ "$status" -eq 2 ]
-  [[ "$stderr" == *"usage:"* ]]
+  [ "$status" -eq 0 ]
+  grep -qF -- "touched: nothing differs from HEAD" <<<"$stderr"
   [ ! -e "$BATS_TEST_TMPDIR/bats-args" ]
 }
 
