@@ -1,22 +1,84 @@
 #!/usr/bin/env bats
-# A test that walks a source tree is a sweep: it carries the '# changed: sweep' mark that
-# `scripts/test-foundation.sh changed` reads, so a change under skills/ agents/ conventions/ commands/
-# runs it. So is a test that reaches an agent or a skill through a variable (agents/kotlin-$a.md,
-# skills/$v), or hands a whole directory to a tool ("$ROOT/skills" to ls, grep -r, cp -R): no file
-# names its target literally, so nothing but the mark selects it.
+# A test that walks a source tree is a sweep: it carries '# changed: sweep <dir>...' naming each
+# directory it walks, and `scripts/test-foundation.sh changed` runs it for a change under one of
+# them. Walking means a glob over the directory, a find or a for loop in it, an agent or a skill
+# reached through a variable (agents/kotlin-$a.md, skills/$v), or the whole directory handed to a
+# tool ("$ROOT/skills" to ls, grep -r, cp -R): no file names its target literally, so nothing but
+# the mark selects it. The per-file check is sweep_findings in helpers/sweep-lint.bash.
+
+load "$(dirname "$BATS_TEST_FILENAME")/../helpers/sweep-lint"
 
 setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
 }
 
-@test "a test that walks a source tree is marked as a sweep" {
-  d='skills|agents|conventions|templates|commands'
-  re="($d)/\\*|find [^|]*($d)|for [a-z_]+ in [^;]*($d)/|ROOT\\}?/($d)/[^ \"/]*\\\$|ROOT\\}?/($d)\""
-  missing=""
+# A fixture test file: <mark line or empty> followed by one line that walks skills/ and, with
+# <more>, one that walks agents/.
+fixture() {   # <name> <mark> [walk-agents]
+  local f="$BATS_TEST_TMPDIR/$1.test.bats"
+  { echo '#!/usr/bin/env bats'
+    [ -z "$2" ] || echo "$2"
+    echo 'for s in "$ROOT"/skills/*; do :; done'
+    [ -z "${3:-}" ] || echo 'x="$ROOT/agents/kotlin-$a.md"'
+  } >"$f"
+  printf '%s\n' "$f"
+}
+
+@test "every test that walks a source tree names the directories it walks in its mark" {
+  bad=""
   for f in "$ROOT"/tests/foundation/lib/*.bats; do
     [ "$(basename "$f")" = changed-sweep.test.bats ] && continue
-    grep -qE "$re" "$f" || continue
-    head -10 "$f" | grep -qx '# changed: sweep' || missing="$missing $(basename "$f")"
+    out="$(sweep_findings "$f")"
+    [ -z "$out" ] || bad="$bad"$'\n'"$(basename "$f"): $(tr '\n' ';' <<<"$out")"
   done
-  [ -z "$missing" ] || { echo "walks a tree but carries no '# changed: sweep':$missing"; return 1; }
+  [ -z "$bad" ] || { echo "sweep marks to fix:$bad"; return 1; }
+}
+
+@test "a right mark and a file that walks nothing are clean" {
+  [ -z "$(sweep_findings "$(fixture ok '# changed: sweep skills')")" ]
+  [ -z "$(sweep_findings "$(fixture two '# changed: sweep skills agents' a)")" ]
+  printf '#!/usr/bin/env bats\n# names scripts/a.sh\n' >"$BATS_TEST_TMPDIR/none.test.bats"
+  [ -z "$(sweep_findings "$BATS_TEST_TMPDIR/none.test.bats")" ]
+}
+
+@test "a bare sweep mark is a finding" {
+  run sweep_findings "$(fixture bare '# changed: sweep')"
+  grep -qF -- "bare sweep mark" <<<"$output"
+  run sweep_findings "$(fixture bare-two '# changed: sweep' a)"
+  grep -qF -- "bare sweep mark" <<<"$output"
+  grep -qF -- "walks skills but" <<<"$output"
+  grep -qF -- "walks agents but" <<<"$output"
+}
+
+@test "a walk with no mark is a finding" {
+  run sweep_findings "$(fixture unmarked '')"
+  [ "$output" = "walks skills but the mark does not name it" ]
+}
+
+@test "a walked directory missing from the mark is a finding" {
+  run sweep_findings "$(fixture missing '# changed: sweep skills' a)"
+  [ "$output" = "walks agents but the mark does not name it" ]
+}
+
+@test "a directory in the mark the file never walks is a finding" {
+  run sweep_findings "$(fixture extra '# changed: sweep skills commands')"
+  [ "$output" = "the mark names commands, which the file never walks" ]
+}
+
+@test "an unknown word in the mark is a finding" {
+  run sweep_findings "$(fixture unknown '# changed: sweep skills workflows')"
+  grep -qF -- "unknown word 'workflows'" <<<"$output"
+}
+
+@test "a mark on a file that walks nothing is a finding" {
+  printf '#!/usr/bin/env bats\n# changed: sweep skills\n# names scripts/a.sh\n' >"$BATS_TEST_TMPDIR/none.test.bats"
+  run sweep_findings "$BATS_TEST_TMPDIR/none.test.bats"
+  [ "$output" = "the mark names skills, which the file never walks" ]
+}
+
+@test "an agent reached through a variable counts as agents, a skill through a variable as skills" {
+  printf 'x="$ROOT/agents/kotlin-$a.md"\n' >"$BATS_TEST_TMPDIR/a.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/a.test.bats")" = agents ]
+  printf 'x="$ROOT/skills/$v/SKILL.md"\n' >"$BATS_TEST_TMPDIR/s.test.bats"
+  [ "$(sweep_walked "$BATS_TEST_TMPDIR/s.test.bats")" = skills ]
 }

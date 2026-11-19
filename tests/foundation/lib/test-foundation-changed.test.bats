@@ -32,7 +32,8 @@ setup() {
   printf '# names scripts/a.sh and scripts/café.sh\n' >"$lib/a.test.bats"
   printf '# names skills/arch-mvvm/ and skills/arch-mvvm/SKILL.md\n' >"$lib/mvvm.test.bats"
   printf '# names skills/arch-mvvm-x\n' >"$lib/mvvm-x.test.bats"
-  printf '#!/usr/bin/env bats\n# changed: sweep\n' >"$lib/sweep.test.bats"
+  printf '#!/usr/bin/env bats\n# changed: sweep agents commands\n' >"$lib/sweep.test.bats"
+  printf '#!/usr/bin/env bats\n# changed: sweep skills conventions\n' >"$lib/sweep-skills.test.bats"
   printf '# names nothing\n' >"$lib/other.test.bats"
   printf '# names scripts/a.sh\n' >"$lib/with space.test.bats"
   git -C "$R" init -q -b main
@@ -76,28 +77,37 @@ names() {
   [ "$(names)" = $'a.test.bats\nwith space.test.bats' ]
 }
 
-@test "a skill file selects its skill's tests and the sweeps" {
+@test "a skill file selects its skill's tests and the skills sweep, not the agents sweep" {
   echo more >>"$R/skills/arch-mvvm/SKILL.md"
   changed
   [ "$status" -eq 0 ]
-  [ "$(names)" = $'mvvm.test.bats\nsweep.test.bats' ]
+  [ "$(names)" = $'mvvm.test.bats\nsweep-skills.test.bats' ]
 }
 
-@test "an agent file selects the sweeps" {
+@test "an agent file selects the agents sweep only" {
   echo more >>"$R/agents/kotlin-reviewer.md"
   changed
   [ "$status" -eq 0 ]
   [ "$(names)" = "sweep.test.bats" ]
 }
 
-@test "a conventions file selects the sweeps" {
+@test "a change in a directory no sweep names selects no sweep" {
+  mkdir -p "$R/templates"
+  echo t >"$R/templates/task.md"
+  changed
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  grep -qF -- "templates/task.md -> no test names it" <<<"$stderr_text"
+}
+
+@test "a conventions file selects the skills sweep, whose mark names it" {
   echo more >>"$R/conventions/layout.md"
   changed
   [ "$status" -eq 0 ]
-  [ "$(names)" = "sweep.test.bats" ]
+  [ "$(names)" = "sweep-skills.test.bats" ]
 }
 
-@test "a command file selects the sweeps" {
+@test "a command file selects the sweep whose mark names commands" {
   echo more >>"$R/commands/setup.md"
   changed
   [ "$status" -eq 0 ]
@@ -112,12 +122,12 @@ names() {
   [ "$(names)" = $'a.test.bats\nwith space.test.bats' ]
 }
 
-@test "an untracked file under skills selects the sweeps" {
+@test "an untracked file under skills selects the skills sweep" {
   mkdir -p "$R/skills/new"
   echo n >"$R/skills/new/SKILL.md"
   changed
   [ "$status" -eq 0 ]
-  [ "$(names)" = "sweep.test.bats" ]
+  [ "$(names)" = "sweep-skills.test.bats" ]
 }
 
 @test "a path with a non-ASCII name selects the test that names it" {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep agents
 # Validation runs the task's regression set, not every test task the build declares: each validator
 # finds the changed modules, their dependents and the app that ships them, runs those, and records the
 # set in Validation.md for core's lint. The reviewer reads that record instead of re-running the suites.

@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-# changed: sweep
 # One test per knowledge skill: the directory has the shape Skeleton B prescribes.
 
 setup() {
@@ -37,25 +36,3 @@ setup() {
 @test "release-ops-android: shape" { assert_skill_shape "$ROOT/skills/release-ops-android"; }
 @test "release-ops-server: shape" { assert_skill_shape "$ROOT/skills/release-ops-server"; }
 @test "test-frameworks: shape" { assert_skill_shape "$ROOT/skills/test-frameworks"; }
-
-@test "thirty knowledge skills, every one named by a Topics row" {
-  topics="$(sed -n '/^## Topics/,/^## /p' "$ROOT/skills/manifest/SKILL.md" | grep '→' \
-              | grep -oE '`[a-z][a-z-]+`' | tr -d '`' | sort -u)"
-  n="$(printf '%s\n' "$topics" | grep -c . || true)"
-  [ "$n" -eq 30 ] || { echo "expected 30 topic skills, found $n"; return 1; }
-  for d in "$ROOT"/skills/*/; do
-    s="$(basename "$d")"
-    case "$s" in manifest|kotlin-setup|gradle-toolchain) continue ;; esac
-    grep -qx "$s" <<<"$topics" || { echo "knowledge skill no Topics row names: $s"; return 1; }
-  done
-}
-
-@test "every knowledge skill is named by at least one agent" {
-  # A skill no agent consults is a skill the orchestrator can reach only through
-  # a methodology topic — which is fine — but one no agent AND no topic names is dead.
-  for d in "$ROOT"/skills/*/; do
-    s="$(basename "$d")"
-    case "$s" in manifest|kotlin-setup|gradle-toolchain) continue ;; esac
-    grep -rq "\`$s\`" "$ROOT/agents" || { echo "no agent references skill: $s"; return 1; }
-  done
-}

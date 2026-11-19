@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep skills agents conventions templates commands
 # A platform plugin ships alone: the only thing it may name across the plugin
 # boundary is a namespaced skill or agent (`spine-toolkit:setup`). A bare relative
 # path resolves under THIS plugin's root, so one that belongs to core finds nothing

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep skills agents
 # The axis named a framework and four testers wrote JUnit5 regardless. The syntax now lives once,
 # keyed by the axis value, and these tests hold the two halves together: every value has a section,
 # every section has a value, and every section has the same seven subsections.

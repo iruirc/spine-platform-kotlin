@@ -5,8 +5,8 @@
 # Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|touched [<file>...]]
 #   changed  runs the test files that name what the branch touched since its merge base with
 #            $TEST_BASE (default main), or on main what is not pushed; uncommitted and untracked
-#            files count. A change under skills/ agents/ conventions/ commands/ also runs the
-#            sweeps, the tests marked '# changed: sweep' in their first 10 lines. A change to a
+#            files count. A change under a directory also runs the sweeps whose mark names it, the
+#            tests with '# changed: sweep <dir>...' in their first 10 lines. A change to a
 #            helper or a fixture, or in the spine-toolkit checkout beside this one, runs the whole
 #            lib/ directory. A file no test names is reported on stderr and runs nothing. It never
 #            selects tests/foundation/snippets: that is Gradle, run with `snippets`. --list prints
@@ -59,7 +59,7 @@ diff_files() {   # <repo> <base>
 
 # Prints the bats arguments for the changed files, one per line, and why to stderr.
 changed_suites() {
-  local files core core_files f name picked all=0 selected="" sweeps="" where="here"
+  local files core core_files f name picked all=0 selected="" sweeps="" where="here" line top
   files="$(diff_files "$root" "${TEST_BASE:-main}")" || exit 2
   # Tests under lib/ read the spine-toolkit checkout beside this one, so a change there can turn
   # them red with nothing changed here. A directory that is not a git checkout is ignored.
@@ -76,8 +76,11 @@ changed_suites() {
     echo "changed: nothing differs from ${TEST_BASE:-main} $where" >&2
     return 0
   fi
+  # Each mark is read once, into one "<file><TAB><dirs>" line per sweep.
   for f in "$lib"/*.bats; do
-    if head -10 "$f" | grep -qx '# changed: sweep'; then sweeps="$sweeps"$'\n'"$f"; fi
+    line="$(head -10 "$f" | grep -E '^# changed: sweep( |$)' | head -1 || true)"
+    [ -n "$line" ] || continue
+    sweeps="$sweeps"$'\n'"$f"$'\t'"${line#\# changed: sweep}"
   done
   while IFS= read -r f; do
     [ -n "$f" ] || continue
@@ -100,10 +103,11 @@ changed_suites() {
       *)
         picked="$(grep -lF -- "$f" "$lib"/*.bats 2>/dev/null || true)" ;;
     esac
-    case "$f" in
-      skills/*|agents/*|conventions/*|commands/*)
-        picked="$picked"$'\n'"$sweeps" ;;
-    esac
+    top="${f%%/*}"
+    if [ "$top" != "$f" ]; then
+      picked="$picked"$'\n'"$(printf '%s\n' "$sweeps" | awk -F'\t' -v top="$top" \
+        'NF == 2 { n = split($2, d, " "); for (i = 1; i <= n; i++) if (d[i] == top) { print $1; break } }')"
+    fi
     picked="$(printf '%s\n' "$picked" | sed '/^$/d' | sort -u)"
     if [ -z "$picked" ]; then
       echo "changed: $f -> no test names it" >&2

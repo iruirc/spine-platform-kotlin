@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep agents
 # A deferred check becomes a case in ManualChecks.md only when it needs a person. The criterion
 # is core's (spine-toolkit:manual-checks); every validator has to apply it, not restate it.
 

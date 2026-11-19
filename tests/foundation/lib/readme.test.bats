@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep skills
 # README.md restates two facts other files own — the core range in plugin.json and the manifest's
 # tables — and nothing moves the copy when the owner changes.
 

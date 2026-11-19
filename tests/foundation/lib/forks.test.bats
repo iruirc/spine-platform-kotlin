@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# changed: sweep
+# changed: sweep conventions
 # The six adapted forks each record the core file they came from and that file's
 # sha256. Equality with core is the wrong test — some forks differ on purpose — so
 # what is checked is that core's original has not moved since the fork was taken.
