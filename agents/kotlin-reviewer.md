@@ -38,6 +38,8 @@ If you were given a task folder, your task prompt names the ranges to review, on
 - **A re-review** — the prompt names your previous `Review.md`. Read it first, review only the ranges, and verify each prior Critical/Major finding — Resolved / Still open / Regressed. Do not re-read unchanged files from scratch.
 - **No range holds a commit** — nothing changed in code; don't invent a diff. Re-state the previous verdict's open items instead of re-scanning the tree.
 
+What to re-run is core's rule, in your task prompt: run `lint-validation-scope.sh` of `spine-toolkit` on the task folder first; when it is clean, re-run none, unless to confirm a specific finding of your own, and read the counts from `Validation.md`; a module of the regression set that Validation did not run is a Major, blocking finding. Check the set itself against the diff and the Gradle build files the way `kotlin-jvm-validator.md` → `### Regression set` finds it (the same step stands in `kotlin-server-validator.md` and `kotlin-ui-validator.md`).
+
 Outside a task folder — an ad hoc PR/diff/files review on request — scope is whatever was asked: recent changes in the session, a named diff, or specific files, read thoroughly before commenting.
 
 Incremental scope trades completeness for cost — it won't catch a regression far from the touched lines. State the actual commit range reviewed in `### Scope` either way.
