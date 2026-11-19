@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/test-foundation.sh sha256:a017999b78c730634aad75bfd510cbc7f34a1209b387e239eee7ea33f3bb6f31
+# Adapted from spine-toolkit scripts/test-foundation.sh sha256:958d0c869837657940462f90fb3fe91dd8d162a91f13bab7b70893aa185c4a43
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
 # Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|touched [<file>...]]
@@ -141,7 +141,9 @@ helper_loaders() {   # <repo-relative helper path>
   name="${1##*/}"; name="${name%.*}"
   seen=" $name "; todo="$name"
   while [ -n "$todo" ]; do
+    todo="${todo# }"
     name="${todo%% *}"; todo="${todo#"$name"}"; todo="${todo# }"
+    [ -n "$name" ] || continue
     grep -lF -- "helpers/$name" "$lib"/*.bats 2>/dev/null || true
     for h in "$root"/tests/foundation/helpers/*; do
       [ -f "$h" ] && grep -qF -- "helpers/$name" "$h" || continue

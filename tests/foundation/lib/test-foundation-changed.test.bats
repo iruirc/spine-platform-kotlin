@@ -321,6 +321,8 @@ names() {
   printf "load '../helpers/h'\n" >"$lib/uses-h.test.bats"
   printf "load '../helpers/outer'\n" >"$lib/uses-outer.test.bats"
   printf "load '../helpers/outer2'\n" >"$lib/uses-outer2.test.bats"
+  echo z >"$hd/zzz.bash"
+  printf "load '../helpers/zzz'\n" >"$lib/uses-zzz.test.bats"
   commit "helpers and the tests that load them"
   echo more >>"$hd/h.bash"
   touched
@@ -328,6 +330,8 @@ names() {
   [ "$(names)" = "uses-h.test.bats
 uses-outer.test.bats
 uses-outer2.test.bats" ]
+  # a test that loads an unrelated helper is not picked by the chain
+  [ "$(grep -c 'uses-zzz' <<<"$output")" -eq 0 ]
 }
 
 @test "touched: helpers that load each other in a cycle still end" {
