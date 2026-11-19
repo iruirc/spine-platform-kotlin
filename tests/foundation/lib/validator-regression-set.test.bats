@@ -123,3 +123,15 @@ no_source_names_its_module() {
   grep -qF 'lint-validation-scope.sh' "$R" || { echo "no lint in the reviewer"; return 1; }
   grep -qF '### Regression set' "$R" || { echo "the reviewer does not point at the validator's recipe"; return 1; }
 }
+
+amper_runs_the_set_and_the_app_is_found_in_every_form() {
+  grep -qF 'over the modules of the set per `### Regression set` item 4' "$V" || { echo "the Amper reading bullet runs the whole build"; return 1; }
+  grep -qF 'among its project dependencies, in any form item 2 lists' "$V" || { echo "the app is found only through project(\":x\")"; return 1; }
+  if grep -qF 'among its `project(":x")` dependencies' "$V"; then echo "item 3 still names only project(\":x\")"; return 1; fi
+  [ "$(grep -c 'rows of one command share' "$V")" -eq 1 ] || { echo "the log-sharing rule is stated more than once"; return 1; }
+  grep -qF 'uncommitted edits reaching their module too' "$V" || { echo "a re-run ignores uncommitted edits"; return 1; }
+}
+
+@test "Amper runs the modules of the set, the app joins through any dependency form, and a re-run counts uncommitted edits" {
+  each amper_runs_the_set_and_the_app_is_found_in_every_form
+}
