@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/test-foundation.sh sha256:d291674e0e785e36d1572daf2ccdee559328f50484aa25440a1ac2325afc80d4
+# Adapted from spine-toolkit scripts/test-foundation.sh sha256:cb0b68d3eac170a48a34d4bc2ac637b8752333d075da8c76576a0d6427a55697
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
-# Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|touched [<file>...]]
+# Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|verified|touched [<file>...]]
 #   changed  runs the test files that name what the branch touched since its merge base with
 #            $TEST_BASE (default main), or on main what is not pushed; uncommitted and untracked
 #            files count. A change under a directory also runs the sweeps whose mark names it, the
@@ -23,6 +23,14 @@
 #            Every lib/ test that mentions SPINE_TOOLKIT_CORE, one that reads the spine-toolkit
 #            checkout beside this repository, is added to the selection whatever was touched,
 #            because the verified tree does not cover that checkout.
+#   verified runs the changed selection for what differs from the verified tree: the newest tree
+#            in the history of HEAD that the stamp holds, from all or from verified, to the
+#            worktree, untracked files included. The tests that read the spine-toolkit checkout
+#            are added whatever changed, as in touched, and a change in that checkout is not
+#            looked at. When green and the tree did not change during the run, records
+#            '<tree> via <verified tree>' in the stamp, so a tree checked after a full run counts
+#            as verified too. With no such tree in the history it says so, runs nothing and exits
+#            2; with nothing differing it says so and runs nothing.
 #   all      when green and the tree did not change during the run, records the tree it verified
 #            in .git/spine-verified-trees (the git common dir), the last 20 trees, newest last.
 #            `snippets` and `unit` record nothing.
@@ -71,13 +79,21 @@ skill_tests() {   # <file under skills/>
 }
 
 # Prints the bats arguments for the changed files, one per line, and why to stderr.
-changed_suites() {
-  local files core core_files f picked all=0 selected="" sweeps="" where="here" line top
-  files="$(diff_files "$root" "${TEST_BASE:-main}")" || exit 2
+changed_suites() {   # <label> <toolkit>
+  local label="$1" toolkit="$2" files core core_files core_tests f picked all=0 selected="" sweeps="" where="here" line top
+  files="$(cat)"
   # Tests under lib/ read the spine-toolkit checkout beside this one, so a change there can turn
-  # them red with nothing changed here. A directory that is not a git checkout is ignored.
+  # them red with nothing changed here. A directory that is not a git checkout is ignored. With
+  # <toolkit> core-tests those tests run whatever changed, as in touched: a verified tree does not
+  # cover that checkout.
   core="${SPINE_TOOLKIT_CORE:-$root/../spine-toolkit}"
-  if git -C "$core" rev-parse -q --git-dir >/dev/null 2>&1; then
+  if [ "$toolkit" = core-tests ]; then
+    core_tests="$(grep -lF -- 'SPINE_TOOLKIT_CORE' "$lib"/*.bats 2>/dev/null || true)"
+    if [ -n "$core_tests" ]; then
+      echo "$label: tests that read the spine-toolkit checkout -> $(printf '%s\n' "$core_tests" | sed 's|.*/||' | tr '\n' ' ' | sed 's/ $//')" >&2
+      selected="$selected"$'\n'"$core_tests"
+    fi
+  elif git -C "$core" rev-parse -q --git-dir >/dev/null 2>&1; then
     where="here or in the toolkit beside"
     core_files="$(diff_files "$core" main)" || exit 2
     if [ -n "$core_files" ]; then
@@ -85,8 +101,8 @@ changed_suites() {
       all=1
     fi
   fi
-  if [ -z "$files" ] && [ "$all" -eq 0 ]; then
-    echo "changed: nothing differs from ${TEST_BASE:-main} $where" >&2
+  if [ -z "$files" ] && [ "$all" -eq 0 ] && [ -z "$selected" ]; then
+    echo "$label: nothing differs from ${TEST_BASE:-main} $where" >&2
     return 0
   fi
   # Each mark is read once, into one "<file><TAB><dirs>" line per sweep.
@@ -101,13 +117,13 @@ changed_suites() {
     picked=""
     case "$f" in
       tests/foundation/helpers/*|tests/foundation/fixtures/*)
-        echo "changed: $f -> all of tests/foundation/lib" >&2; all=1; continue ;;
+        echo "$label: $f -> all of tests/foundation/lib" >&2; all=1; continue ;;
       tests/foundation/lib/*.bats)
         if [ -f "$root/$f" ]; then
-          echo "changed: $f -> itself" >&2
+          echo "$label: $f -> itself" >&2
           selected="$selected"$'\n'"$root/$f"
         else
-          echo "changed: $f -> removed, nothing to run" >&2
+          echo "$label: $f -> removed, nothing to run" >&2
         fi
         continue ;;
       skills/*) picked="$(skill_tests "$f")" ;;
@@ -121,9 +137,9 @@ changed_suites() {
     fi
     picked="$(printf '%s\n' "$picked" | sed '/^$/d' | sort -u)"
     if [ -z "$picked" ]; then
-      echo "changed: $f -> no test names it" >&2
+      echo "$label: $f -> no test names it" >&2
     else
-      echo "changed: $f -> $(printf '%s\n' "$picked" | sed 's|.*/||' | tr '\n' ' ' | sed 's/ $//')" >&2
+      echo "$label: $f -> $(printf '%s\n' "$picked" | sed 's|.*/||' | tr '\n' ' ' | sed 's/ $//')" >&2
       selected="$selected"$'\n'"$picked"
     fi
   done <<< "$files"
@@ -238,15 +254,42 @@ worktree_tree() {
   printf '%s\n' "$tree"
 }
 
-# Appends <tree> to the stamp in the git common dir and keeps the last 20 lines. The new content
-# is written beside the stamp and moved over it, so a reader never sees a half-written file.
-record_green_tree() {   # <tree>
-  local tree="$1" stamp tmp
-  stamp="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)/spine-verified-trees" || return 1
+# Prints the path of the stamp in the git common dir.
+stamp_path() {
+  local common
+  common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  printf '%s\n' "$common/spine-verified-trees"
+}
+
+# Appends <line> - a tree, or `<tree> via <base>` - to the stamp and keeps the last 20 lines. The
+# new content is written beside the stamp and moved over it, so a reader never sees a half-written
+# file.
+record_green_tree() {   # <line>
+  local entry="$1" stamp tmp
+  stamp="$(stamp_path)" || return 1
   [ ! -d "$stamp" ] || return 1   # mv would put the new file inside it
   tmp="$(mktemp "$stamp.XXXXXX" 2>/dev/null)" || return 1
-  { { [ ! -e "$stamp" ] || tail -n 19 "$stamp"; printf '%s\n' "$tree"; } >"$tmp" 2>/dev/null &&
+  { { [ ! -e "$stamp" ] || tail -n 19 "$stamp"; printf '%s\n' "$entry"; } >"$tmp" 2>/dev/null &&
       mv "$tmp" "$stamp" 2>/dev/null; } || { rm -f "$tmp"; return 1; }
+}
+
+# Prints the newest tree in the history of HEAD that is the first field of a stamp line: the tree
+# a verified run takes its difference from. Exits 1 when there is none.
+verified_base() {
+  local stamp t
+  stamp="$(stamp_path)" || return 1
+  [ -f "$stamp" ] || return 1
+  t="$(git -C "$root" log --format=%T HEAD 2>/dev/null |
+    awk 'NR == FNR { seen[$1] = 1; next } ($1 in seen) { print; exit }' "$stamp" -)" || return 1
+  [ -n "$t" ] || return 1
+  printf '%s\n' "$t"
+}
+
+# Prints the files of the worktree that differ from <tree>, untracked ones included, in the form of
+# diff_files.
+verified_files() {   # <tree>
+  { git -C "$root" -c core.quotePath=false diff --name-only --no-renames "$1"
+    git -C "$root" -c core.quotePath=false ls-files --others --exclude-standard; } | sort -u
 }
 
 case "$target" in
@@ -263,7 +306,8 @@ case "$target" in
   # Minutes of Gradle, so `all` leaves it out; `snippets` is run on its own and in CI.
   snippets) bats "$root/tests/foundation/snippets" ;;
   changed)
-    list="$(changed_suites)"
+    files="$(diff_files "$root" "${TEST_BASE:-main}")" || exit 2
+    list="$(printf '%s\n' "$files" | sed '/^$/d' | changed_suites changed beside)"
     if [ "${2:-}" = "--list" ]; then
       [ -z "$list" ] || printf '%s\n' "$list"
       exit 0
@@ -291,5 +335,27 @@ case "$target" in
     chosen=()
     while IFS= read -r s; do chosen+=("$s"); done <<< "$list"
     bats "${chosen[@]}" ;;
-  *)    echo "usage: $0 [unit|all|snippets|changed [--list]|touched [<file>...]]" >&2; exit 2 ;;
+  verified)
+    before="$(worktree_tree)" || {
+      echo "verified: the script is not at the repository top level" >&2; exit 2; }
+    base="$(verified_base)" || {
+      echo "verified: no tree in the history of HEAD passed a full run; run all" >&2; exit 2; }
+    files="$(verified_files "$base")"
+    if [ -z "$files" ]; then
+      echo "verified: nothing differs from the verified tree $base" >&2
+      exit 0
+    fi
+    list="$(printf '%s\n' "$files" | changed_suites verified core-tests)"
+    rc=0
+    if [ -n "$list" ]; then
+      chosen=()
+      while IFS= read -r s; do chosen+=("$s"); done <<< "$list"
+      bats "${chosen[@]}" || rc=$?
+    fi
+    after="$(worktree_tree || true)"
+    if [ "$rc" -eq 0 ] && [ "$before" = "$after" ]; then
+      record_green_tree "$before via $base" || echo "test-foundation: could not record the verified tree" >&2
+    fi
+    exit "$rc" ;;
+  *)    echo "usage: $0 [unit|all|snippets|changed [--list]|verified|touched [<file>...]]" >&2; exit 2 ;;
 esac
