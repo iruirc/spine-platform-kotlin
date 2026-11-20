@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/test-foundation.sh sha256:3025409bc50297b33e4ac92b0d429b04775ad6e83c17ff9e90ae2fe86c99613f
+# Adapted from spine-toolkit scripts/test-foundation.sh sha256:681560e95d1221606465ccce7616b8d28463873ded88bbf74b99a2fd4158a799
 # Adapted from spine-toolkit's test runner. Plugins share no code; update both or neither.
 # Run Foundation bats tests.
 # Usage: scripts/test-foundation.sh [unit|all|snippets|changed [--list]|verified|touched [<file>...]]
@@ -70,18 +70,23 @@ diff_files() {   # <repo> <base>
 
 # The tests that name the skill a file under skills/ belongs to: skills/<name> followed by
 # anything but [a-z0-9-], so that task-report does not pick the tests of task-report-x. A test that
-# reads "$ROOT/skills/<s>/locales/$l.md" through a variable names the skill, not the file.
-skill_tests() {   # <file under skills/>
+# reads "$ROOT/skills/<s>/locales/$l.md" through a variable names the skill, not the file. It looks
+# in the given test files, or in lib/ without them.
+skill_tests() {   # <file under skills/> [<test file>...]
   local name
-  name="${1#skills/}"; name="${name%%/*}"
+  name="${1#skills/}"; name="${name%%/*}"; shift
   name="$(printf '%s' "$name" | sed 's/[][\\.*^$+?(){}|]/\\&/g')"
-  grep -lE -- "skills/$name([^a-z0-9-]|\$)" "$lib"/*.bats 2>/dev/null || true
+  [ "$#" -gt 0 ] || set -- "$lib"/*.bats
+  grep -lE -- "skills/$name([^a-z0-9-]|\$)" "$@" 2>/dev/null || true
 }
 
 # Prints the bats arguments for the changed files, one per line, and why to stderr.
 changed_suites() {   # <label> <toolkit>
-  local label="$1" toolkit="$2" files core core_files core_tests f picked all=0 selected="" sweeps="" where="here" line top
+  local label="$1" toolkit="$2" files core core_files core_tests f picked all=0 selected="" sweeps="" where="here" line top tests
   files="$(cat)"
+  # Every suite `all` runs is searched, so an integration suite is not left out once one exists.
+  tests=("$lib"/*.bats)
+  [ -d "$root/tests/foundation/integration" ] && tests+=("$root/tests/foundation/integration"/*.bats)
   # Tests under lib/ read the spine-toolkit checkout beside this one, so a change there can turn
   # them red with nothing changed here. A directory that is not a git checkout is ignored. With
   # <toolkit> core-tests those tests run whatever changed, as in touched: a verified tree does not
@@ -106,7 +111,7 @@ changed_suites() {   # <label> <toolkit>
     return 0
   fi
   # Each mark is read once, into one "<file><TAB><dirs>" line per sweep.
-  for f in "$lib"/*.bats; do
+  for f in "${tests[@]}"; do
     line="$(head -10 "$f" | grep -E '^# changed: sweep([[:blank:]]|$)' | head -1 || true)"
     [ -n "$line" ] || continue
     line="${line//$'\t'/ }"   # a tab would split the record below into three fields
@@ -118,7 +123,7 @@ changed_suites() {   # <label> <toolkit>
     case "$f" in
       tests/foundation/helpers/*|tests/foundation/fixtures/*)
         echo "$label: $f -> all of tests/foundation/lib" >&2; all=1; continue ;;
-      tests/foundation/lib/*.bats)
+      tests/foundation/lib/*.bats|tests/foundation/integration/*.bats)
         if [ -f "$root/$f" ]; then
           echo "$label: $f -> itself" >&2
           selected="$selected"$'\n'"$root/$f"
@@ -126,9 +131,9 @@ changed_suites() {   # <label> <toolkit>
           echo "$label: $f -> removed, nothing to run" >&2
         fi
         continue ;;
-      skills/*) picked="$(skill_tests "$f")" ;;
+      skills/*) picked="$(skill_tests "$f" "${tests[@]}")" ;;
       *)
-        picked="$(grep -lF -- "$f" "$lib"/*.bats 2>/dev/null || true)" ;;
+        picked="$(grep -lF -- "$f" "${tests[@]}" 2>/dev/null || true)" ;;
     esac
     top="${f%%/*}"
     if [ "$top" != "$f" ]; then
@@ -144,7 +149,7 @@ changed_suites() {   # <label> <toolkit>
     fi
   done <<< "$files"
   if [ "$all" -eq 1 ]; then
-    printf '%s\n' "$lib"
+    printf '%s\n' "${suites[@]}"
     return 0
   fi
   printf '%s\n' "$selected" | sed '/^$/d' | sort -u

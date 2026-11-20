@@ -145,14 +145,14 @@ names() {
   changed
   [ "$status" -eq 0 ]
   [ "$(names)" = "a.test.bats" ]
-  [[ "$stderr_text" == *"scripts/café.sh -> a.test.bats"* ]]
+  [[ "$stderr_text" == *"scripts/café.sh -> a.test.bats"* ]] || false
 }
 
 @test "the stderr summary keeps a path with a space whole" {
   echo more >>"$R/scripts/a.sh"
   changed
   [ "$status" -eq 0 ]
-  [[ "$stderr_text" == *"scripts/a.sh -> a.test.bats with space.test.bats"* ]]
+  [[ "$stderr_text" == *"scripts/a.sh -> a.test.bats with space.test.bats"* ]] || false
 }
 
 @test "a changed test file selects itself" {
@@ -168,7 +168,7 @@ names() {
   changed
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  [[ "$stderr_text" == *"tests/foundation/lib/other.test.bats -> removed, nothing to run"* ]]
+  [[ "$stderr_text" == *"tests/foundation/lib/other.test.bats -> removed, nothing to run"* ]] || false
 }
 
 @test "a helper change selects the whole suite" {
@@ -190,7 +190,7 @@ names() {
   changed
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  [[ "$stderr_text" == *"tests/foundation/snippets/build.gradle.kts -> no test names it"* ]]
+  [[ "$stderr_text" == *"tests/foundation/snippets/build.gradle.kts -> no test names it"* ]] || false
 }
 
 @test "a file no test names is reported, not run" {
@@ -198,21 +198,21 @@ names() {
   changed
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  [[ "$stderr_text" == *"scripts/orphan.sh -> no test names it"* ]]
+  [[ "$stderr_text" == *"scripts/orphan.sh -> no test names it"* ]] || false
 }
 
 @test "nothing changed selects nothing" {
   changed
   [ "$status" -eq 0 ]
   [ -z "$output" ]
-  [[ "$stderr_text" == *"nothing differs"* ]]
+  [[ "$stderr_text" == *"nothing differs"* ]] || false
 }
 
 @test "no merge base exits 2 and names TEST_BASE" {
   echo more >>"$R/scripts/a.sh"
   TEST_BASE=nope changed
   [ "$status" -eq 2 ]
-  [[ "$stderr_text" == *"TEST_BASE"* ]]
+  [[ "$stderr_text" == *"TEST_BASE"* ]] || false
 }
 
 @test "a change in the toolkit beside selects unit" {
@@ -227,7 +227,7 @@ names() {
   SPINE_TOOLKIT_CORE="$C" changed
   [ "$status" -eq 0 ]
   [ "$(names)" = "DIR" ]
-  [[ "$stderr_text" == *"1 file(s) in the toolkit beside"* ]]
+  [[ "$stderr_text" == *"1 file(s) in the toolkit beside"* ]] || false
 }
 
 @test "a toolkit beside that is not a git checkout is ignored" {
@@ -428,4 +428,38 @@ uses-outer2.test.bats" ]
   [ "$status" -eq 0 ]
   [ "$(names)" = $'a.test.bats\ntoolkit.test.bats\nwith space.test.bats' ]
   grep -qF -- "touched: tests that read the spine-toolkit checkout -> toolkit.test.bats" <<<"$stderr_text"
+}
+
+# An integration suite on main, with one test naming scripts/a.sh and one naming nothing.
+with_integration() {
+  git -C "$R" checkout -q main
+  mkdir -p "$R/tests/foundation/integration"
+  printf '# names scripts/a.sh\n' >"$R/tests/foundation/integration/build.test.bats"
+  printf '# names nothing\n' >"$R/tests/foundation/integration/quiet.test.bats"
+  commit integration
+  git -C "$R" checkout -q -B work
+}
+
+@test "with an integration suite, a helper change selects both suites" {
+  with_integration
+  echo more >>"$R/tests/foundation/helpers/h.bash"
+  changed
+  [ "$status" -eq 0 ]
+  [ "$output" = "$(printf '%s\n' "$R/tests/foundation/lib" "$R/tests/foundation/integration")" ]
+}
+
+@test "with an integration suite, a file selects the integration tests that name it" {
+  with_integration
+  echo more >>"$R/scripts/a.sh"
+  changed
+  [ "$status" -eq 0 ]
+  [ "$(names)" = $'build.test.bats\na.test.bats\nwith space.test.bats' ]
+}
+
+@test "with an integration suite, a changed integration test selects itself" {
+  with_integration
+  echo more >>"$R/tests/foundation/integration/quiet.test.bats"
+  changed
+  [ "$status" -eq 0 ]
+  [ "$(names)" = "quiet.test.bats" ]
 }

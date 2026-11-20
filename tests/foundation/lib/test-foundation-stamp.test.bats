@@ -107,7 +107,7 @@ FAKE
   mkdir "$S"
   run --separate-stderr "$R/scripts/test-foundation.sh" all
   [ "$status" -eq 0 ]
-  [[ "$stderr" == *"test-foundation: could not record the verified tree"* ]]
+  [[ "$stderr" == *"test-foundation: could not record the verified tree"* ]] || false
 }
 
 @test "touched runs the tests that name the files, not the whole lib for a fixture" {
@@ -116,7 +116,7 @@ FAKE
   # the manifest test holds the shorter path only, so it is not chosen; other and lib/ are not either;
   # the test that reads the toolkit checkout is always there
   [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/driver.test.bats"$'\n'"$R/tests/foundation/lib/toolkit.test.bats" ]
-  [[ "$stderr" == *"touched: tests/fixtures/fixture-driver/.claude-plugin/plugin.json -> "* ]]
+  [[ "$stderr" == *"touched: tests/fixtures/fixture-driver/.claude-plugin/plugin.json -> "* ]] || false
 }
 
 @test "touched with a shorter path also runs the tests that hold the longer one" {
@@ -142,7 +142,7 @@ FAKE
   [ "$(cat "$BATS_TEST_TMPDIR/bats-args")" = "$R/tests/foundation/lib/toolkit.test.bats" ]
   grep -qF -- "touched: docs/nothing.md -> no test names it" <<<"$stderr"
   grep -qF -- "touched: tests that read the spine-toolkit checkout -> toolkit.test.bats" <<<"$stderr"
-  [[ "$stderr" != *"touched: no test names these files"* ]]
+  [[ "$stderr" != *"touched: no test names these files"* ]] || false
 }
 
 @test "touched on files no test names, with no test reading the toolkit, runs nothing and passes" {
@@ -152,7 +152,7 @@ FAKE
   [ ! -e "$BATS_TEST_TMPDIR/bats-args" ]
   grep -qF -- "touched: docs/nothing.md -> no test names it" <<<"$stderr"
   grep -qF -- "touched: no test names these files" <<<"$stderr"
-  [[ "$stderr" != *"tests that read the spine-toolkit checkout"* ]]
+  [[ "$stderr" != *"tests that read the spine-toolkit checkout"* ]] || false
 }
 
 @test "touched without files on a clean tree runs nothing and passes" {
