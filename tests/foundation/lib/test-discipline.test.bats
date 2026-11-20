@@ -110,3 +110,11 @@ TESTERS="kotlin-jvm-tester kotlin-server-tester kotlin-ui-tester kotlin-kmp-test
     echo "kotlin-diagnostics' roster still promises the regression test unconditionally"; return 1
   fi
 }
+
+@test "core at the floor has the subsection the validators point at" {
+  [ -d "$CORE/.git" ] || skip "no spine-toolkit checkout beside this one"
+  floor="$(python3 -c 'import json,sys,re; d=json.load(open(sys.argv[1]))["dependencies"]; v=[x["version"] for x in d if x["name"]=="spine-toolkit"][0]; print(re.search(r">=\s*(\d+\.\d+\.\d+)", v).group(1))' "$ROOT/.claude-plugin/plugin.json")"
+  git -C "$CORE" rev-parse -q --verify "$floor^{commit}" >/dev/null || skip "core has no tag $floor"
+  git -C "$CORE" show "$floor:skills/phase-verification/SKILL.md" | grep -qxF '### Failures outside the task' \
+    || { echo "core $floor has no ### Failures outside the task — the floor is too low"; return 1; }
+}
