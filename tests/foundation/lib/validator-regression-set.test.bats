@@ -253,6 +253,17 @@ non_zero_test_task_is_classified() {
   each non_zero_test_task_is_classified
 }
 
+run_line_continues_past_a_failing_module() {
+  grep -qF '4. **The run.** `./gradlew --console=plain --continue :a:<task> :b:<task> …`' "$V" || { echo "the run line of the regression set has no --continue"; return 1; }
+}
+
+@test "the regression set's run line carries --continue, and a Maven run -fae in the test step" {
+  each run_line_continues_past_a_failing_module
+  for v in kotlin-jvm-validator kotlin-server-validator; do
+    grep -qF '`-pl <modules> -amd` in both steps and `-fae` in the test step' "$ROOT/agents/$v.md" || { echo "$v: the Maven run has no -fae in the test step"; return 1; }
+  done
+}
+
 registry_is_untouched() {
   grep -qF 'Write the known failures registry, or report a failure outside the task as PASSED without a row for it in `## Outside the task`.' "$V" || { echo "no registry line in What You Never Do"; return 1; }
   grep -qF 'the registry is untouched' "$V" || { echo "no registry item in the checklist"; return 1; }
