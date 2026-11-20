@@ -98,9 +98,9 @@ manual_checks_passage() {
 }
 
 @test "the toolkit floor is the release that ships the Impact line and the closing block" {
-  # 2.31.0 shipped them; the floor now, 2.39.0, carries them too.
-  grep -qF '"version": ">=2.39.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "plugin.json floor is not >=2.39.0 <3"; return 1; }
+  # 2.31.0 shipped them; the floor now, 2.44.0, carries them too, and adds the failures outside the task and PASSED_WITH_FLAKES.
+  grep -qF '"version": ">=2.44.0 <3"' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "plugin.json floor is not >=2.44.0 <3"; return 1; }
 }
 
 @test "no validator's MANUAL_CHECKS axis row still promises a human a script" {

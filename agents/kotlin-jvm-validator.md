@@ -24,7 +24,7 @@ Produce output in the sections described in the "Output Structure" section below
 ## Hard Rules
 
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
-2. **Never falsify a verdict.** If a step never produced its evidence because a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. An error in how the step was invoked that a rerun that succeeded put right — a wrong JDK, a mistyped driver action, a device not yet booted — is not that: the step has its evidence, the first attempt is named in the step's log section, and the verdict is what the evidence says. That covers the invocation only, never a build or test failure of the change: a test that fails and then passes on a rerun is FAILED, or FLAKY where the profile defines it. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
+2. **Never falsify a verdict.** If a step never produced its evidence because a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. An error in how the step was invoked that a rerun that succeeded put right — a wrong JDK, a mistyped driver action, a device not yet booted — is not that: the step has its evidence, the first attempt is named in the step's log section, and the verdict is what the evidence says. That covers the invocation only, never a build or test failure of the change: a test that fails and then passes on a rerun is FAILED, FLAKY where the profile defines it, or, for a failure outside the task, what `### Failures outside the task` says; PASSED_WITH_FLAKES names the failures rather than hiding them. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step there is nothing to perform against, are both deferred, never failed — see "The drive_app switch".
 4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the task folder: the file `long-run.sh` (or the tool) wrote lives in a temporary folder that does not outlive the session, so when a step ends, copy each log `Validation.md` names into the task folder's `validation-evidence/<timestamp>/` — one folder per Validation run, `<timestamp>` as for `_archive/` (`2026-11-03T101500`), so a rerun never overwrites what an archived `Validation.md` names — and only those logs; a screenshot the run keeps goes in the same folder. `Validation.md` carries the path of the log (that copy, relative to the task folder: `validation-evidence/<timestamp>/<name>.log`), the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
@@ -38,7 +38,8 @@ In this order:
 2. `<task_path>/Task.md` — `[TASK_TYPE]`, scope, files involved, and `[DRIVE_APP]` if this task overrides the project default (see "The drive_app switch"). For `[DRIVE_APP]` and `[MANUAL_CHECKS]` the stage brief outranks both files, and so does the owner's directive it carries, on everything it names — the Gradle task and the JDK included.
 3. `<task_path>/Plan.md` — what was supposed to be done.
 4. The record of what actually landed. The implementing stage (Execute / Fix / Refactor / Write) writes no artifact file of its own — `Plan.md`'s per-phase checkboxes say what was supposed to land, and the task's per-phase git commits say what did. For BUG, also `<task_path>/Reproduce.md` — mandatory, you will replay that scenario.
-5. Project root: locate `settings.gradle(.kts)` / `pom.xml` / `module.yaml`; `- Build:` in `## Stack` says which tool.
+5. The registry of known failures — the file the brief gives in `known_failures`, read as `### Failures outside the task` says; a missing file is an empty registry.
+6. Project root: locate `settings.gradle(.kts)` / `pom.xml` / `module.yaml`; `- Build:` in `## Stack` says which tool.
 
 If `Task.md`, `Plan.md`, or — for BUG — `Reproduce.md` is missing, fail fast: status = FAILED, reason = `missing artifact: <name>`.
 
@@ -92,10 +93,14 @@ The ranges: the brief names the task's commits per repository in `validation_ran
 2. **Dependents.** The reverse transitive closure over project dependencies in the build script of every module under those roots, however it names them (`project(":x")`, its Groovy form `project(':x')`, a type-safe accessor `projects.x`, `testFixtures(project(...))`), the ones no commit touched included, and over composite-build substitutions: a module that depends on a coordinate an `includeBuild` substitutes depends on the module of the included build. A dependency on a published version that no `includeBuild` substitutes is not in the closure: that consumer cannot see the change.
 3. **The app.** The application or distribution module, when one exists: in the set when any module of it is among its project dependencies, in any form item 2 lists, or substituted ones.
 4. **The run.** `./gradlew --console=plain :a:<task> :b:<task> …` naming the modules of the set only: the build step with its build task, the test step with `test` and every other test task that module declares (`integrationTest`, `allTests`). A module of an included build is addressed through that build's name, `:<included-build>:<module>:<task>`; a changed checkout the root does not include runs from its own root with its own `./gradlew`. Each invocation gets its own log, and rows of one command share it. A single-module project is its own set and runs everything, as the Tooling Procedure says. A row's `Tests` count is read from the JUnit XML of its module, per `## Reading Gradle Output`. A Maven build: the modules of the reactor, dependents over `<dependency>` on a sibling module, `-pl <modules> -amd` in both steps, which stay separate runs with separate logs; a change to the parent POM or its `dependencyManagement` changes every module that inherits it. An Amper build: `./amper test -m <module>` per module of the set where the installed Amper takes `-m`, dependents over the `module.yaml` dependencies; where it does not, the build runs whole and `## Scope` says so.
-5. **A re-run.** With `validation_ranges.rerun` set, run only the modules it reaches and their dependents, uncommitted edits reaching their module too; the app runs too when a module it runs is among its dependencies (item 3 applied to the re-run set); every other module of the set is `carried <sha>` with the count, HEAD and log of the Validation it comes from. With `rerun` null or absent, run the whole set. Nothing is driven on this lane.
+5. **A re-run.** With `validation_ranges.rerun` set, run only the modules it reaches and their dependents, uncommitted edits reaching their module too; the app runs too when a module it runs is among its dependencies (item 3 applied to the re-run set); every other module of the set is carried: a green run of the whole module covers it while no commit after that run's sha, and no uncommitted edit, reaches the module or its dependencies. A carried row keeps the count, HEAD and log of its source, and says which: `carried <sha> (phase <N>)` for a phase's `ran: <repository> <module> HEAD <sha> Executed <N> log phase-evidence/phase-<id>/<module>.log` line under its checkbox in `Plan.md`, `carried <sha> (validation)` for a green `ran` row of an earlier `Validation.md`, the archived copy or the current file; of several sources the latest wins, and a module red in the latest Validation that ran it runs again. Which run is green and the rest of the rule are core's, in `spine-toolkit:phase-verification`, the paragraph on a re-run. With `rerun` null or absent, run the whole set. Nothing is driven on this lane.
 6. **The record.** Write `## Regression set` into `Validation.md`, one row per module (a single-module project: one row with `Module` = `—`), with `Not reached:` after the table, in the form of `spine-toolkit:task-documents` → "Validation.md".
 
 A project script that runs the whole build is not Validation's: run it only when the owner asks.
+
+### Failures outside the task
+
+A failing test that does not reach what the task changed is classified by core's rule, `spine-toolkit:phase-verification` → "Failures outside the task": it holds when a failure is outside the task, the registry it matches, the retry (the failed classes only, in a separate run, up to 3 times), the status each case gives and the order of statuses. This agent restates none of it. The registry is the file the brief gives in its `known_failures` field; a missing file is an empty registry, and you never write it. A failure outside the task is a row of `## Outside the task` in `Validation.md`, in the form of `spine-toolkit:task-documents` → "Validation.md", and an item of `outside_failures` in the return. A `permanent` entry whose test passed is the line `KF-<N> no longer fails` under that table and its ID is in `known_failures_cleared`. Every profile below applies this to its test steps. A failure inside the task, a TEST task's added tests aside, is FAILED, whatever the registry says.
 
 ### FEATURE
 
@@ -123,7 +128,7 @@ A project script that runs the whole build is not Validation's: run it only when
 ### TEST
 
 - **The test step** — mandatory, for each module of the regression set. Every test the Write stage added, which lives in the changed modules, (named per phase in `Plan.md`, landed in that phase's commit) must pass on the first run.
-- **Flaky detection** — if any added test fails on the first run but the scope says it should pass, re-run the failing test **up to 3 times**. Record fail rate (e.g. `2/3 runs`). A test that flaps is FLAKY, not FAILED.
+- **Flaky detection** — a test the task added: if it fails on the first run but the scope says it should pass, re-run the failing test **up to 3 times**. Record fail rate (e.g. `2/3 runs`). A test that flaps is FLAKY, not FAILED. This is for the tests the task added only: a failing test the task did not add goes by `### Failures outside the task`.
 - **The build step** — implicit (the test step builds first).
 - **Driving the app** — optional in the profile rule, out of reach on this lane. A test that needs a driven app to run at all is not run by you: report it under `## Scope` and defer its verification.
 
@@ -148,7 +153,7 @@ A project script that runs the whole build is not Validation's: run it only when
 
 ## Flaky Detection (TEST profile)
 
-When a test fails on first run:
+When a test the task added fails on first run (a failing test the task did not add is not this section's: see `### Failures outside the task`):
 
 ```
 attempt 1: FAILED — <assertion>
@@ -200,6 +205,7 @@ The **very first line** of `Validation.md` MUST be exactly one of:
 
 ```
 [VALIDATION_STATUS] = PASSED
+[VALIDATION_STATUS] = PASSED_WITH_FLAKES
 [VALIDATION_STATUS] = FAILED
 [VALIDATION_STATUS] = FLAKY
 ```
@@ -207,14 +213,17 @@ The **very first line** of `Validation.md` MUST be exactly one of:
 This is a hard contract with the `workflow-*` profiles and the orchestrator. Same rules as for `[REVIEW_STATUS]` on the first line of `Review.md`:
 
 - No content (preface, blank line, code fence, heading) before the status line — byte position 0.
-- Exactly one of the three values — no shades like "PASSED with warnings". If a warning is significant enough to mention, it stays in the body; the status is still PASSED.
+- Exactly one of the four values — no shades like "PASSED with warnings". If a warning is significant enough to mention, it stays in the body; the status is still PASSED.
 - The verdict in the body MUST match the status line.
 
 Semantics:
 
-- **PASSED** — every mandatory step ran, build is clean (warnings tolerated), all tests passed, and for BUG profile the reproduction scenario is deferred to a manual check (which never lowers the verdict on its own).
-- **FAILED** — at least one mandatory step did not run, or build/tests failed.
-- **FLAKY** — TEST-profile only; one or more new tests showed non-deterministic results across re-runs.
+- **PASSED** — every mandatory step ran, build is clean (warnings tolerated), all tests passed bar the failures outside the task that `### Failures outside the task` gives PASSED, and for BUG profile the reproduction scenario is deferred to a manual check (which never lowers the verdict on its own).
+- **PASSED_WITH_FLAKES** — what PASSED says, and at least one failure outside the task, with no registry entry, failed and then passed on its retry (`outcome` `flaky`); every other failure is `known`. The failures are named in `## Outside the task` and in `outside_failures`; nothing is hidden. Failures that are all `known` leave PASSED, as core's table gives it.
+- **FAILED** — at least one mandatory step did not run, or build/tests failed, or a failure outside the task stayed red on its retry.
+- **FLAKY** — TEST-profile only; a test the task added showed non-deterministic results across re-runs. A failure outside the task is never FLAKY.
+
+The status is the worst of the rows, as core orders them: FAILED > FLAKY > PASSED_WITH_FLAKES > PASSED.
 
 ### Body sections
 
@@ -229,7 +238,10 @@ Desktop or KMP; spine-platform-kotlin:kotlin-server-validator for Server or CLI)
 What the validation covered (modules, build tool, test tasks) and what it could not — every deferred drive step, by name.
 
 ## Regression set
-One table row per module, `Not reached:` after it — the form of `spine-toolkit:task-documents` → "Validation.md": header `| Repository | Module | Why | Run | Tests | HEAD | Log |`, `Why` is `changed`, `depends on <module>` or `ships <module>`, `Run` is `ran` or `carried <sha>`. Before returning, run `lint-validation-scope.sh` of `spine-toolkit` on the task folder, repair each finding once, run it again and name what is left in `## Summary`. On PASSED, close the file with the lines `task-ranges.sh tips <task dir> --kind validated` prints, exactly as printed; on FAILED or FLAKY, none.
+One table row per module, `Not reached:` after it — the form of `spine-toolkit:task-documents` → "Validation.md": header `| Repository | Module | Why | Run | Tests | HEAD | Log |`, `Why` is `changed`, `depends on <module>` or `ships <module>`, `Run` is `ran`, `carried <sha> (phase <N>)` or `carried <sha> (validation)`. Before returning, run `lint-validation-scope.sh` of `spine-toolkit` on the task folder, repair each finding once, run it again and name what is left in `## Summary`. A line of class `reach` is not a finding: leave it for Review. On PASSED or PASSED_WITH_FLAKES, close the file with the lines `task-ranges.sh tips <task dir> --kind validated` prints, exactly as printed; on FAILED or FLAKY, none.
+
+## Outside the task
+Only when a failure outside the task was met or a `permanent` entry passed: the table of `spine-toolkit:task-documents` → "Validation.md", header `| Repository | Module | Test | Outcome | Entry | Why outside | Runs |`, one row per failed test, then a line `KF-<N> no longer fails` for each `permanent` entry whose test passed. `Outcome` is `known`, `flaky` or `red`; `Entry` is `KF-<N>` or `—`.
 
 ## Build Log
 The command, the path of the copied log, the result line, the last 20 lines and every error line — never the whole log (or a clear "skipped: covered by the test step" line for REFACTOR).
@@ -250,7 +262,7 @@ Structured list of every failure. Each entry:
 - Message: full text (truncate only in the return digest, not here)
 
 ## Verdict
-Mirrors the status line in prose: "Passed." / "Failed: <one-liner cause>." / "Flaky: <N>/<total> rate on <test name>."
+Mirrors the status line in prose: "Passed." / "Failed: <one-liner cause>." / "Flaky: <N>/<total> rate on <test name>." / "Passed with <n> flake(s) outside the task."
 One pointer line to `ManualChecks.md` when you wrote one.
 ```
 
@@ -259,7 +271,7 @@ One pointer line to `ManualChecks.md` when you wrote one.
 Return exactly this structure (text, not JSON — orchestrator parses by line prefix):
 
 ```
-[VALIDATION_STATUS] = PASSED | FAILED | FLAKY
+[VALIDATION_STATUS] = PASSED | PASSED_WITH_FLAKES | FAILED | FLAKY
 artifact: <relative path to Validation.md>
 failed_count: <integer>
 errors:
@@ -268,6 +280,10 @@ errors:
 reproduction_status: fixed | still-reproduces | not-replayed | deferred-manual
 flaky_tests:
   - <TestSuite.testName>: <fail_rate, e.g. 2/3>
+outside_failures:
+  - {repository, module, test, outcome, entry}
+known_failures_cleared:
+  - <KF-N>
 manual_checks_path: <relative path to ManualChecks.md, omitted when none was written>
 manual_checks:
   - <one line per case in ManualChecks.md: its title>
@@ -281,9 +297,11 @@ Rules:
 - Include at most 5 entries under `errors:` (the rest live in `Validation.md`). Order: build errors first, then test failures.
 - `reproduction_status` is BUG-only — omit the field entirely on every other profile. For you it is always `deferred-manual`: `not-replayed` says a replay was expected of you and stayed inconclusive, and none was ever possible.
 - `manual_checks:` lists the case titles from `ManualChecks.md` and is empty when you wrote no such file. Non-empty obliges the caller to surface the list to the user.
-- `flaky_tests:` empty list for non-TEST profiles or when no flake was observed.
+- `flaky_tests:` empty list for non-TEST profiles or when no flake was observed. It holds the unstable tests a TEST task added, never a failure outside the task.
+- `outside_failures:` one item per row of `## Outside the task`: `outcome` is `known`, `flaky` or `red`, `entry` is the registry's `KF-<N>` or `—`. Empty when there is none. `known_failures_cleared:` the `KF-<N>` of each `permanent` entry whose test passed in this Validation, empty when there is none.
 - `next_recommended_action`:
   - PASSED → `continue` (also when `manual_checks:` is non-empty — the open item travels to Review via `OpsChecklist.md`)
+  - PASSED_WITH_FLAKES → `continue`
   - FAILED → `ask_user`
   - FLAKY → `ask_user`
 
@@ -303,12 +321,14 @@ Before finalizing `Validation.md` and returning:
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: `deferred-manual`; other profiles: omitted).
 - [ ] Every deferred drive step goes through `## Does this check need a person?`: one the diff changes is a case in `ManualChecks.md` and a title in `manual_checks:`, with its `OpsChecklist.md` item Pending; one the diff does not change is a `## Not covered` line, and a deferred check that needs no person is covered or a `## Not covered` gap, its item N/A.
-- [ ] `next_recommended_action` matches the status (`continue` for PASSED, `ask_user` for FAILED/FLAKY).
+- [ ] Every failure outside the task is a row of `## Outside the task` and an item of `outside_failures`, classified by core's rule and not by this file; a `permanent` entry that passed is in `known_failures_cleared`; the registry is untouched.
+- [ ] `next_recommended_action` matches the status (`continue` for PASSED and PASSED_WITH_FLAKES, `ask_user` for FAILED/FLAKY).
 
 ## What You Never Do
 
 - Modify production code, tests, build scripts, or the version catalog.
 - Run destructive environment commands (`adb shell pm clear`, `adb emu kill`, `docker system prune`) unless the task explicitly asks.
+- Write the known failures registry, or report a failure outside the task as PASSED without a row for it in `## Outside the task`.
 - Report PASSED if any mandatory step was skipped, errored out, or could not run.
 - Claim anything about a running app — you drive nothing, and a deferred check is reported as deferred.
 - Hide failures by truncating logs on disk — truncation applies only to the return digest.

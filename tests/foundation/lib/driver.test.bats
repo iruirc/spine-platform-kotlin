@@ -38,9 +38,10 @@ setup() {
   # 2.36.0: core ships ## What a case must prove and ## Code references, on top of 2.32.0 ## Does this check need a person?, which the validators apply before they write a case.
   # 2.37.0: core ships ## Marks for a collective pass, which the validator points at when the epic asks for one.
   # 2.39.0: core hands Validation the regression set, validation_ranges and lint-validation-scope.sh, which the validator runs.
+  # 2.44.0: core classifies failures outside the task, returns PASSED_WITH_FLAKES and carries green whole-module runs, which the validator follows.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$output" = ">=2.39.0 <3" ] || { echo "floor: $output"; return 1; }
+  [ "$output" = ">=2.44.0 <3" ] || { echo "floor: $output"; return 1; }
 }
 
 @test "the vendored manifest lint is the copy that knows the Driver block" {
