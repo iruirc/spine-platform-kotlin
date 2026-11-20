@@ -234,7 +234,16 @@ non_zero_test_task_is_classified() {
   if grep -qF 'Exit code decides pass/fail' "$V"; then echo "the old exit-code rule remains"; return 1; fi
   grep -qF 'A test task exits non-zero on any test failure: when every failure it reports is outside the task, it is classified by core'"'"'s `### Failures outside the task` as that subsection says, not FAILED for the exit code alone.' "$V" || { echo "no classification of a non-zero test task"; return 1; }
   grep -qF 'A compile or build error is `BUILD FAILED` and FAILED' "$V" || { echo "a build error is not FAILED"; return 1; }
-  grep -qF -- '--continue' "$V" || { echo "the test step stops at the first failing module"; return 1; }
+  local forms f
+  case "$V" in
+    *kotlin-jvm-validator.md) forms='./gradlew --console=plain --continue :a:test :b:test' ;;
+    *kotlin-server-validator.md) forms='./gradlew --continue :a:test :b:test' ;;
+    *kotlin-ui-validator.md) forms='Android `./gradlew --continue :<app>:testDebugUnitTest`|Desktop `./gradlew --continue :<app>:test`|KMP `./gradlew --continue :<module>:allTests`' ;;
+  esac
+  local IFS='|'
+  for f in $forms; do
+    grep -qF -- "$f" "$V" || { echo "the test form lacks --continue: $f"; return 1; }
+  done
   grep -qF 'a retry of failures outside the task uses the same `--rerun --tests` form as `## Flaky Detection (TEST profile)`' "$V" || { echo "no retry form"; return 1; }
   if grep -qF 'every test of its regression set passes' "$V"; then echo "the role intro says every test passes"; return 1; fi
   if grep -qF 'tests of its regression set pass,' "$V"; then echo "the role intro says the tests pass"; return 1; fi
