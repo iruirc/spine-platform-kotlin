@@ -273,3 +273,12 @@ registry_is_untouched() {
 @test "the validator never writes the registry, in the checklist and in What You Never Do" {
   each registry_is_untouched
 }
+
+null_rerun_keeps_carried_runs() {
+  grep -qF 'With `rerun` null or absent, run every module of the set that no carried source covers' "$V" || { echo "no null-rerun rule"; return 1; }
+  ! grep -qF 'run the whole set' "$V" || { echo "still runs the whole set"; return 1; }
+}
+
+@test "a null rerun runs every module of the set that no carried source covers" {
+  each null_rerun_keeps_carried_runs
+}
