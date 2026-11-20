@@ -229,6 +229,32 @@ inside_is_failed_and_registry_is_an_input() {
   each inside_is_failed_and_registry_is_an_input
 }
 
+non_zero_test_task_is_classified() {
+  grep -qF 'The exit code decides whether a step ran green' "$V" || { echo "the exit code still decides pass/fail"; return 1; }
+  if grep -qF 'Exit code decides pass/fail' "$V"; then echo "the old exit-code rule remains"; return 1; fi
+  grep -qF 'A test task exits non-zero on any test failure: when every failure it reports is outside the task, it is classified by core'"'"'s `### Failures outside the task` as that subsection says, not FAILED for the exit code alone.' "$V" || { echo "no classification of a non-zero test task"; return 1; }
+  grep -qF 'A compile or build error is `BUILD FAILED` and FAILED' "$V" || { echo "a build error is not FAILED"; return 1; }
+  grep -qF -- '--continue' "$V" || { echo "the test step stops at the first failing module"; return 1; }
+  grep -qF 'a retry of failures outside the task uses the same `--rerun --tests` form as `## Flaky Detection (TEST profile)`' "$V" || { echo "no retry form"; return 1; }
+  if grep -qF 'every test of its regression set passes' "$V"; then echo "the role intro says every test passes"; return 1; fi
+  if grep -qF 'tests of its regression set pass,' "$V"; then echo "the role intro says the tests pass"; return 1; fi
+}
+
+@test "a non-zero test task over failures outside the task is classified, not FAILED for its exit code" {
+  each non_zero_test_task_is_classified
+}
+
+registry_is_untouched() {
+  grep -qF 'Write the known failures registry, or report a failure outside the task as PASSED without a row for it in `## Outside the task`.' "$V" || { echo "no registry line in What You Never Do"; return 1; }
+  grep -qF 'the registry is untouched' "$V" || { echo "no registry item in the checklist"; return 1; }
+  sed -n '/^## Self-Verification/,/^## What You Never Do/p' "$V" | grep -qF 'the registry is untouched' || { echo "the registry item is not in Self-Verification"; return 1; }
+  sed -n '/^## What You Never Do/,/^## Output Language/p' "$V" | grep -qF 'Write the known failures registry' || { echo "the registry line is not in What You Never Do"; return 1; }
+}
+
+@test "the validator never writes the registry, in the checklist and in What You Never Do" {
+  each registry_is_untouched
+}
+
 @test "core at the floor has the subsection the validators point at" {
   [ -d "$CORE/.git" ] || skip "no spine-toolkit checkout beside this one"
   floor="$(python3 -c 'import json,sys,re; d=json.load(open(sys.argv[1]))["dependencies"]; v=[x["version"] for x in d if x["name"]=="spine-toolkit"][0]; print(re.search(r">=\s*(\d+\.\d+\.\d+)", v).group(1))' "$ROOT/.claude-plugin/plugin.json")"
