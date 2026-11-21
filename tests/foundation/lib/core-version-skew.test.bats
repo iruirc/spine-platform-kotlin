@@ -17,7 +17,7 @@ setup() {
   missing=""
   for agent in "$ROOT"/agents/*.md; do
     # long-run.sh is in every core this platform's floor admits.
-    scripts="$(grep -oE '[a-z0-9-]+\.sh' "$agent" | sort -u | while read -r s; do
+    scripts="$(grep -oE '[A-Za-z0-9_-]+\.sh' "$agent" | sort -u | while read -r s; do
       [ "$s" != long-run.sh ] && [ -f "$CORE/scripts/$s" ] && echo "$s"; done | tr '\n' ' ')"
     [ -z "$scripts" ] && continue
     grep -qxF "$GUARD" "$agent" || missing="$missing$(basename "$agent") ($scripts)\n"
@@ -26,8 +26,14 @@ setup() {
 }
 
 @test "the spine-toolkit range in plugin.json is one the core reads" {
-  # The grammar of spine-toolkit's scripts/lib/core_compat.py: comparisons separated by spaces.
   range="$(python3 -c 'import json,sys; print([d["version"] for d in json.load(open(sys.argv[1]))["dependencies"] if d["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json")"
-  grep -qE '^(>=|<=|>|<|=)[0-9]+(\.[0-9]+){0,2}( (>=|<=|>|<|=)[0-9]+(\.[0-9]+){0,2})*$' <<<"$range" \
-    || { echo "core cannot read the range '$range'"; return 1; }
+  if [ -f "$CORE/scripts/lib/core_compat.py" ]; then
+    # Core's own parser: None is a range it cannot read, and a run would then never be checked.
+    python3 -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from core_compat import in_range; sys.exit(in_range("0.0.0", sys.argv[2]) is None)' \
+      "$CORE/scripts/lib" "$range" || { echo "core cannot read the range '$range'"; return 1; }
+  else
+    # No checkout beside: the grammar of core's scripts/lib/core_compat.py, comparisons separated by spaces.
+    grep -qE '^(>=|<=|>|<|=)[0-9]+(\.[0-9]+){0,2}( (>=|<=|>|<|=)[0-9]+(\.[0-9]+){0,2})*$' <<<"$range" \
+      || { echo "core cannot read the range '$range'"; return 1; }
+  fi
 }
