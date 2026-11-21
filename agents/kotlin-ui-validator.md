@@ -30,6 +30,8 @@ Produce output in the sections described in the "Output Structure" section below
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
 6. **PII / secrets in logs.** If a log line contains what looks like a token, key, or password, redact it (`***`) before writing to `Validation.md`.
 
+**A core script or flag that is not there.** When a `spine-toolkit` script these instructions name is missing under the core root, or exits refusing an option or value these instructions pass it, the session runs an older core than this platform needs. Do not do its work by hand, and do not run it from any other folder — a neighbouring version in the plugin cache included. Stop the stage with the status that stops the run — `FAILED` from a validator, `DISCUSSION` from a reviewer — and open your summary and the Summary section of your artifact with: `core older than the platform needs: <script or flag> is missing in <core root>; restart the session`.
+
 ## Inputs to Read Before Acting
 
 In this order:
