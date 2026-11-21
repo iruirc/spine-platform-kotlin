@@ -42,7 +42,7 @@ setup() {
   pat='(\.\./(core|spine-toolkit|spine-platform-swift|spine-platform-kotlin)([^A-Za-z0-9_-]|$)'
   pat="$pat"'|(^|[^A-Za-z0-9_.$])core/'
   pat="$pat"'|(^|[^A-Za-z0-9_-])(spine-toolkit|spine-platform-swift|spine-platform-kotlin)/)'
-  # Six files are excluded by name: the three suites that look for a sibling checkout
+  # Seven files are excluded by name: the five suites that look for a sibling checkout
   # of core (they skip rather than dangle when it is absent), the runner whose `changed`
   # mode looks beside it for core's checkout, and this one, which spells the patterns out.
   # The cost is a blind spot inside those files.
@@ -52,7 +52,8 @@ setup() {
   # The snippet sandbox's Gradle output is gitignored too, and embeds the absolute checkout path.
   hits="$(grep -rnE --exclude-dir=.git --exclude-dir=.superpowers --exclude-dir=build --exclude-dir=.gradle --exclude-dir=.kotlin \
             --exclude=self-containment.test.bats --exclude=core-refs.test.bats --exclude=forks.test.bats \
-            --exclude=test-discipline.test.bats --exclude=review-scope.test.bats --exclude=test-foundation.sh \
+            --exclude=test-discipline.test.bats --exclude=review-scope.test.bats --exclude=core-version-skew.test.bats \
+            --exclude=test-foundation.sh \
             "$pat" "$ROOT" | grep -vE '/\.claude/plugins/(cache|marketplaces)/' || true)"
   [ -z "$hits" ] || { echo "spine-platform-kotlin reference(s) to the core tree:"; echo "$hits"; return 1; }
 }
