@@ -9,7 +9,7 @@
 setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
   CORE="${SPINE_TOOLKIT_CORE:-$ROOT/../spine-toolkit}"
-  GUARD='**A core script or flag that is not there.** When a `spine-toolkit` script these instructions name is missing under the core root, or exits refusing an option or value these instructions pass it, the session runs an older core than this platform needs. Do not do its work by hand, and do not run it from any other folder — a neighbouring version in the plugin cache included. Stop the stage with the status that stops the run — `FAILED` from a validator, `DISCUSSION` from a reviewer — and open your summary and the Summary section of your artifact with: `core older than the platform needs: <script or flag> is missing in <core root>; restart the session`.'
+  GUARD='**A core script or flag that is not there.** When a `spine-toolkit` script these instructions name is missing under the core root, or rejects as unknown an option or value these instructions pass it (a usage error, not a finding), the session runs an older core than this platform needs. A script that exits non-zero to report findings, or a stop it is meant to give, is working: handle that exit as these instructions say. Do not do the work of a missing script by hand, and do not run it from any other folder — a neighbouring version in the plugin cache included. Stop the stage with the status that stops the run — `FAILED` from a validator, `DISCUSSION` from a reviewer — and open your summary and the Summary section of your artifact with: `core older than the platform needs: <script or flag> is missing in <core root>; restart the session`.'
 }
 
 @test "every agent that runs a core script carries the guard" {
