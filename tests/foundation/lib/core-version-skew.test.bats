@@ -1,4 +1,5 @@
 #!/usr/bin/env bats
+# changed: sweep agents
 # A session can run a core older than this platform's agents need: the agents load from the newest
 # install, the core from whatever the session started with. An agent that meets a core script or
 # flag that is not there stops its stage — it never does the script's work by hand, and never runs
