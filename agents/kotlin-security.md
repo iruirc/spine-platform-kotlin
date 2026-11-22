@@ -83,7 +83,7 @@ Audit source code, build scripts (build.gradle.kts, libs.versions.toml, gradle.p
 
 ## Skills Reference (core)
 
-- `spine-toolkit:ops-checklist` — the security rows of the checklist this audit feeds
+- `spine-toolkit:security-lens` — decides whether a task touches the security perimeter and runs the lens when it does; this audit is its platform half
 - `spine-toolkit:feature-requirements` — the Secondary table where privacy and permission requirements land
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management, for findings that become their own task
 

@@ -39,9 +39,10 @@ setup() {
   # 2.37.0: core ships ## Marks for a collective pass, which the validator points at when the epic asks for one.
   # 2.39.0: core hands Validation the regression set, validation_ranges and lint-validation-scope.sh, which the validator runs.
   # 2.44.0: core classifies failures outside the task, returns PASSED_WITH_FLAKES and carries green whole-module runs, which the validator follows.
+  # 2.46.0: core retires ops-checklist for ops-risks, so a platform no longer names the skill that is gone.
   run python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["dependencies"]; print([x["version"] for x in d if x["name"]=="spine-toolkit"][0])' "$ROOT/.claude-plugin/plugin.json"
   [ "$status" -eq 0 ] || { echo "$output"; return 1; }
-  [ "$output" = ">=2.44.0 <3" ] || { echo "floor: $output"; return 1; }
+  [ "$output" = ">=2.46.0 <3" ] || { echo "floor: $output"; return 1; }
 }
 
 @test "the vendored manifest lint is the copy that knows the Driver block" {

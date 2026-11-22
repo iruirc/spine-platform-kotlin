@@ -154,7 +154,7 @@ Consult the skill that matches the target and the concern at hand:
 - `spine-toolkit:feature-requirements` — Research-stage skill: Primary vs Secondary requirements, designer/backend questions, known unknowns; produces `## Requirements` in Research.md
 - `spine-toolkit:feature-landscape` — Research-stage skill: entity graph + layer map + integration points + work-item decomposition; produces `## Landscape` in Research.md and seeds Plan.md phases
 - `spine-toolkit:feature-estimation` — Plan-stage skill: calibrated day range from work items; produces `## Estimation` in Plan.md
-- `spine-toolkit:ops-checklist` — produced by the validator as `OpsChecklist.md`; design so that feature flags, analytics, deep links, offline behaviour are explicit in the proposed design, not afterthoughts
+- `spine-toolkit:ops-risks` — apply its `## Plan`: the proof of each risk the design triggers goes into a phase.
 - `spine-toolkit:docs-route` — at Plan, name the documentation components the design touches so the run can route them
 - `spine-toolkit:task-new`, `spine-toolkit:task-move` — task lifecycle management
 

@@ -606,4 +606,4 @@ adb shell am start -W -a android.intent.action.VIEW -d "https://example.com/orde
    `Start-Process "myapp://app/orders/42"` in PowerShell.
 5. **None of this is a regression test.** It needs a device, a network and a file someone else
    deploys. The regression tests are `The Parser Test` and the gate's; these commands belong on the
-   release checklist (`spine-toolkit:ops-checklist`).
+   release checklist.

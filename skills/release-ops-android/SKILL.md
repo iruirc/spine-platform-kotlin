@@ -21,7 +21,7 @@ targets — versioning, CI lanes, crash reporting, feature flags, secrets — is
 ## When to Use
 
 - `spine-toolkit:feature-estimation` needs the Play review buffer or a verdict on the
-  fragmentation delta, or `spine-toolkit:ops-checklist` has a **Release ops** row to settle
+  fragmentation delta, or `spine-toolkit:ops-risks` found a `release-settings` risk to settle
 - `spine-toolkit:feature-requirements` listed push, permissions or accessibility as a secondary
   requirement and nobody has priced it
 - A release is being prepared and nobody has said which track it goes to

@@ -22,7 +22,7 @@ flags and secrets in CI are shared with every target and live in `release-ops`.
 ## When to Use
 
 - `spine-toolkit:feature-estimation` needs a release-review buffer for a service or a verdict on
-  platform fragmentation, or `spine-toolkit:ops-checklist` has a **Release ops** row to settle
+  platform fragmentation, or `spine-toolkit:ops-risks` found a `release-settings` risk to settle
 - `spine-toolkit:feature-requirements` put a probe, a freeze window or an observability signal in
   the secondary list
 - A service is going into a container for the first time, or the image is 900 MB

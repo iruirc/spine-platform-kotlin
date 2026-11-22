@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Adapted from spine-toolkit scripts/lint-core-refs.sh sha256:5d36a2ec78516c22bf741604c77a7afc1db2a936df72ac1f060412e4d68358ff
+# Adapted from spine-toolkit scripts/lint-core-refs.sh sha256:734132a432237e5b0b1aeff7b137b7d46df7a47071b881669faafd6cd484f02a
 # Adapted from spine-toolkit's lint. Plugins share no code; update both or neither.
 # Checks a platform plugin's references to core skills against the version floor
 # the platform itself declares. Two rules: a namespaced reference must resolve to
@@ -86,7 +86,7 @@ done < <(grep -rnoE "$CORE:[a-z][a-z0-9-]*" "$plugin/agents" "$plugin/skills" 2>
 # vocabulary (`lang`, `setup`, `orchestrator`) legitimately appears bare as a
 # dispatch field or an Entrypoints row, and 11 of the platform's occurrences are
 # exactly that. The cost is a known blind spot, named in the spec as D-11.
-# The pattern needs a backtick on both sides, so `spine-toolkit:ops-checklist`
+# The pattern needs a backtick on both sides, so `spine-toolkit:feature-landscape`
 # cannot match: the colon is outside the character class.
 while IFS= read -r hit; do
   tok="${hit##*:}"

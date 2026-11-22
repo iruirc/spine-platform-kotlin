@@ -22,7 +22,7 @@ sibling that matches the target.
 
 ## When to Use
 
-- A methodology skill — `spine-toolkit:ops-checklist`, `spine-toolkit:feature-requirements` or
+- A methodology skill — `spine-toolkit:ops-risks`, `spine-toolkit:feature-requirements` or
   `spine-toolkit:feature-estimation` — named topic **release ops** and needs a number: a calendar
   buffer, a binary-distribution tier, or whether platform fragmentation applies
 - A build has no CI yet, or has lanes nobody can name the order of

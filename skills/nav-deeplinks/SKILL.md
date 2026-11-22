@@ -252,8 +252,9 @@ adb shell pm get-app-links com.example.app
 6. **A `PendingIntent` is opaque to a test.** Build the `Intent` in a named function, assert on that
    function, and let the wrapping be one untested line.
 7. **Put link verification on the release checklist.** It depends on the signing key and on a file
-   someone else deploys, so it breaks between releases with no code change:
-   `spine-toolkit:ops-checklist`.
+   someone else deploys, so it breaks between releases with no code change.
+   A registered route that changes is the `contract` risk of `spine-toolkit:ops-risks` at Review: a
+   test that the previous links still work.
 
 ## Common Mistakes
 

@@ -193,10 +193,10 @@ rule_two_names_the_flakes() {
   each rule_two_names_the_flakes
 }
 
-@test "the toolkit floor is 2.44.0" {
-  grep -qF '{ "name": "spine-toolkit", "version": ">=2.44.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "the spine-toolkit floor is not >=2.44.0 <3"; return 1; }
-  grep -qF '`spine-toolkit` `>=2.44.0 <3`' "$ROOT/README.md" || { echo "the README floor is not >=2.44.0 <3"; return 1; }
+@test "the toolkit floor is 2.46.0" {
+  grep -qF '{ "name": "spine-toolkit", "version": ">=2.46.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "the spine-toolkit floor is not >=2.46.0 <3"; return 1; }
+  grep -qF '`spine-toolkit` `>=2.46.0 <3`' "$ROOT/README.md" || { echo "the README floor is not >=2.46.0 <3"; return 1; }
 }
 
 statuses_follow_core() {
