@@ -307,6 +307,9 @@ Group by severity, each finding includes Category, Location (`file:line`), Descr
 - **Minor** (code quality, idiom, maintainability)
 - **Suggestions** (non-blocking ideas)
 
+### Ops risks
+This is the section core calls `## Ops risks`: one line per triggered risk, `- <label> — <the proof in words> (<ref>)`, or the single line `- none triggered — the diff touches <X>`. A risk with no proof is also a finding under `### Findings`.
+
 ### For Done
 This is the section core calls `## For Done` — core's Done stage closes every item in it; write it at the level of your other sections. Findings that editing files inside the task folder — `Done.md`, `Plan.md`, `Walkthrough.md` — closes without a single code commit. They do not make the status `CHANGES_REQUESTED` on their own; Done closes them. Omit the section when there are none.
 

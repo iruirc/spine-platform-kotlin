@@ -8,14 +8,16 @@ setup() {
   ROOT="$(cd -- "$(dirname -- "$BATS_TEST_FILENAME")/../../.." && pwd)"
 }
 
-@test "no agent or skill names OpsChecklist.md or ops-checklist" {
-  hits="$(cd "$ROOT" && grep -rIl -E 'OpsChecklist|ops-checklist|ops_checklist' agents skills conventions || true)"
+@test "no agent or skill names OpsChecklist.md, ops-checklist or the Manual test pass item" {
+  hits="$(cd "$ROOT" && grep -rIl -E 'OpsChecklist|ops-checklist|ops_checklist|Manual test pass' agents skills conventions || true)"
   [ -z "$hits" ] || { echo "still named in: $hits"; return 1; }
 }
 
 @test "the reviewer applies ops-risks at Review and the architect at Plan" {
-  grep -F 'spine-toolkit:ops-risks' "$ROOT/agents/kotlin-reviewer.md" | grep -qF '## Review'
-  grep -F 'spine-toolkit:ops-risks' "$ROOT/agents/kotlin-architect.md" | grep -qF '## Plan'
+  grep -F 'spine-toolkit:ops-risks' "$ROOT/agents/kotlin-reviewer.md" | grep -qF '## Review' \
+    || { echo "kotlin-reviewer.md does not apply spine-toolkit:ops-risks with ## Review"; return 1; }
+  grep -F 'spine-toolkit:ops-risks' "$ROOT/agents/kotlin-architect.md" | grep -qF '## Plan' \
+    || { echo "kotlin-architect.md does not apply spine-toolkit:ops-risks with ## Plan"; return 1; }
 }
 
 @test "the toolkit floor is 2.46.0" {

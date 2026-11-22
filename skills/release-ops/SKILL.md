@@ -22,9 +22,11 @@ sibling that matches the target.
 
 ## When to Use
 
-- A methodology skill — `spine-toolkit:ops-risks`, `spine-toolkit:feature-requirements` or
-  `spine-toolkit:feature-estimation` — named topic **release ops** and needs a number: a calendar
-  buffer, a binary-distribution tier, or whether platform fragmentation applies
+- `spine-toolkit:feature-requirements` or `spine-toolkit:feature-estimation` named topic
+  **release ops** and needs a number: a calendar buffer, a binary-distribution tier, or whether
+  platform fragmentation applies
+- `spine-toolkit:ops-risks` found a `release-settings` risk, and what must agree — signing, the
+  version a build declares — is to be settled
 - A build has no CI yet, or has lanes nobody can name the order of
 - Someone is about to type a version number into a build file
 - A crash arrives obfuscated, or does not arrive at all
