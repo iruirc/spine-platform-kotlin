@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ATest" tests="3" skipped="1" failures="0" errors="0" timestamp="2026-11-25T10:00:00" hostname="localhost" time="0.12">
+  <properties/>
+  <testcase name="a()" classname="com.example.ATest" time="0.01"/>
+  <testcase name="b()" classname="com.example.ATest" time="0.01"/>
+  <testcase name="c()" classname="com.example.ATest" time="0.0"><skipped/></testcase>
+</testsuite>

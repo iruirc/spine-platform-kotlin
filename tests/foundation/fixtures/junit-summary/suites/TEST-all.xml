@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="6" failures="0" errors="0">
+  <testsuite name="com.example.DTest" tests="2" failures="0" errors="0" skipped="0"/>
+  <testsuite name="com.example.ETest" tests="4" failures="0" errors="0" skipped="1"/>
+</testsuites>

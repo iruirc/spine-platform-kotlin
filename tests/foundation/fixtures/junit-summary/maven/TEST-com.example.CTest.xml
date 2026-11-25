@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="3.0" name="com.example.CTest" time="0.2" failures="0" errors="1" skipped="0" tests="4">
+  <testcase name="f" classname="com.example.CTest" time="0.01"/>
+  <testcase name="g" classname="com.example.CTest" time="0.01"/>
+  <testcase name="h" classname="com.example.CTest" time="0.01"><error type="java.lang.IllegalStateException"/></testcase>
+  <testcase name="i" classname="com.example.CTest" time="0.01"/>
+</testsuite>
