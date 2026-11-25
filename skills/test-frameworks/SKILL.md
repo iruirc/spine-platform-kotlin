@@ -276,6 +276,31 @@ Gradle plugin with `com.google.devtools.ksp`, and `kotest-framework-engine` in `
 Android: `useJUnitPlatform()` in `testOptions` for unit tests, and for an instrumented test
 `kotest-runner-junit4` with `@RunWith(KotestTestRunner::class)`.
 
+## Result line
+
+The same for every value of the axis: they differ in what a report holds, not where it lands. The
+result line is the line of a run's log that says how many tests ran.
+
+A green Gradle or Amper run prints no count, so the run's command calls this plugin's
+`<platform-root>/scripts/junit-summary.sh` over the module's report directory, in the same command
+as the tests, so that its line lands in the same log, and keeps the tests' exit status:
+
+```bash
+./gradlew --console=plain :app:test; s=$?; <platform-root>/scripts/junit-summary.sh app/build/test-results/test; exit $s
+```
+
+```text
+JUnit XML: N tests, F failures, E errors, S skipped in K files
+```
+
+That line is the result line and `N` its count. Gradle's directory is `build/test-results/<task>/`
+of the module, one per test task; Amper's are under `build/tasks/`, one `test-results/` per test
+task, and the script takes several. It reads only the directories it is given and exits 1 when they
+hold no report, so an empty run never reads as zero tests passed.
+
+Maven prints its own: `Tests run: N, Failures: F, Errors: E, Skipped: S` per class and once more for
+the module, under `Results:`. The last such line is the result line.
+
 ## Main Dispatcher in Tests
 
 `viewModelScope`, and anything else that launches on `Dispatchers.Main`, takes no dispatcher

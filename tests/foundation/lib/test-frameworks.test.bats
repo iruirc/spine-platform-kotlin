@@ -36,13 +36,22 @@ h2s() {
 }
 
 @test "every framework section of the skill is a value of the tests axis" {
-  # Skeleton B's own sections and the two that span every value are not framework sections;
+  # Skeleton B's own sections and the three that span every value are not framework sections;
   # everything else must be a value, so a framework dropped from the axis cannot leave a section behind.
   values="$(axis_values tests)"
   while IFS= read -r h; do
-    case "$h" in "When to Use"|"Common Mistakes"|"Forced by surface"|"Main Dispatcher in Tests") continue ;; esac
+    case "$h" in "When to Use"|"Common Mistakes"|"Forced by surface"|"Main Dispatcher in Tests"|"Result line") continue ;; esac
     grep -qxF -- "$h" <<<"$values" || { echo "'## $h' is no value of the tests axis"; return 1; }
   done < <(h2s "$SKILL")
+}
+
+@test "the result line is named for every build, Gradle's from the JUnit XML" {
+  body="$(awk '$0=="## Result line"{f=1;next} f&&/^## /{exit} f' "$SKILL")"
+  [ -n "$body" ] || { echo "no '## Result line'"; return 1; }
+  for t in 'scripts/junit-summary.sh' 'JUnit XML: N tests, F failures, E errors, S skipped in K files' \
+           'same command' 'Tests run: N, Failures: F, Errors: E, Skipped: S' 'Amper'; do
+    grep -qF -- "$t" <<<"$body" || { echo "## Result line does not say: $t"; return 1; }
+  done
 }
 
 @test "every framework section carries all seven subsections" {
