@@ -204,3 +204,8 @@ common_block() {
     || { echo "scanned $blocks kotlin block(s), $tests @Test line(s); the scan went vacuous"; return 1; }
   [ -z "$hits" ] || { echo "$hits"; return 1; }
 }
+
+@test "the example puts the tests and the summary under one long-run job" {
+  body="$(awk '$0=="## Result line"{f=1;next} f&&/^## /{exit} f' "$SKILL")"
+  grep -qF "long-run.sh start -- bash -c '" <<<"$body" || { echo "the example is not one long-run job"; return 1; }
+}

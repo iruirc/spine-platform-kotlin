@@ -283,10 +283,12 @@ result line is the line of a run's log that says how many tests ran.
 
 A green Gradle or Amper run prints no count, so the run's command calls this plugin's
 `<platform-root>/scripts/junit-summary.sh` over the module's report directory, in the same command
-as the tests, so that its line lands in the same log, and keeps the tests' exit status:
+as the tests, so that its line lands in the same log, and keeps the tests' exit status. Under
+`long-run.sh` that is one job, the shell line passed whole to `bash -c`, because `start` runs its
+arguments as one command, not through a shell:
 
 ```bash
-./gradlew --console=plain :app:test; s=$?; <platform-root>/scripts/junit-summary.sh app/build/test-results/test; exit $s
+long-run.sh start -- bash -c './gradlew --console=plain :app:test; s=$?; <platform-root>/scripts/junit-summary.sh app/build/test-results/test; exit $s'
 ```
 
 ```text

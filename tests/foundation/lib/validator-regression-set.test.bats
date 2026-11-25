@@ -173,7 +173,8 @@ return_carries_the_new_status_and_fields() {
 rerun_carries_from_phase_or_validation() {
   grep -qF 'carried <sha> (phase <N>)' "$V" || { echo "no phase source"; return 1; }
   grep -qF 'carried <sha> (validation)' "$V" || { echo "no validation source"; return 1; }
-  grep -qF 'ran: <repository> <module> HEAD <sha> Executed <N> log phase-evidence/phase-<id>/<module>.log' "$V" || { echo "no ran: line"; return 1; }
+  grep -qF 'ran: <repository> <module> HEAD <sha> tests <N> result "<result line>" log phase-evidence/phase-<id>/<module>.log' "$V" || { echo "no ran: line"; return 1; }
+  grep -qF '`Executed <N>` where `tests <N>` stands in a line written before that form' "$V" || { echo "the old ran: form is not read"; return 1; }
   grep -qF 'of several sources the latest wins, and a module red in the latest Validation that ran it runs again' "$V" || { echo "no latest-wins rule"; return 1; }
   grep -qF 'A line of class `reach` is not a finding: leave it for Review.' "$V" || { echo "reach lines are not left for Review"; return 1; }
   if grep -qF 'Run` is `ran` or `carried <sha>`' "$V"; then echo "the Run column keeps the bare carried form"; return 1; fi

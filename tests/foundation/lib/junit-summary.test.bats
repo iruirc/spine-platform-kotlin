@@ -39,3 +39,8 @@ setup() {
   [ "$status" -eq 2 ] || { echo "status $status"; return 1; }
   grep -qF 'usage' <<<"$stderr" || { echo "stderr: $stderr"; return 1; }
 }
+
+@test "a testsuite tag a test printed into its captured output is not counted" {
+  run "$SCRIPT" "$FIX/cdata"
+  [ "$output" = "JUnit XML: 2 tests, 0 failures, 0 errors, 0 skipped in 1 files" ] || { echo "$output"; return 1; }
+}

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.FTest" tests="2" skipped="0" failures="0" errors="0" time="0.01">
+  <testcase name="j()" classname="com.example.FTest" time="0.01"/>
+  <testcase name="k()" classname="com.example.FTest" time="0.01"/>
+  <system-out><![CDATA[printed by a test:
+<testsuite tests="100" failures="3">
+<testsuite tests="7"/>
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

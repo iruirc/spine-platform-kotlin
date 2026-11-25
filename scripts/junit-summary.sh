@@ -3,7 +3,8 @@
 #   JUnit XML: N tests, F failures, E errors, S skipped in K files
 # A green Gradle or Amper run prints no count of its own, so a run's command calls this after the
 # tests, and the line lands in the same log. Sums the tests, failures, errors and skipped attributes
-# of every <testsuite> start tag (a <testsuites> root's own totals are not counted again). Reads the
+# of every <testsuite> start tag (a <testsuites> root's own totals are not counted again; a tag
+# inside CDATA, where captured output sits, is text, not a suite). Reads the
 # TEST-*.xml files directly in each named directory, not in its subdirectories; runs nothing.
 # Usage: junit-summary.sh <reports-dir>...
 # Exit: 0 printed; 1 no TEST-*.xml in any named directory; 2 usage.
@@ -27,8 +28,12 @@ if [ "${#files[@]}" -eq 0 ]; then
 fi
 
 awk -v k="${#files[@]}" '
-  BEGIN { RS = ">"; t = 0; f = 0; e = 0; s = 0 }
+  BEGIN { RS = ">"; t = 0; f = 0; e = 0; s = 0; cdata = 0 }
   {
+    # Captured output sits in CDATA, which may hold any text, a <testsuite tag a test printed included.
+    # A record ends at a ">", so a CDATA section ends with a record that ends in "]]".
+    if (cdata) { if ($0 ~ /]]$/) cdata = 0; next }
+    if (index($0, "<![CDATA[")) { cdata = ($0 !~ /]]$/); next }
     i = index($0, "<testsuite")
     if (i == 0) next
     tag = substr($0, i + 10)
