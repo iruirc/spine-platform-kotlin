@@ -256,3 +256,41 @@ PY
   grep -qF 'each secret header (`Authorization`, `Cookie`, an API key)' "$f" || { echo "no secret header rule"; return 1; }
   grep -qF 'shown as `***`' "$f" || { echo "no *** rule"; return 1; }
 }
+
+# evidence.sh exits 2 on a ## Redact line that does not parse, on no project config and on an evidence
+# dir with no task folder above it. Read as a usage error, that exit sent the validator to "A core
+# script or flag that is not there" and the user to restart the session instead of fixing the config.
+@test "rule 4 says an evidence.sh exit 2 about the config is a configuration error, not an older core" {
+  for f in "$ROOT"/agents/*-validator.md; do
+    r="$(grep '^4\. \*\*Full logs' "$f")"
+    grep -qF 'An `evidence.sh` exit 2 whose message names `## Redact`, the project config or the task folder is a configuration error: the step fails with that message; it is not an older core, and "A core script or flag that is not there" does not apply.' <<<"$r" \
+      || { echo "$(basename "$f"): no configuration-error rule"; return 1; }
+  done
+}
+
+# A bare `evidence.sh raw`, `keep-image` or `keep <…>` runs from the project root, where there is none.
+@test "every evidence.sh command is written from the core root" {
+  local bare
+  for f in "$ROOT"/agents/*-validator.md; do
+    bare="$(grep -oE '`[^`]*evidence\.sh (raw|keep-image|keep [^`]+)[^`]*`' "$f" | grep -vF '`<core root>/scripts/evidence.sh ' || true)"
+    [ -z "$bare" ] || { echo "$(basename "$f"): $bare"; return 1; }
+  done
+}
+
+# gradle-toolchain: a command with a shell redirect is matched by no Codex rule and stops to ask, and a
+# file "in a temp file" or "into a file" has no stated location. A process log comes from long-run.sh,
+# which writes it in $TMPDIR; logcat is written on the device and pulled.
+@test "the app, server and logcat logs come with no shell redirect" {
+  local ui="$ROOT/agents/kotlin-ui-validator.md" srv="$ROOT/agents/kotlin-server-validator.md"
+  for f in "$ui" "$srv"; do
+    ! grep -nE '> <file>|2>&1 &|into a temp file|log into a file' "$f" || { echo "$(basename "$f"): a redirect or an unplaced file"; return 1; }
+  done
+  grep -qF '`<core root>/scripts/long-run.sh start --parallel -- ./gradlew :<app>:run`' "$ui" || { echo "ui: desktop app not started through long-run.sh"; return 1; }
+  grep -qF '`<core root>/scripts/long-run.sh stop <log>`' "$ui" || { echo "ui: desktop app not stopped through long-run.sh"; return 1; }
+  grep -qF '`adb -s <serial> logcat -d -f /sdcard/spine-logcat.txt -s AndroidRuntime:E`' "$ui" || { echo "ui: logcat not written on the device"; return 1; }
+  grep -qF '`adb -s <serial> pull /sdcard/spine-logcat.txt <dir>/logcat.txt`' "$ui" || { echo "ui: logcat not pulled"; return 1; }
+  grep -qF '`<core root>/scripts/evidence.sh keep <dir>/logcat.txt <task_path>/validation-evidence/<timestamp>/ --name logcat' "$ui" || { echo "ui: pulled logcat not kept"; return 1; }
+  grep -qF '`<core root>/scripts/long-run.sh start --parallel -- <command>`' "$srv" || { echo "server: not booted through long-run.sh"; return 1; }
+  grep -qF '`<core root>/scripts/long-run.sh stop <log>`' "$srv" || { echo "server: not stopped through long-run.sh"; return 1; }
+  grep -qF '`<core root>/scripts/evidence.sh keep <log> <task_path>/validation-evidence/<timestamp>/ --name boot' "$srv" || { echo "server: boot log not kept"; return 1; }
+}
