@@ -114,7 +114,7 @@ through it, or invoked by name by an agent.
 ## Requirements
 
 - `spine-toolkit` `>=2.51.0 <3`, declared as a dependency in `plugin.json`; 2.51.0 is the release that
-  ships `scripts/evidence.sh`, which the validators keep their logs and screenshots through. An installed core
+  ships `<core root>/scripts/evidence.sh`, which the validators keep their logs and screenshots through. An installed core
   outside that range is not a warning: the host demotes this plugin and it does not load at all.
 - The validators drive Android and desktop apps through the driver the project resolved — the
   manifest's `## Driver` default when it never chose one — and servers with `curl`; a project with
