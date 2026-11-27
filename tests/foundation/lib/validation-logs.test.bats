@@ -279,7 +279,8 @@ PY
 
 # gradle-toolchain: a command with a shell redirect is matched by no Codex rule and stops to ask, and a
 # file "in a temp file" or "into a file" has no stated location. A process log comes from long-run.sh,
-# which writes it in $TMPDIR; logcat is written on the device and pulled.
+# which writes it in $TMPDIR; logcat is written on the device under the run's timestamp, so two runs on
+# one device do not overwrite each other, pulled, and removed from the device.
 @test "the app, server and logcat logs come with no shell redirect" {
   local ui="$ROOT/agents/kotlin-ui-validator.md" srv="$ROOT/agents/kotlin-server-validator.md"
   for f in "$ui" "$srv"; do
@@ -287,8 +288,10 @@ PY
   done
   grep -qF '`<core root>/scripts/long-run.sh start --parallel -- ./gradlew :<app>:run`' "$ui" || { echo "ui: desktop app not started through long-run.sh"; return 1; }
   grep -qF '`<core root>/scripts/long-run.sh stop <log>`' "$ui" || { echo "ui: desktop app not stopped through long-run.sh"; return 1; }
-  grep -qF '`adb -s <serial> logcat -d -f /sdcard/spine-logcat.txt -s AndroidRuntime:E`' "$ui" || { echo "ui: logcat not written on the device"; return 1; }
-  grep -qF '`adb -s <serial> pull /sdcard/spine-logcat.txt <dir>/logcat.txt`' "$ui" || { echo "ui: logcat not pulled"; return 1; }
+  grep -qF '`adb -s <serial> logcat -d -f /data/local/tmp/spine-logcat-<timestamp>.txt -s AndroidRuntime:E`' "$ui" || { echo "ui: logcat not written on the device under the run's timestamp"; return 1; }
+  grep -qF '`adb -s <serial> pull /data/local/tmp/spine-logcat-<timestamp>.txt <dir>/logcat.txt`' "$ui" || { echo "ui: logcat not pulled"; return 1; }
+  grep -qF '`adb -s <serial> shell rm -f /data/local/tmp/spine-logcat-<timestamp>.txt`' "$ui" || { echo "ui: logcat file left on the device"; return 1; }
+  ! grep -qF '/sdcard/spine-logcat.txt' "$ui" || { echo "ui: a fixed device path two runs would share"; return 1; }
   grep -qF '`<core root>/scripts/evidence.sh keep <dir>/logcat.txt <task_path>/validation-evidence/<timestamp>/ --name logcat' "$ui" || { echo "ui: pulled logcat not kept"; return 1; }
   grep -qF '`<core root>/scripts/long-run.sh start --parallel -- <command>`' "$srv" || { echo "server: not booted through long-run.sh"; return 1; }
   grep -qF '`<core root>/scripts/long-run.sh stop <log>`' "$srv" || { echo "server: not stopped through long-run.sh"; return 1; }
