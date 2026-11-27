@@ -150,6 +150,7 @@ samples = [
     "BUILD FAILED in 4s",
     "[ERROR] COMPILATION ERROR :",
     "[INFO] BUILD FAILURE",
+    "* What went wrong: Execution failed for task ':app:compileKotlin'.",
 ]
 bad = []
 for line in samples:
@@ -158,7 +159,7 @@ for line in samples:
 for r in regexes:
     if not any(re.search(r, l) for l in samples):
         bad.append("--match keeps no sample: " + r)
-for need in ("JUnit XML:", "Tests run:", "e: ", "error:", "BUILD FAIL", "FAILED", "ERROR"):
+for need in ("JUnit XML:", "Tests run:", "e: ", "error:", "BUILD FAIL", "Execution failed for task", "FAILED", "ERROR"):
     if not any(need in r for r in regexes):
         bad.append("no --match for " + need)
 if any(r.startswith("^") for r in regexes):
@@ -178,4 +179,80 @@ sys.exit(1 if bad else 0)
 PY
     [ "$status" -eq 0 ] || { echo "kotlin-$n-validator: $output"; return 1; }
   done
+}
+
+# A device or process log a validator quotes goes through keep as well: the excerpt, not the
+# command's raw output, is what Validation.md holds. Each `keep` that names a log (--name logcat,
+# boot, app-process) carries --match regexes, and they are applied to the lines such a log has.
+@test "the device and process logs a validator quotes are kept, and their --match regexes select the failure lines" {
+  run python3 -I - "$ROOT/agents" <<'PY'
+import re, sys
+agents = sys.argv[1]
+logs = {  # agent -> {name: sample lines the log has}
+    "kotlin-ui-validator.md": {
+        "logcat": [
+            "E/AndroidRuntime( 4321): FATAL EXCEPTION: main",
+            "E/AndroidRuntime( 4321): Process: com.example.app, PID: 4321",
+            "E/AndroidRuntime( 4321): \tat com.example.app.CartViewModel.load(CartViewModel.kt:42)",
+            "E/AndroidRuntime( 4321): Caused by: java.lang.IllegalStateException: no cart",
+        ],
+        "app-process": [
+            "Exception in thread \"main\" java.lang.IllegalStateException: no cart",
+            "Caused by: java.io.IOException: closed",
+            "ERROR com.example.app.Main - startup failed",
+        ],
+    },
+    "kotlin-server-validator.md": {
+        "boot": [
+            "2026-11-27 ERROR 1 --- [main] o.s.boot.SpringApplication : Application run failed",
+            "java.lang.IllegalStateException: Failed to load ApplicationContext",
+            "Caused by: org.postgresql.util.PSQLException: connection refused",
+            "APPLICATION FAILED TO START",
+        ],
+    },
+}
+bad = []
+for agent, named in logs.items():
+    text = open(agents + "/" + agent, encoding="utf-8").read()
+    cmds = re.findall(r"`[^`]*evidence\.sh keep [^`]*`", text)
+    for name, samples in named.items():
+        cmd = [c for c in cmds if "--name " + name + " " in c or "--name " + name + "`" in c]
+        if len(cmd) != 1:
+            bad.append("%s: %d keep commands for --name %s" % (agent, len(cmd), name))
+            continue
+        regexes = re.findall(r"--match '([^']+)'", cmd[0])
+        if "<task_path>/validation-evidence/<timestamp>/" not in cmd[0]:
+            bad.append("%s: %s keep has no <task_path> dir" % (agent, name))
+        for line in samples:
+            if not any(re.search(r, line) for r in regexes):
+                bad.append("%s: no --match keeps: %s" % (name, line))
+        for r in regexes:
+            if not any(re.search(r, l) for l in samples):
+                bad.append("%s: --match keeps no sample: %s" % (name, r))
+print("\n".join(bad))
+sys.exit(1 if bad else 0)
+PY
+  [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+}
+
+@test "no validator quotes a device or process log it did not keep" {
+  ! grep -qE 'Logcat stays yours either way: `adb logcat -d -s AndroidRuntime:E` after the run' "$ROOT/agents/kotlin-ui-validator.md" \
+    || { echo "ui: logcat quoted straight from the command"; return 1; }
+  grep -qF -- '--name app-process' "$ROOT/agents/kotlin-ui-validator.md" || { echo "ui: no desktop process log keep"; return 1; }
+  grep -qF -- '--name boot' "$ROOT/agents/kotlin-server-validator.md" || { echo "server: no boot log keep"; return 1; }
+}
+
+# evidence.sh refuses a --name with a "/" (exit 2, "not a name"): an endpoint such as GET /api/cart
+# makes one unless the agent is told to write a slug.
+@test "a --name built from an endpoint or an invocation is a slug with no slash" {
+  f="$ROOT/agents/kotlin-server-validator.md"
+  grep -qF 'is a slug of letters, digits, `-`, `_` and `.` with no `/` and no spaces' "$f" || { echo "no slug rule for the endpoint name"; return 1; }
+  grep -qF 'get-api-cart-response' "$f" || { echo "no example slug"; return 1; }
+  grep -qF 'the invocation in a name is a slug too, with no `/` and no spaces' "$f" || { echo "no slug rule for the invocation name"; return 1; }
+}
+
+@test "a quoted request shows the value of each secret header as ***" {
+  f="$ROOT/agents/kotlin-server-validator.md"
+  grep -qF 'each secret header (`Authorization`, `Cookie`, an API key)' "$f" || { echo "no secret header rule"; return 1; }
+  grep -qF 'shown as `***`' "$f" || { echo "no *** rule"; return 1; }
 }
