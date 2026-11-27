@@ -22,9 +22,9 @@ manual_checks_passage() {
 }
 
 @test "the platform requires the core release that carries the criterion" {
-  # 2.46.0 carries the criterion too.
-  grep -qF '{ "name": "spine-toolkit", "version": ">=2.46.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
-    || { echo "the spine-toolkit floor is not >=2.46.0 <3"; return 1; }
+  # 2.46.0 carries the criterion too; the floor is 2.51.0, which ships scripts/evidence.sh, which the validators keep their logs through.
+  grep -qF '{ "name": "spine-toolkit", "version": ">=2.51.0 <3" }' "$ROOT/.claude-plugin/plugin.json" \
+    || { echo "the spine-toolkit floor is not >=2.51.0 <3"; return 1; }
 }
 
 @test "the none line names what was covered and each automatable gap" {

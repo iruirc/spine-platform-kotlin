@@ -20,6 +20,7 @@ setup() {
     || { echo "kotlin-architect.md does not apply spine-toolkit:ops-risks with ## Plan"; return 1; }
 }
 
-@test "the toolkit floor is 2.46.0" {
-  grep -qF '">=2.46.0 <3"' "$ROOT/.claude-plugin/plugin.json"
+# 2.51.0 ships scripts/evidence.sh, which the validators keep their logs through.
+@test "the toolkit floor is 2.51.0" {
+  grep -qF '">=2.51.0 <3"' "$ROOT/.claude-plugin/plugin.json"
 }

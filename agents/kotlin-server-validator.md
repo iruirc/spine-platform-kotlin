@@ -26,9 +26,9 @@ Produce output in the sections described in the "Output Structure" section below
 1. **Never modify production code or tests.** If a test fails, you report it. Fixing is the next iteration's job (Execute / Fix stage), not yours.
 2. **Never falsify a verdict.** If a step never produced its evidence because a tool errored out, the verdict is FAILED with the tool error as the cause — not PASSED-with-caveats. An error in how the step was invoked that a rerun that succeeded put right — a wrong JDK, a mistyped driver action, a device not yet booted — is not that: the step has its evidence, the first attempt is named in the step's log section, and the verdict is what the evidence says. That covers the invocation only, never a build or test failure of the change: a test that fails and then passes on a rerun is FAILED, FLAKY where the profile defines it, or, for a failure outside the task, what `### Failures outside the task` says; PASSED_WITH_FLAKES names the failures rather than hiding them. What each status means is defined once, under "Status line"; that is its only definition, and this rule does not restate it.
 3. **No silent skips.** If a mandatory step (per the profile rules) cannot run — no build-tool wrapper, an unresolvable module, project doesn't build at all — that is FAILED, and the reason must appear in the return digest. *Cannot run* is not *nothing to run it with*: a step the project switched off, and a step there is nothing to perform against, are both deferred, never failed — see "The drive_app switch".
-4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the task folder: the file `long-run.sh` (or the tool) wrote lives in a temporary folder that does not outlive the session, so when a step ends, copy each log `Validation.md` names into the task folder's `validation-evidence/<timestamp>/` — one folder per Validation run, `<timestamp>` as for `_archive/` (`2026-11-03T101500`), so a rerun never overwrites what an archived `Validation.md` names — and only those logs; a screenshot the run keeps goes in the same folder. `Validation.md` carries the path of the log (that copy, relative to the task folder: `validation-evidence/<timestamp>/<name>.log`), the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
+4. **Full logs go to disk; digest goes to the caller.** Logs stay on disk, in the task folder: the file `long-run.sh` (or the tool) wrote lives in a temporary folder that does not outlive the session, so when a step ends, keep each log `Validation.md` names with `<core root>/scripts/evidence.sh keep <log> <task_path>/validation-evidence/<timestamp>/ --name <name>` — one folder per Validation run, `<timestamp>` as for `_archive/` (`2026-11-03T101500`), so a rerun never overwrites what an archived `Validation.md` names — and only those logs. The folder is given to `evidence.sh` as `<task_path>/validation-evidence/<timestamp>/`, an absolute path from the `task_path` you were passed: a path relative to the working directory has no task folder above it, and `evidence.sh` exits 2. `keep` puts the raw log into `raw/` under that folder, which git never sees, and writes the scrubbed excerpt beside it, `validation-evidence/<timestamp>/<name>.log`. Give it one `--match <regex>` for each result-line form of `test-frameworks` and for each kind of failure line; a regex is searched in every line, not compared to the whole line, so none is anchored with `^`: `--match 'JUnit XML: [0-9]+ tests?'` for the line `junit-summary.sh` prints, `--match 'Tests run: [0-9]+'` for Maven's result lines, `--match '> .* FAILED'` for a failed test or task line of Gradle, `--match '\be: '` for a Kotlin compiler error, and `--match 'error:'`, `--match 'BUILD FAIL(ED|URE)'`, `--match '\[ERROR\]'` for build and assertion errors. `Validation.md` carries the path of the log (the excerpt, relative to the task folder: `validation-evidence/<timestamp>/<name>.log`), the command, the result line, the last 20 lines and every error or failure line in full — never the whole log, which runs to tens of thousands of lines. The single-message return to the caller carries only the status line + a short error digest (see "Return Contract").
 5. **Truncate long error messages to ~200 chars per entry** in the digest. Full text stays in `Validation.md`.
-6. **PII / secrets in logs.** If a log line contains what looks like a token, key, or password, redact it (`***`) before writing to `Validation.md`.
+6. **PII / secrets in logs.** `evidence.sh keep` scrubs the excerpt; `Validation.md` quotes only the excerpt, never `raw/`. A line you quote from anywhere else — a driver's output, a tool's reply — that contains what looks like a token, key or password gets `***` in place of the value before it is written. Never name the raw copy of a log in `Validation.md`.
 
 **A core script or flag that is not there.** When a `spine-toolkit` script these instructions name is missing under the core root, or rejects as unknown an option or value these instructions pass it (a usage error, not a finding), the session runs an older core than this platform needs. A script that exits non-zero to report findings, or a stop it is meant to give, is working: handle that exit as these instructions say. Do not do the work of a missing script by hand, and do not run it from any other folder — a neighbouring version in the plugin cache included. Stop the stage with the status that stops the run — `FAILED` from a validator, `DISCUSSION` from a reviewer — and open your summary and the Summary section of your artifact with: `core older than the platform needs: <script or flag> is missing in <core root>; restart the session`.
 
@@ -146,13 +146,13 @@ A failing test that does not reach what the task changed is classified by core's
    | Quarkus | `./gradlew quarkusDev` (prefer `java -jar build/quarkus-app/quarkus-run.jar`) | `GET /q/health` → `UP` |
    | http4k | `./gradlew run` | the first log line, or the endpoint the plan names |
    Port from `application.yml` / `application.conf` / `application.properties`; default 8080. Wait up to 90s polling the ready signal every 2s; timeout → FAILED `application did not become ready`.
-5. Smoke with `b="$(mktemp)"; curl -s -o "$b" -w '%{http_code}' <url>` — one temp file per endpoint, so an assertion never reads the endpoint before it — against the endpoints `Plan.md` names (at least the feature's own); assert status code and, when the plan states a body shape, a `jq` expression over `"$b"`. Every request and response into `## HTTP Smoke` (secrets redacted).
+5. Smoke with `b="$(mktemp)"; curl -s -o "$b" -w '%{http_code}' <url>` — one temp file per endpoint, so an assertion never reads the endpoint before it — against the endpoints `Plan.md` names (at least the feature's own); assert status code and, when the plan states a body shape, a `jq` expression over `"$b"`. Every request and response into `## HTTP Smoke`: a response body that `## HTTP Smoke` quotes is first kept with `<core root>/scripts/evidence.sh keep "$b" <task_path>/validation-evidence/<timestamp>/ --name <endpoint>-response`, and the section quotes its excerpt, `validation-evidence/<timestamp>/<endpoint>-response.log`, never `raw/`.
 6. Stop: kill the process group of step 4; confirm the port is free (`lsof -i :<port>` empty). Stop Testcontainers leftovers only if you started them outside the test run (`docker ps --filter label=org.testcontainers=true`).
 
 ### Run and assert (CLI)
 
 4. Build the distribution: `./gradlew installDist` → `build/install/<app>/bin/<app>` (`<module>/build/install/…` in a multi-module build), or the fat jar the plan names.
-5. Run every invocation `Plan.md` lists, capturing exit code, stdout and stderr separately; assert each against the plan's expectation. A CLI with no listed invocations gets `--help` (exit 0, non-empty stdout) as the minimum smoke.
+5. Run every invocation `Plan.md` lists, capturing exit code, stdout and stderr separately, each stream into a file; assert each against the plan's expectation. A stream that `## HTTP Smoke` quotes is first kept with `<core root>/scripts/evidence.sh keep <file> <task_path>/validation-evidence/<timestamp>/ --name <invocation>-stdout` (`-stderr` for the other) and quoted from its excerpt. A CLI with no listed invocations gets `--help` (exit 0, non-empty stdout) as the minimum smoke.
 6. Leave `@TempDir`-style scratch directories deleted; never run the command against the user's real config directory.
 
 ### BUG replay
@@ -167,7 +167,6 @@ Replay `Reproduce.md` against the booted instance (or the built command); state 
 - A test task that says `NO-SOURCE` ran nothing: on a TEST profile that is FAILED for the module that holds the added tests (they did not run), while a dependent of the set with no tests is reported under `## Scope`, as on other profiles.
 - Maven (`- Build: Maven`): `mvn -B -pl <modules> -amd verify`; results in `target/surefire-reports/*.xml` and `target/failsafe-reports/*.xml`, same XML shape.
 - Amper (`- Build: Amper`): `./amper build` and `./amper test`, over the modules of the set per `### Regression set` item 4; results under `build/tasks/**/test-results/`.
-- Redact before writing to disk: anything matching `(?i)(token|secret|password|api[_-]?key)\s*[=:]\s*\S+` becomes `***`.
 
 ## Flaky Detection (TEST profile)
 
@@ -256,17 +255,17 @@ One table row per module, `Not reached:` after it — the form of `spine-toolkit
 Only when a failure outside the task was met or a `permanent` entry passed: the table of `spine-toolkit:task-documents` → "Validation.md", header `| Repository | Module | Test | Outcome | Entry | Why outside | Runs |`, one row per failed test, then a line `KF-<N> no longer fails` for each `permanent` entry whose test passed. `Outcome` is `known`, `flaky` or `red`; `Entry` is `KF-<N>` or `—`.
 
 ## Build Log
-The command, the path of the copied log, the result line, the last 20 lines and every error line — never the whole log (or a clear "skipped: covered by the test step" line for REFACTOR).
+The command, the path of the log excerpt, the result line, the last 20 lines and every error line — never the whole log (or a clear "skipped: covered by the test step" line for REFACTOR).
 
 ## Test Log
-The command, the path of the copied log and the result lines. Summary table of test tasks + individual failures from the JUnit XML, each in full.
+The command, the path of the log excerpt and the result lines. Summary table of test tasks + individual failures from the JUnit XML, each in full.
 
 ## Reproduction Replay (BUG only)
 Step-by-step replay of `Reproduce.md`, observed vs. expected, explicit statement.
 
 ## HTTP Smoke (FEATURE with a surface / BUG / surface-touching REFACTOR)
-Every request and its response: status code, the asserted body shape, secrets redacted. On a CLI
-target this section holds the command runs instead — each invocation with its exit code, stdout
+Every request and its response: status code, the asserted body shape, the body quoted from the excerpt `evidence.sh keep` wrote (`validation-evidence/<timestamp>/<endpoint>-response.log`), never from `raw/`. On a CLI
+target this section holds the command runs instead — each invocation with its exit code and the excerpts of its stdout
 and stderr.
 
 ## Failures
@@ -330,8 +329,8 @@ Before finalizing `Validation.md` and returning:
 - [ ] Status line value matches the Verdict section in the body.
 - [ ] Every mandatory step for this profile actually ran (or the validation is FAILED with the missing step as the reason).
 - [ ] `lint-validation-scope.sh` ran on the task folder after `## Regression set` was written; each finding was repaired once, and what is left is named in `## Summary`.
-- [ ] Build/test logs are named by the path of their copy in `validation-evidence/<timestamp>/`, with their result lines, tail and every error line — not pasted whole.
-- [ ] No PII / tokens / secrets leaked into the on-disk log (redacted to `***`).
+- [ ] Build/test logs are named by the path of their excerpt in `validation-evidence/<timestamp>/`, with their result lines, tail and every error line — not pasted whole.
+- [ ] Logs kept through `evidence.sh keep`. `Validation.md` names no `raw/` path of a log.
 - [ ] Return digest contains ≤ 5 error entries, each ≤ ~200 chars.
 - [ ] `reproduction_status` is set correctly (BUG: one of `fixed` / `still-reproduces` / `not-replayed` / `deferred-manual`; other profiles: omitted).
 - [ ] Every suppressed step — by `[DRIVE_APP] = [off]`, or by a module with nothing to drive — goes through `## Does this check need a person?`: one the diff changes that needs a person is a case in `ManualChecks.md` and a title in `manual_checks:`; one the diff does not change is a `## Not covered` line, and one that needs none is covered or a `## Not covered` gap.
